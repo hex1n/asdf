@@ -1,0 +1,22 @@
+[
+  {"query": "I'm planning to migrate our auth from session cookies to JWT tokens stored in localStorage. Whole rollout in one weekend, swap the middleware, deploy. Can you stress-test this plan? I keep getting the feeling I'm missing something but can't pin it down.", "should_trigger": true},
+  {"query": "OK here's my bug-fix approach for the race condition in OrderService.processPayment — wrap the whole thing in a SELECT FOR UPDATE on the order row. Poke holes in this please, I want to make sure I'm not creating new problems.", "should_trigger": true},
+  {"query": "我准备把 user_events 表从 PG 拆出去单独搞一个 ClickHouse 集群，迁移走双写一周再切读。帮我 challenge 一下这个方案，怕有坑。", "should_trigger": true},
+  {"query": "Trying to harden my plan for the v3 API deprecation: announce 90 days, send 2 emails, return Sunset header on every response, then 410 Gone. What loopholes am I missing — both technical and customer-facing?", "should_trigger": true},
+  {"query": "Here's how I'm thinking of handling the duplicate-submit issue on /checkout — generate a UUID client-side, check against Redis SETNX with 5min TTL. Find loopholes in this please before I implement.", "should_trigger": true},
+  {"query": "adversarially review my migration plan: drop FK on orders.user_id, batch-update user_id values via a Python script reading from a CSV my data team gave me, recreate the FK. table is ~80M rows on RDS Postgres 14.", "should_trigger": true},
+  {"query": "我想把 prod traefik 的 cert renewal 从 cert-manager 切到 ACME http-01 直连，单 ingress 单 cert 一对一。帮我 falsify 一下这个迁移方案，特别是 cutover 那一步", "should_trigger": true},
+  {"query": "Plan: replace our custom rate limiter with the `tollbooth` library token-bucket impl, deploy gradually behind a feature flag at 10/50/100% on 3 consecutive days. Can you break this? I'm worried about the cutover semantics.", "should_trigger": true},
+  {"query": "I want to attack this architecture choice — using SQS FIFO with deduplication ID for our payment events instead of building idempotency in the consumer. CTO is pushing for it, I'm skeptical. What's wrong with it?", "should_trigger": true},
+  {"query": "Stress-test my deployment rollback strategy: if metrics regress >5% on any of error_rate / p99_latency / payment_success_rate, auto-rollback. Threshold check runs every 60s on the first 10min after deploy. Region us-east-1.", "should_trigger": true},
+  {"query": "Can you review this PR? Mostly small refactors in src/utils/dates.ts, splitting one function into three smaller ones, no behavior change.", "should_trigger": false},
+  {"query": "Find the bug in this function — it's supposed to return the second-largest element but returns undefined for inputs like [3,3,2]. I think the issue is in the dedup step but not sure.", "should_trigger": false},
+  {"query": "Double-check my regex for me real quick, want to make sure it matches both v1.0.0 and 1.0.0-rc1 but not 1.0 alone. Current pattern: ^v?\\d+\\.\\d+\\.\\d+(-\\w+)?$", "should_trigger": false},
+  {"query": "Help me brainstorm names for this new feature, something around 'collaborative editing' but shorter and snappier. Target audience is small teams, not enterprises.", "should_trigger": false},
+  {"query": "I have this fixture file fixtures/users.json with 200 user records, can you write a script to anonymize the email addresses while keeping the domain distribution?", "should_trigger": false},
+  {"query": "What's the difference between Promise.all and Promise.allSettled? Specifically when one rejects, what happens to the others?", "should_trigger": false},
+  {"query": "我刚把这个 typo 修了 (`recieve` -> `receive` in src/api/notifications.ts)，build 也过了，还有什么需要看的吗？", "should_trigger": false},
+  {"query": "Format this JSON file for me — it's all on one line and I can't read it. File is at /tmp/dump.json.", "should_trigger": false},
+  {"query": "Generate a CSV with 50 rows of fake transaction data for testing — columns: id, user_id, amount, currency, created_at. amounts between $5 and $500.", "should_trigger": false},
+  {"query": "我刚加了一个新接口 GET /api/users/:id/preferences，返回用户偏好。你能帮我写两三个 unit test 覆盖一下吗？", "should_trigger": false}
+]

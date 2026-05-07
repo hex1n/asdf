@@ -23,19 +23,27 @@ Hardens a draft strategy by trying to break it. Performs bounded adversarial pas
 
 Trigger verbs: `pre-mortem`, `do a pre-mortem on`, `challenge`, `harden`, `falsify`, `stress-test`, `find loopholes in`, `poke holes in`, `adversarially review`, `break`, `attack`.
 
-**Install:**
+**Install — Claude Code:**
 
 ```bash
 cp -r skills/pre-mortem ~/.claude/skills/
 ```
 
-Then in any Claude Code session:
+**Install — Codex CLI:**
+
+```bash
+cp -r skills/pre-mortem ~/.agents/skills/
+```
+
+(Both tools use the same `SKILL.md` format; the only difference is the install path. After installing in Codex, restart it so `~/.codex/config.toml` re-scans skills.)
+
+Then in any session:
 
 ```
 /pre-mortem
 ```
 
-or just describe a plan and ask Claude to "harden this" / "find loopholes in this" / "do a pre-mortem on this".
+or just describe a plan and ask the agent to "harden this" / "find loopholes in this" / "do a pre-mortem on this".
 
 ## Adding new skills
 

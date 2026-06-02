@@ -14,10 +14,36 @@ python3 scripts/git_resume_miner.py \
   --author "developer-name" \
   --since 2024-01-01 \
   --until 2024-09-30 \
+  --path service \
+  --path domain \
+  --with-diffs \
   --format markdown
 ```
 
-Merge commits are excluded by default because they usually add weak resume evidence. Add `--include-merges` only when merge ownership is relevant.
+Merge commits are excluded by default because they usually add weak resume evidence. Add `--include-merges` only when merge ownership is relevant. Matching history is not capped by default; use `--max-commits N` only when you deliberately want a quick sample before the full pass.
+
+The script is self-contained. It does not read category, taxonomy, or redaction config files; business meaning comes from reading diffs and surrounding code. Repo-native workstream candidates are generated from identifiers and co-changed paths; treat them as prompts for inspection, not final labels.
+
+## Project Positioning Example
+
+Weak framing:
+
+```text
+Project name: Bonus campaign service, inferred from a repo description and a dominant bonus/ directory.
+```
+
+Rewrite:
+
+```text
+Project description:
+Backend support for customer operations and transaction workflows. Evidence shows work across campaign configuration, transaction processing, settlement recovery, and async compensation; the exact internal project name needs confirmation.
+```
+
+Reason:
+
+```text
+The repo description and dominant directory are weak metadata. They can guide inspection, but final project framing must follow user-provided context, authoritative docs, and current workflow evidence.
+```
 
 ## Output Shape
 
@@ -27,6 +53,7 @@ Inputs:
 - Author: developer-name
 - Range: 2024-01-01..2024-09-30
 - Target: Java backend resume, Chinese interview prep
+- Paths: service, domain
 
 Project Positioning:
 - Large project: multi-tenant order fulfillment and settlement platform.
@@ -38,11 +65,31 @@ Contribution Map:
   Evidence: a1b2c3d, e4f5g6h, touched service/, domain/, database migration files
   Confidence: observed for implementation ownership; inferred for business impact
 
+Inspection Plan:
+- a1b2c3d score=8.8 add product order workflow
+  Why inspect: change_size=480, file_count=6, directory_breadth=2
+  Subject terms: product=1, order=1, workflow=1
+  Path terms: service=2, domain=2, order=2
+  Files: service/OrderWorkflowService.java, domain/OrderState.java
+- i7j8k9l score=6.5 handle provider callback retry
+  Why inspect: change_size=260, file_count=4, directory_breadth=2
+  Subject terms: handle=1, provider=1, callback=1, retry=1
+  Path terms: client=1, provider=1, handler=1
+  Files: client/ProviderClient.java, handler/CallbackHandler.java
+
 Code Evidence:
 - service/OrderWorkflowService.java: handles state transitions and failure compensation.
   Commits: a1b2c3d, e4f5g6h. Confidence: observed.
 - database/migration/...sql: adds workflow audit table and indexes used by state queries.
   Commits: q1w2e3r. Confidence: observed.
+
+Repo-Native Workstream Candidates:
+- order_workflow: current files present, multiple representative commits. Validate as a likely resume theme.
+- provider_callback: strong diff evidence but shared ownership. Use `expanded` or `improved`, not `owned`, unless the user confirms ownership.
+- doc_generator: real contribution but narrower than transaction consistency. Keep as interview backup unless the target role values internal tooling.
+
+Diff Samples:
+- a1b2c3d touched workflow state handlers and persistence mapping. Use this only as a preview; read the full diff and current files before writing final claims.
 
 Key Contributions:
 - Productized workflow extension: used state-machine nodes to isolate business-line rules from the shared lifecycle, preserving workflow extensibility. Evidence: a1b2c3d, e4f5g6h. Confidence: observed.
@@ -64,6 +111,30 @@ Follow-up Questions:
 
 Use this fictionalized shape when the user asks for a version that can go into a resume. Prefer four bullets, remove overlaps, and do not include confidence labels or real project/customer/product names in skill examples.
 
+Before writing the final version, prune the evidence:
+
+```md
+Candidate Ranking:
+1. Transaction consistency recovery - keep as bullet. Current code, multiple diffs, clear failure mode.
+2. Async task reliability - keep as bullet. Reusable infrastructure and retry/serial execution behavior.
+3. Domain workflow extension - keep as bullet. Strong ownership and business workflow depth.
+4. Data trust before downstream sync - keep as bullet. Distinct consistency boundary.
+5. Thread-pool monitoring - interview backup. Useful, but narrower and weaker than the core workflow.
+6. Historical deleted integration - downgrade. Commit evidence exists, but current code is absent.
+
+Pruning Decision:
+- Merge "async retry" and "message idempotency" into one reliability bullet.
+- Use early platform cleanup as project context, not a final bullet.
+- Keep four bullets ordered by resume value, not chronology.
+- Downgrade verbs when evidence shows multi-author ownership. Prefer "expanded" or "contributed to" over "owned" for shared subsystems.
+- Move support tooling to interview backup when it is weaker than the four core system contributions.
+
+Final Output Decision:
+- Return only the resume-ready project description, core contributions, and metric questions.
+- Do not include this ranking table unless the user explicitly asks for analysis.
+- Run one self-review pass before returning and rewrite overstated ownership or duplicate themes.
+```
+
 ```md
 项目名称：企业级订单履约与结算平台
 
@@ -80,6 +151,8 @@ Use this fictionalized shape when the user asks for a version that can go into a
 - 上线订单量或交易规模
 - 状态异常、人工对账、缺陷率或接入周期的前后变化
 ```
+
+Do not append code paths, commit hashes, confidence labels, or the candidate ranking after the resume-ready section. Those belong in `analysis` mode.
 
 ## Senior Gate Example
 
@@ -119,17 +192,31 @@ Rewrite:
 外部服务接入标准化：统一外部服务请求、查询和状态映射能力，降低外部系统差异对内部交易流程的影响。
 ```
 
+Implementation-layer inventory:
+
+```text
+覆盖接口层、业务层、任务层、持久化层等多层开发。
+```
+
+Rewrite:
+
+```text
+贯通运营配置、计划执行、交易处理和异常恢复链路，将服务端实现表达为业务流程闭环，而不是代码分层清单。
+```
+
 ## Review Checklist
 
 - Every resume bullet has at least one evidence anchor.
-- Key contribution labels must be problem/domain themes, not bare technology tags like `state machine orchestration` or `async idempotency`.
+- Key contribution themes must be problem/domain oriented, not bare technology tags like `state machine orchestration` or `async idempotency`.
 - Resume-ready output prefers four bullets; use five only when the fifth has distinct senior-level value.
 - Merge or drop bullets that repeat the same contribution theme or result.
 - Each highlight should carry one idea only; split mixed bullets.
 - DTOs, constants, fields, and query methods appear only as evidence, not as final resume selling points.
+- Code-structure inventories appear only in analysis mode unless the user asks for architecture detail.
 - Unsupported business metrics are written as questions, not claims.
 - If a contribution lacks quantified impact, mark it `needs user metric` and ask one focused metric question.
 - Remove `observed`, `inferred`, and `needs user metric` labels from resume-ready bullets.
+- Remove code paths, commit hashes, and candidate rankings from resume-ready output unless explicitly requested.
 - Apply the 20-second scan test: scope, technical judgment, solved problem, and result value must be visible fast.
 - The strongest bullets appear first and match the target role.
 - Interview stories include enough technical depth for follow-up questions.

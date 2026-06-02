@@ -18,6 +18,22 @@
 - Project description should establish the business system, critical workflows, ownership boundary, and platform value.
 - Avoid packing internal mechanisms such as state machines, queues, locks, or idempotency into the project description unless the mechanism is the product itself.
 - Put technical mechanisms in contribution bullets, where they can be tied to a concrete problem and result.
+- In resume-ready output, avoid implementation-layer inventories. Code layers and artifacts are evidence surfaces, not project value.
+
+## Project Positioning Evidence Priority
+
+- User-provided or user-corrected framing overrides earlier inference unless stronger contradictory evidence is found in authoritative docs.
+- Authoritative product docs, architecture docs, API contracts, and current workflow code outrank repo names, package names, README/POM descriptions, dominant modules, and high-frequency script candidates.
+- Treat repo metadata and dominant path terms as discovery clues, not project titles. They may describe one subsystem, historical demand, or module family rather than the whole project.
+- Separate system framing from workstream labels. A frequent module can become a contribution theme only after current code and representative diffs prove the workflow it supports.
+- If project positioning remains uncertain, use a neutral domain framing such as "backend support for <observed workflow group>" or describe the workflows directly instead of asserting a product name.
+- When the user corrects a project label, remove the old label from resume-ready output and rerun the final wording through the acceptance checklist.
+
+## Implementation Surface Compression
+
+Before returning resume-ready output, compress implementation surfaces into business or system workflows. When a phrase is mainly a list of code layers, modules, generated artifacts, data shapes, task classes, or integration wrappers, translate it into the user-facing workflow, operational failure mode, consistency boundary, or platform behavior it supports.
+
+Use implementation names only in `analysis` mode as evidence anchors. In `resume-ready` and `compact` modes, describe the workflow, failure mode, technical decision, and result value. If a sentence reads like a code-structure inventory, rewrite it into the business process or system reliability problem those surfaces support.
 
 ## Output Modes
 
@@ -25,6 +41,70 @@
 - `resume-ready`: remove evidence labels, keep only polished project description and bullets, and move metric gaps into follow-up questions.
 - `interview`: keep STAR stories, architecture narrative, trade-offs, and likely interviewer follow-ups.
 - `compact`: produce one project description and four strongest bullets for direct resume insertion.
+- If the user asks for "一版", "最佳", "简历版", or a directly usable result, default to `resume-ready`/`compact`, not a full evidence dump.
+
+## Best-Version Funnel
+
+Before final resume output, rank every candidate workstream on five signals:
+
+- Evidence strength: current code plus representative diffs beats old commit text alone.
+- Ownership: owned design/implementation beats small maintenance or one-off fixes.
+- Senior complexity: consistency, recovery, integration boundaries, workflow depth, or reusable infrastructure beats CRUD or DTO work.
+- Distinctness: a bullet must solve a different problem from the other bullets.
+- Result value: credible business/platform/operational value beats long implementation lists.
+
+Then prune aggressively:
+
+- Merge overlapping candidates into the stronger problem theme.
+- Downgrade deleted or absent historical code to interview backup unless the user asks for history.
+- Keep broad early work as project context when a later workstream has stronger evidence and resume value.
+- Prefer four strong bullets over six complete but diluted bullets.
+
+## Ownership Verb Calibration
+
+Before polishing bullets, choose verbs by evidence strength rather than ambition:
+
+- Use `owned`, `designed`, `built`, or `delivered` only when representative diffs and current code show the candidate carried the core design or implementation.
+- Use `drove`, `expanded`, `refactored`, `standardized`, or `improved` when the candidate made substantial changes inside a multi-author subsystem.
+- Use `participated in`, `contributed to`, or `supported` when the evidence proves meaningful work but not end-to-end ownership.
+- If current class comments, early history, or dense co-author commits point to shared ownership, avoid "responsible for the whole system" phrasing. State the concrete workstream instead.
+- Do not let commit count alone upgrade ownership language. Commit count is an evidence lead, not proof of authorship scope.
+
+## Post-Output Self-Review
+
+After writing a resume-ready version, review it once before returning:
+
+- Does the project description imply total ownership of a multi-author system?
+- Are the strongest bullets first, and are support tools moved to interview backup unless they add distinct senior-level value?
+- Does each bullet solve a different problem rather than repeating "integration", "reliability", or "configuration" in new words?
+- Are DTOs, mappers, constants, table fields, and job names absent from final bullets unless they carry a clear system decision?
+- Does the project description avoid code-structure inventories and instead describe business workflows or system responsibilities?
+- Are all metrics observed or user-provided? If not, move them into focused metric questions.
+- Would the candidate be comfortable defending every verb under interview questioning?
+
+## Final Acceptance Checklist
+
+Use this checklist before returning `resume-ready` or `compact` output:
+
+- Exactly one project framing, not a list of demands.
+- Four bullets by default; five only if the fifth solves a distinct senior-level problem.
+- No evidence table, commit list, code path, confidence label, or candidate ranking in the final resume section.
+- Each bullet names a concrete system/business problem and a technical decision.
+- No bullet depends on a metric that was not observed or provided by the user.
+- Missing metrics appear after the bullets as focused questions, not hidden inside value claims.
+- Weaker but real contributions are moved to interview backup or omitted.
+
+## Evidence Sampling Script
+
+- Treat script output as an index, not the final analysis. The inspection plan prioritizes commits to read; it does not prove behavior or ownership by itself.
+- Prefer a full-history pass for final analysis. Use `--max-commits` only as a stated sampling constraint, then remove it before drawing project-level conclusions.
+- Use `--path` to focus on the subsystem the user owned before drawing project conclusions.
+- Use `--top-by-size` to discover large changes, but do not rank resume value by line count.
+- Use repo-native workstream candidates to discover likely themes from code identifiers and co-changed paths. Validate every candidate against current code and representative diffs before turning it into a claim.
+- Use `--with-diffs` for local preview only. Final claims still require reading representative full diffs and current surrounding code.
+- Do not build an exhaustive taxonomy in Python or config. Business domains, workstreams, and ownership boundaries must come from reading diffs and code.
+- Do not depend on external config for labels, categories, or redaction. The script should remain self-contained; add human judgment in the analysis, not config files.
+- Treat built-in redaction as best effort for common credential patterns across all output fields. Manually review private repository excerpts for customer names, internal hostnames, and proprietary identifiers before quoting.
 
 ## Senior Bullet Formula
 

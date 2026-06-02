@@ -1,93 +1,74 @@
 ---
 name: git-resume-miner
-description: Analyzes a specified Git author's commits, diffs, and surrounding code to extract evidence-backed backend project contributions, resume bullets, and interview stories. Use when the user wants to mine Git history for resume content, interview preparation, contribution summaries, STAR stories, or project experience writeups grounded in actual code.
+description: Analyzes a specified Git author's commits, diffs, and surrounding code to produce evidence-backed backend project contributions, resume bullets, interview stories, and best-version pruning. Use when the user wants to mine Git history for resume content, analyze repository contributions, prepare interview narratives, or turn code evidence into a concise resume-ready project experience.
 ---
 
 # Git Resume Miner
 
 ## Quick Start
 
-When the user provides a repository and Git author, first collect evidence:
+When the user provides a repository and Git author, collect evidence first:
 
 ```bash
 python3 scripts/git_resume_miner.py --repo . --author "name-or-email" --since 2024-01-01 --until 2024-12-31 --format markdown
 ```
 
-Then use commit metadata only as an index. Final claims must come from diffs, current code context, data models, integration points, and workflow behavior. Follow the user's language by default. If no author is provided, ask for the Git author name or email before analysis.
+On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and does not read project-specific configuration. It scans the full matching history by default; add `--max-commits N` only for an explicitly bounded exploratory pass. Add `--path service --path api` to narrow scope and `--with-diffs` to include built-in redacted diff excerpts for top inspection commits. The script emits UTF-8 output and includes repo-native workstream candidates derived from code identifiers and co-changed paths.
 
-## Required Inputs
+Use script output only as an index. Final claims must come from representative diffs, current code context, data models, integration points, workflow behavior, and tests. If no author is provided, ask for the Git author name or email.
 
-- Repository path, Git author name/email/regex, optional date or revision range, target role, seniority, resume language, and privacy constraints.
+## Inputs
+
+- Repository path and Git author name/email/regex.
+- Optional date/revision/path scope, target role, seniority, language, privacy constraints, and output mode.
 
 ## Workflow
 
-1. Extract evidence with the script or equivalent `git log` commands: commits, dates, subjects, changed files, insertions/deletions, top directories, file types, activity, and categories. Exclude merges unless ownership matters.
-2. Establish project positioning before feature narrative:
-   - infer the large system/project from repo name, modules, package layout, domain folders, facades, configs, and data model
-   - separate `large project`, `subsystem/domain`, `user-owned workstream`, and `specific feature evidence`
-   - treat a product integration or one demand as a contribution under the larger project unless the whole repo is dedicated to it
-3. Cluster commits into candidate workstreams:
-   - product feature, domain workflow, external integration, data model, reliability, bugfix, test/tooling
-   - treat vague subjects like "修改" only as weak evidence until the diff and code confirm meaning
-4. Inspect representative diffs and surrounding code: central changes; domain/API/database/integration/risk/test files; entry points; orchestration; domain model; external clients/callbacks/config/error handling; tests and operational hooks.
-5. Build a contribution ledger:
-   - `observed`: directly supported by commit metadata, diffs, code, tests, docs
-   - `inferred`: plausible technical impact from observed evidence
-   - `needs confirmation`: business metrics, user impact, production outcomes, ownership scope
-6. Group work into narratives: feature delivery, backend/domain modeling, integrations, data migration, reliability, performance, security, risk, testability, tooling, CI/CD, and maintainability.
-7. Choose the output mode:
-   - `analysis`: evidence ledger, contribution map, code references, confidence labels
-   - `resume-ready`: project description plus 3-5 polished bullets, preferring 4; no evidence labels in final bullets
-   - `interview`: STAR stories plus architecture, data, integration, and failure-handling talking points
-   - `compact`: one project description plus four strongest bullets for a resume
-8. Draft bullets using backend resume best practice and STAR framing:
-   - for Chinese resumes, title the section `核心贡献`; for English resumes, use `Key Contributions`
-   - contribution labels must be problem/domain themes, not bare technology tags; put the technology inside the sentence
-   - project experience order: Situation as large-system context, Task as ownership boundary, Action as technical choices, Result as observed or user-supplied outcome
-   - keep project descriptions business-first; put mechanisms such as state machines, queues, locks, and idempotency in bullets unless they define the product
-   - include metrics when observed; otherwise keep `needs user metric` only in analysis notes, not in resume-ready bullets
-   - apply a 20-second scan test: each contribution must quickly show scope, technical judgment, solved problem, and result value
-   - keep DTOs, constants, table fields, and query methods in evidence; elevate bullets to domain model, persistence model, external contract, integration boundary, consistency, or reliability
-   - replace weak verbs like "participated" with precise ownership verbs when evidence supports it
-   - deduplicate before finalizing: merge overlapping bullets and drop summary bullets without a unique problem, decision, or result
-   - compress final bullets: remove repeated product names and long stage lists when the project description already provides context
-9. Run the senior quality gate before finalizing:
-   - ownership boundary is clear
-   - system complexity or scale is visible
-   - technical decision is explicit
-   - solved problem is concrete
-   - result value is credible from evidence or marked as a metric question
-   - titles are domain/problem oriented, not bare engineering nouns such as orchestration, abstraction, modeling, or DTOs
-10. Prepare interview assets: project summary, strongest 3-5 bullets, STAR stories, likely questions, and one architecture narrative covering problem, boundary, flow, consistency, reliability, and trade-offs.
+1. Extract evidence: commits, dates, subjects, changed files, insertions/deletions, top paths, repo-derived terms, inspection plan, and optional diff excerpts. Exclude merges unless ownership matters.
+2. Establish project positioning before feature narrative: large system, subsystem/domain, user-owned workstream, and feature evidence. Apply evidence priority: user-provided or corrected framing > authoritative product/architecture docs > current workflow code and tests > repo names, package names, README/POM descriptions, dominant modules, and high-frequency script candidates. Treat weak metadata as clues only; if sources conflict, use a neutral framing and state uncertainty instead of asserting a project title.
+3. Cluster candidate workstreams from repo-native evidence: co-changed paths, code identifiers, representative diffs, current code, data models, integration boundaries, operational hooks, tests, and domain workflow. Use script candidates as hints, not labels.
+4. Build a contribution ledger with confidence labels: `observed`, `inferred`, and `needs confirmation`. Treat vague commit subjects as weak evidence until code confirms them.
+5. Calibrate ownership language before writing bullets:
+   - use `designed`, `owned`, or `delivered` only when commits, current code, and diffs support direct ownership of the core design or implementation
+   - use `expanded`, `refactored`, `improved`, or `drove` when the work is substantial but the subsystem is clearly multi-author
+   - use `participated in` or `contributed to` when evidence shows meaningful work but not end-to-end ownership
+6. Run the best-version funnel before writing final bullets:
+   - rank candidates by current-code evidence, ownership, senior complexity, distinct failure mode, and business/platform value
+   - downgrade historical code that is deleted or absent from the current branch unless the user asks for archaeology
+   - merge candidates that solve the same problem; keep weaker real themes as interview backup
+   - choose the strongest four resume bullets by value, not chronology, commit count, or changed lines
+7. Select output mode:
+   - `analysis`: evidence ledger, contribution map, ranking, confidence labels, and weak spots
+   - `resume-ready`: polished project description plus 3-5 bullets, preferring 4
+   - `compact`: one project description plus four strongest bullets
+   - `interview`: STAR stories, architecture narrative, trade-offs, and likely follow-ups
+8. Default to `resume-ready` or `compact` when the user asks for "一版", "最佳", "简历版", or a directly usable result. Include only a short evidence note unless the user explicitly asks for full analysis.
+9. For `resume-ready` and `compact`, output only the final project framing, strongest bullets, and metric questions. Do not include code paths, contribution maps, candidate rankings, or confidence labels unless the user asks.
+10. Run a post-output self-review and rewrite once if needed: remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
+11. Run the final acceptance gate: one project framing, four strong bullets by default, no low-level artifact lists, no invented metrics, no duplicate problem themes, missing metrics separated as questions, and ownership verbs matching evidence strength.
 
 ## Output Contract
 
-Return:
-
 - Inputs and constraints used.
-- Project positioning: large system, subsystem/domain, user-owned workstream, and evidence.
-- Contribution map and code evidence table with file/function, behavior, supporting commits, and confidence.
-- Key contributions after senior-level abstraction pass.
-- In `analysis` mode, label each contribution `observed`, `inferred`, or `needs user metric`.
-- In `resume-ready` and `compact` modes, remove evidence labels from final bullets and keep missing metrics as follow-up questions.
-- Interview stories and talking points for architecture, data model, integration, failure handling, and trade-offs.
+- Project positioning and evidence-backed ownership boundary.
+- In `analysis`: contribution map, candidate ranking, code evidence, confidence labels, and metric gaps.
+- In `resume-ready`/`compact`: final project description and strongest bullets only; remove confidence labels, file names, and low-level artifact lists.
+- Interview stories and talking points when requested.
 - Follow-up questions only for missing high-value metrics or business context.
 
 ## Quality Bar
 
 - Do not invent product impact, revenue, latency, scale, user count, or production outcomes.
-- Prefer ownership, architecture, reliability, integration, and reuse signals; avoid bare technology labels, process narration, and low-level artifact lists.
-- Prefer concise resume bullets; use 5 bullets only when each adds a distinct senior-level contribution.
-- Use short commit hashes and file references as evidence anchors.
-- Explain confidence when a contribution is inferred from code shape rather than commit text.
-- Do not claim architecture ownership from a tiny patch; separate implementation, design, and maintenance ownership.
-- Do not over-index on commit count or lines changed; use them only to prioritize inspection.
-- Do not title a resume project after one demand; use the system/project name, then describe the demand as a module or contribution.
-- Drop or rewrite any bullet that fails the senior quality gate; do not pad the resume with task-level implementation.
-- Redact secrets, customer names, internal hostnames, and sensitive data before quoting.
-- Keep bundled examples fictional or anonymized; do not embed real project, customer, product, author, or proprietary domain details in the skill itself.
-- Do not send repository content or personal data outside the local environment without explicit confirmation.
+- Prefer ownership, architecture, consistency, reliability, integration, and reuse signals over bare technology labels.
+- Keep DTOs, constants, table fields, query methods, and config keys as evidence, not final selling points.
+- Do not turn implementation-surface inventories into resume-ready value. If a sentence mainly lists code layers, modules, artifacts, or surfaces, rewrite it as workflow scope, failure mode, technical decision, and result value.
+- Use short commit hashes and file references as evidence anchors in analysis mode only.
+- Do not treat script categories, commit count, or lines changed as proof of value.
+- Do not add project-specific configuration to encode business meaning; read diffs and code instead.
+- Do not let one dominant module, repo description, package/POM label, or path term name the whole project unless authoritative docs and current workflows support it.
+- Treat built-in redaction as best effort for common secret patterns. Manually redact customer names, internal hostnames, and sensitive data before quoting or sharing.
+- Keep bundled examples fictional or anonymized.
 
-## Examples
+## References
 
-See [EXAMPLES.md](EXAMPLES.md) and [BEST_PRACTICES.md](BEST_PRACTICES.md).
+See [BEST_PRACTICES.md](BEST_PRACTICES.md) for resume pruning rules and [EXAMPLES.md](EXAMPLES.md) for output shapes.

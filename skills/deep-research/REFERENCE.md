@@ -79,6 +79,36 @@ Stop if the investigation keeps expanding faster than it converges. Report the s
 
 Use the user's language for headings and table labels. Use tables for comparisons and reconciliation, diagrams for flows, narrative for causal chains, and bullets for edge cases/checklists.
 
+### Orientation Diagrams
+
+Produce the step-2 orientation map before deep evidence gathering, then refine it in the final output. Use Mermaid in saved artifacts; Mermaid or ASCII in chat. Keep it to the components in scope, not the whole system. For codebase maps, label the edges the question turns on — whatever is decision-relevant for that domain (a transactional service: tx boundaries and locks; a UI: state and effect flow; a pipeline: transforms and idempotency; most things: concurrency and failure/retry) — not just component names. Mark unverified nodes or edges with `?`; keep the `?` on anything still unverified in the final map.
+
+Codebase (one domain — a transactional service; adapt the edge labels to your question):
+
+```mermaid
+flowchart LR
+  Client -->|HTTP| API[API handler]
+  API -->|"acquires lock"| Svc[OrderService]
+  Svc -->|"tx boundary"| DB[(orders table)]
+  Svc -.->|"async, retry x3 ?"| Queue[[events queue]]
+```
+
+External (option comparison / decision):
+
+```mermaid
+flowchart TD
+  Q{"single-file binary needed?"} -->|yes| A[candidate A]
+  Q -->|no| B[candidate B]
+  A -.->|"? bundling maturity"| V[verify in docs]
+```
+
+ASCII fallback for chat:
+
+```
+Client -> API handler -> OrderService -> (orders table)
+                              \-- ? --> [events queue]   (unverified)
+```
+
 For version/environment applicability, use a compact gate table: `Gate | Evidence | Result`.
 
 For Standard/Deep source audit in Chinese requests:

@@ -79,6 +79,20 @@ Stop if the investigation keeps expanding faster than it converges. Report the s
 
 Use the user's language for headings and table labels. Use tables for comparisons and reconciliation, diagrams for flows, narrative for causal chains, and bullets for edge cases/checklists.
 
+### Saved Artifact Headers
+
+For Chinese Standard/Deep saved findings:
+
+```md
+**问题**: ...
+**深度**: Standard | Deep
+**核心结论**: ...
+**TL;DR**: ...
+**产物类型**: canonical | supporting | temporary
+**验证状态**: code-only | current-state checked | external-call tested | UI/runtime tested | not run
+**开放问题**: N - see end.
+```
+
 ### Orientation Diagrams
 
 Produce the step-2 orientation map before deep evidence gathering, then refine it in the final output. Use Mermaid in saved artifacts; Mermaid or ASCII in chat. Keep it to the components in scope, not the whole system. For codebase maps, label the edges the question turns on — whatever is decision-relevant for that domain (a transactional service: tx boundaries and locks; a UI: state and effect flow; a pipeline: transforms and idempotency; most things: concurrency and failure/retry) — not just component names. Mark unverified nodes or edges with `?`; keep the `?` on anything still unverified in the final map.

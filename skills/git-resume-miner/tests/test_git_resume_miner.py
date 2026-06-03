@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import pathlib
+import tempfile
 import types
 import unittest
 from typing import Any
@@ -22,6 +23,42 @@ def load_miner() -> Any:
 
 
 class GitResumeMinerTest(unittest.TestCase):
+    def test_workstream_score_downranks_deleted_historical_paths(self) -> None:
+        miner = load_miner()
+
+        with tempfile.TemporaryDirectory() as repo:
+            present_file = pathlib.Path(repo) / "src" / "service" / "order.py"
+            present_file.parent.mkdir(parents=True)
+            present_file.write_text("def create_order():\n    return True\n", encoding="utf-8")
+
+            commits = [
+                {
+                    "hash": "111111111111",
+                    "short_hash": "11111111",
+                    "date": "2024-01-01",
+                    "subject": "feat: remove legacy output",
+                    "files": [{"path": "legacy/output.py", "insertions": 0, "deletions": 4000}],
+                    "insertions": 0,
+                    "deletions": 4000,
+                },
+                {
+                    "hash": "222222222222",
+                    "short_hash": "22222222",
+                    "date": "2024-02-01",
+                    "subject": "feat: add order workflow",
+                    "files": [{"path": "src/service/order.py", "insertions": 200, "deletions": 0}],
+                    "insertions": 200,
+                    "deletions": 0,
+                },
+            ]
+
+            candidates = miner.build_workstream_candidates(repo, commits)
+
+        by_topic = {candidate["topic"]: candidate for candidate in candidates}
+        self.assertLess(by_topic["feat_remove"]["score"], by_topic["feat_add"]["score"])
+        self.assertEqual(by_topic["feat_remove"]["current_presence_ratio"], 0)
+        self.assertEqual(by_topic["feat_add"]["current_presence_ratio"], 1)
+
     def test_path_filter_inspection_and_diff_sampling(self) -> None:
         miner = load_miner()
         calls: list[list[str]] = []
@@ -48,33 +85,43 @@ class GitResumeMinerTest(unittest.TestCase):
 
         miner.run_git = fake_run_git
 
-        args = types.SimpleNamespace(
-            repo=".",
-            author="alice@example.com",
-            since=None,
-            until=None,
-            rev="--all",
-            paths=["src"],
-            max_commits=0,
-            include_merges=False,
-            oldest_first=False,
-            top_by_size=False,
-            inspection_limit=3,
-            with_diffs=True,
-            diff_commits=1,
-            diff_context=3,
-            max_diff_lines=20,
-        )
+        with tempfile.TemporaryDirectory() as repo:
+            present_file = pathlib.Path(repo) / "src" / "service" / "order.py"
+            present_file.parent.mkdir(parents=True)
+            present_file.write_text("def create_order(payload):\n    return payload\n", encoding="utf-8")
 
-        commits = miner.collect_commits("repo", args)
-        inspection_plan = miner.build_inspection_plan(commits, args.inspection_limit)
-        diff_samples = miner.collect_diff_samples("repo", args, inspection_plan, miner.BUILT_IN_REDACTION_PATTERNS)
-        payload = miner.build_payload("repo", args, miner.BUILT_IN_REDACTION_PATTERNS)
+            args = types.SimpleNamespace(
+                repo=".",
+                author="alice@example.com",
+                since=None,
+                until=None,
+                rev="--all",
+                paths=["src"],
+                max_commits=0,
+                include_merges=False,
+                oldest_first=False,
+                top_by_size=False,
+                inspection_limit=3,
+                with_diffs=True,
+                diff_commits=1,
+                diff_context=3,
+                max_diff_lines=20,
+            )
+
+            commits = miner.collect_commits(repo, args)
+            inspection_plan = miner.build_inspection_plan(repo, commits, args.inspection_limit)
+            diff_samples = miner.collect_diff_samples(repo, args, inspection_plan, miner.BUILT_IN_REDACTION_PATTERNS)
+            payload = miner.build_payload(repo, args, miner.BUILT_IN_REDACTION_PATTERNS)
 
         self.assertFalse(any(part.startswith("--max-count=") for part in calls[0]))
         self.assertEqual(calls[0][-2:], ["--", "src"])
         self.assertEqual(inspection_plan[0]["short_hash"], "abcdef12")
         self.assertIn("src/service/order.py", inspection_plan[0]["files"])
+        self.assertEqual(inspection_plan[0]["current_file_hits"], 1)
+        self.assertEqual(inspection_plan[0]["current_file_total"], 2)
+        self.assertEqual(inspection_plan[0]["current_presence_ratio"], 0.5)
+        self.assertIn("src/service/order.py", inspection_plan[0]["current_files_present"])
+        self.assertIn("src/domain/order.py", inspection_plan[0]["current_files_missing"])
         self.assertEqual(calls[1][-2:], ["--", "src"])
         self.assertIn("token=[REDACTED]", diff_samples[0]["subject"])
         self.assertIn("create_order", diff_samples[0]["diff_excerpt"])

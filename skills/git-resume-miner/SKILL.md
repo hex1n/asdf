@@ -13,7 +13,7 @@ When the user provides a repository and Git author, collect evidence first:
 python3 scripts/git_resume_miner.py --repo . --author "name-or-email" --since 2024-01-01 --until 2024-12-31 --format markdown
 ```
 
-On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and does not read project-specific configuration. It scans the full matching history by default; add `--max-commits N` only for an explicitly bounded exploratory pass. Add `--path service --path api` to narrow scope and `--with-diffs` to include built-in redacted diff excerpts for top inspection commits. The script emits UTF-8 output and includes repo-native workstream candidates derived from code identifiers and co-changed paths.
+On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and does not read project-specific configuration. It scans the full matching history by default; add `--max-commits N` only for an explicitly bounded exploratory pass. Add `--path service --path api` to narrow scope and `--with-diffs` to include built-in redacted diff excerpts for top inspection commits. The script emits UTF-8 output and includes repo-native workstream candidates derived from code identifiers and co-changed paths, plus current-file presence checks that show whether inspected commit paths still exist on the current branch.
 
 Use script output only as an index. Final claims must come from representative diffs, current code context, data models, integration points, workflow behavior, and tests. If no author is provided, ask for the Git author name or email.
 
@@ -24,10 +24,10 @@ Use script output only as an index. Final claims must come from representative d
 
 ## Workflow
 
-1. Extract evidence: commits, dates, subjects, changed files, insertions/deletions, top paths, repo-derived terms, inspection plan, and optional diff excerpts. Exclude merges unless ownership matters.
+1. Extract evidence: commits, dates, subjects, changed files, insertions/deletions, top paths, repo-derived terms, current-file presence, inspection plan, and optional diff excerpts. Exclude merges unless ownership matters.
 2. Establish project positioning before feature narrative: large system, subsystem/domain, user-owned workstream, and feature evidence. Apply evidence priority: user-provided or corrected framing > authoritative product/architecture docs > current workflow code and tests > repo names, package names, README/POM descriptions, dominant modules, and high-frequency script candidates. Treat weak metadata as clues only; if sources conflict, use a neutral framing and state uncertainty instead of asserting a project title.
 3. Cluster candidate workstreams from repo-native evidence: co-changed paths, code identifiers, representative diffs, current code, data models, integration boundaries, operational hooks, tests, and domain workflow. Use script candidates as hints, not labels.
-4. Build a contribution ledger with confidence labels: `observed`, `inferred`, and `needs confirmation`. Treat vague commit subjects as weak evidence until code confirms them.
+4. Build a contribution ledger with confidence labels: `observed`, `inferred`, and `needs confirmation`. Treat vague commit subjects as weak evidence until code confirms them, and mark commits with low current-file presence as historical evidence until current code, release notes, or user context proves they still matter.
 5. Calibrate ownership language before writing bullets:
    - use `designed`, `owned`, or `delivered` only when commits, current code, and diffs support direct ownership of the core design or implementation
    - use `expanded`, `refactored`, `improved`, or `drove` when the work is substantial but the subsystem is clearly multi-author
@@ -47,12 +47,21 @@ Use script output only as an index. Final claims must come from representative d
 10. Run a post-output self-review and rewrite once if needed: remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
 11. Run the final acceptance gate: one project framing, four strong bullets by default, no low-level artifact lists, no invented metrics, no duplicate problem themes, missing metrics separated as questions, and ownership verbs matching evidence strength.
 
+## Evidence Gates
+
+- Use full-history script output to choose what to inspect; do not write final bullets from the script summary alone.
+- For each kept workstream, inspect at least one representative full diff and one current surrounding code path unless the output is explicitly historical.
+- Treat `Current file presence` as a pruning signal: high presence strengthens current relevance; low presence requires checking whether the work was deleted, renamed, generated, or replaced before using it as resume value.
+- Promote a contribution from `inferred` to `observed` only after code or tests show the workflow, boundary, failure mode, or data model behind the commit subject.
+- If the user asks for archaeology or interview preparation, keep deleted but meaningful work as an interview backup instead of a primary resume bullet.
+
 ## Output Contract
 
 - Inputs and constraints used.
 - Project positioning and evidence-backed ownership boundary.
 - In `analysis`: contribution map, candidate ranking, code evidence, confidence labels, and metric gaps.
 - In `resume-ready`/`compact`: final project description and strongest bullets only; remove confidence labels, file names, and low-level artifact lists.
+- Current-code relevance: note deleted, renamed, or absent evidence in analysis mode; omit or demote it in resume-ready output unless the user asks for historical work.
 - Interview stories and talking points when requested.
 - Follow-up questions only for missing high-value metrics or business context.
 

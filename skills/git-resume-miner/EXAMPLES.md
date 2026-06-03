@@ -24,6 +24,8 @@ Merge commits are excluded by default because they usually add weak resume evide
 
 The script is self-contained. It does not read category, taxonomy, or redaction config files; business meaning comes from reading diffs and surrounding code. Repo-native workstream candidates are generated from identifiers and co-changed paths; treat them as prompts for inspection, not final labels.
 
+The inspection plan reports `Current file presence` for each candidate commit. Use it to decide whether to inspect current code, search for renames, or treat the commit as historical evidence before writing a resume bullet.
+
 ## Project Positioning Example
 
 Weak framing:
@@ -68,11 +70,17 @@ Contribution Map:
 Inspection Plan:
 - a1b2c3d score=8.8 add product order workflow
   Why inspect: change_size=480, file_count=6, directory_breadth=2
+  Current file presence: 5/6 (0.833)
+  Present now: service/OrderWorkflowService.java, domain/OrderState.java
+  Missing now: database/migration/20240101_add_order_audit.sql
   Subject terms: product=1, order=1, workflow=1
   Path terms: service=2, domain=2, order=2
   Files: service/OrderWorkflowService.java, domain/OrderState.java
 - i7j8k9l score=6.5 handle provider callback retry
   Why inspect: change_size=260, file_count=4, directory_breadth=2
+  Current file presence: 4/4 (1.0)
+  Present now: client/ProviderClient.java, handler/CallbackHandler.java
+  Missing now: n/a
   Subject terms: handle=1, provider=1, callback=1, retry=1
   Path terms: client=1, provider=1, handler=1
   Files: client/ProviderClient.java, handler/CallbackHandler.java
@@ -87,6 +95,9 @@ Repo-Native Workstream Candidates:
 - order_workflow: current files present, multiple representative commits. Validate as a likely resume theme.
 - provider_callback: strong diff evidence but shared ownership. Use `expanded` or `improved`, not `owned`, unless the user confirms ownership.
 - doc_generator: real contribution but narrower than transaction consistency. Keep as interview backup unless the target role values internal tooling.
+
+Scoring Note:
+- Candidate score is weighted by current code relevance so deleted historical paths are less likely to dominate the first inspection pass. Still read representative diffs and current code before deciding value.
 
 Diff Samples:
 - a1b2c3d touched workflow state handlers and persistence mapping. Use this only as a preview; read the full diff and current files before writing final claims.
@@ -120,7 +131,7 @@ Candidate Ranking:
 3. Domain workflow extension - keep as bullet. Strong ownership and business workflow depth.
 4. Data trust before downstream sync - keep as bullet. Distinct consistency boundary.
 5. Thread-pool monitoring - interview backup. Useful, but narrower and weaker than the core workflow.
-6. Historical deleted integration - downgrade. Commit evidence exists, but current code is absent.
+6. Historical deleted integration - downgrade. Commit evidence exists, but current file presence is low and no current replacement path has been verified.
 
 Pruning Decision:
 - Merge "async retry" and "message idempotency" into one reliability bullet.
@@ -207,6 +218,7 @@ Rewrite:
 ## Review Checklist
 
 - Every resume bullet has at least one evidence anchor.
+- Each primary bullet has current-code evidence, or is explicitly framed as historical/interview material.
 - Key contribution themes must be problem/domain oriented, not bare technology tags like `state machine orchestration` or `async idempotency`.
 - Resume-ready output prefers four bullets; use five only when the fifth has distinct senior-level value.
 - Merge or drop bullets that repeat the same contribution theme or result.

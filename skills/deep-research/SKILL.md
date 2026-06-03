@@ -44,9 +44,11 @@ For Standard/Deep:
 2. For codebase research, read the smallest relevant local authority set: nearest operating instructions, workspace/project rules, README/docs index, project profile, and named domain docs. Before concluding no formal local source exists, run a targeted local search with the question's domain terms and inspect sources surfaced by indexes, links, naming, or nearby aggregation.
 3. Build a source inventory, then draw an orientation map before deep evidence gathering and share it early as the scaffold. Ground every node in what you have read; mark unverified nodes or edges with `?` and keep remaining `?` marks in the final answer.
 4. Write a 3-5 line plan: key unknowns, where evidence will come from, and what would change the conclusion.
-5. Follow uncertainty, not section order. After each step, decide: continue, replan, or stop.
+5. Follow uncertainty, not section order. After each step, decide: continue, replan, escalate, or stop.
 
 Stop early when the premise is wrong, the answer is clear, or two consecutive steps no longer change the conclusion. Before each new read or search, ask whether it could change a conclusion; if it would only confirm what you already have, stop. For Quick depth, skip the diagram unless one line of structure clarifies the answer.
+
+Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to a handoff — name the target and hand off. An adopt/replace/upgrade decision is a dependency-adoption call outside this skill's lane: flag it and confirm scope with the user rather than owning it.
 
 Use [REFERENCE.md](REFERENCE.md) for diagram examples, current-state research, session-history analysis, broad-task staging, output patterns, saved artifact headers, and research-to-work handoff.
 
@@ -66,11 +68,11 @@ Use the user's language for chat and saved artifacts; for Chinese requests, use 
 Pick the smallest shape that answers the decision boundary:
 - Causal trace: conclusion, mechanism, evidence chain, weakest point.
 - Decision memo: recommendation, alternatives, tradeoffs, confidence, source audit.
-- Comparison matrix: criteria, candidates, field-by-field evidence, decision.
+- Comparison matrix: criteria, candidates, field-by-field evidence, decision. If the comparison has turned into an adopt/replace/upgrade recommendation, flag it as a dependency-adoption call outside this skill's lane and confirm scope with the user instead of owning it.
 - Code walkthrough: orientation map, key files/functions, control/data flow, edge cases.
 - Research-to-work handoff: decision, evidence, risk, verification, next workflow.
 
-For Standard/Deep, include only the relevant pieces: answer, TL;DR, refined diagram with remaining `?`, key evidence, weakest point, open questions that could change the conclusion, verification status, and artifact status.
+For Standard/Deep, include only the relevant pieces: answer, TL;DR, refined diagram with remaining `?`, key evidence, weakest point, what this does not decide (boundaries/non-goals), open questions that could change the conclusion, verification status, and artifact status. When a conclusion rests on external or versioned sources, surface version/date/channel context by default, or mark it unknown.
 
 ## 5. Save
 Quick answers stay in chat unless the user asks for a file.

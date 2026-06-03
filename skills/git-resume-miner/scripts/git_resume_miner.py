@@ -164,6 +164,18 @@ def current_path_exists(repo: str, git_path: str) -> bool:
     return os.path.exists(os.path.join(repo, git_path.replace("/", os.sep)))
 
 
+def current_file_presence(repo: str, files: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
+    present: list[str] = []
+    missing: list[str] = []
+    for file_info in files:
+        path = file_info["path"]
+        if current_path_exists(repo, path):
+            present.append(path)
+        else:
+            missing.append(path)
+    return present, missing
+
+
 def percentile(values: list[int], ratio: float) -> int:
     if not values:
         return 0
@@ -283,12 +295,14 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
         total_refs = cluster["total_file_refs"]
         current_ratio = round(cluster["current_file_hits"] / total_refs, 3) if total_refs else 0
         concentration = round(parent_concentration(cluster), 3)
-        cluster_score = (
+        base_score = (
             cluster["commit_count"] * 2
             + min(cluster["insertions"] + cluster["deletions"], 5000) / 500
             + min(cluster["current_file_hits"], 20) / 2
             + concentration * 5
         )
+        current_relevance_factor = 0.4 + current_ratio * 0.6
+        cluster_score = base_score * current_relevance_factor
         representatives = sorted(
             cluster["representative_commits"],
             key=lambda item: (item["score"], item["change_size"], item["date"]),
@@ -305,6 +319,7 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                 "current_file_hits": cluster["current_file_hits"],
                 "total_file_refs": total_refs,
                 "current_presence_ratio": current_ratio,
+                "current_relevance_factor": round(current_relevance_factor, 3),
                 "path_concentration": concentration,
                 "representative_paths": [
                     path for path, _count in cluster["path_counter"].most_common(8)
@@ -439,10 +454,13 @@ def score_commit(commit: dict[str, Any]) -> tuple[float, list[str]]:
     return round(score, 2), reasons
 
 
-def build_inspection_plan(commits: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+def build_inspection_plan(repo: str, commits: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     candidates = []
     for commit in commits:
         score, reasons = score_commit(commit)
+        current_files_present, current_files_missing = current_file_presence(repo, commit["files"])
+        current_file_total = len(commit["files"])
+        current_presence_ratio = round(len(current_files_present) / current_file_total, 3) if current_file_total else 0
         candidates.append(
             {
                 "hash": commit["hash"],
@@ -454,6 +472,11 @@ def build_inspection_plan(commits: list[dict[str, Any]], limit: int) -> list[dic
                 "subject_terms": commit["subject_terms"],
                 "path_terms": commit["path_terms"],
                 "files": [item["path"] for item in commit["files"][:8]],
+                "current_file_hits": len(current_files_present),
+                "current_file_total": current_file_total,
+                "current_presence_ratio": current_presence_ratio,
+                "current_files_present": current_files_present[:8],
+                "current_files_missing": current_files_missing[:8],
             }
         )
     candidates.sort(key=lambda item: (item["score"], item["date"], item["short_hash"]), reverse=True)
@@ -572,6 +595,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
                     f"- `{candidate['topic']}` score={candidate['score']} commits={candidate['commit_count']} latest={candidate['latest_date']}",
                     f"  - Change size: +{candidate['insertions']} -{candidate['deletions']}",
                     f"  - Current file presence: {candidate['current_file_hits']}/{candidate['total_file_refs']} ({candidate['current_presence_ratio']})",
+                    f"  - Current relevance factor: {candidate['current_relevance_factor']}",
                     f"  - Representative paths: {', '.join(candidate['representative_paths'][:5]) or 'n/a'}",
                 ]
             )
@@ -585,6 +609,9 @@ def render_markdown(payload: dict[str, Any]) -> str:
             [
                 f"- `{item['short_hash']}` {item['date']} score={item['score']} {item['subject']}",
                 f"  - Why inspect: {', '.join(item['reasons'])}",
+                f"  - Current file presence: {item['current_file_hits']}/{item['current_file_total']} ({item['current_presence_ratio']})",
+                f"  - Present now: {', '.join(item['current_files_present'][:5]) or 'n/a'}",
+                f"  - Missing now: {', '.join(item['current_files_missing'][:5]) or 'n/a'}",
                 f"  - Subject terms: {format_terms(item['subject_terms'])}",
                 f"  - Path terms: {format_terms(item['path_terms'])}",
                 f"  - Files: {files or 'n/a'}",
@@ -628,7 +655,7 @@ def build_payload(
     redaction_patterns: list[tuple[re.Pattern[str], str]],
 ) -> dict[str, Any]:
     commits = collect_commits(repo, args)
-    inspection_plan = build_inspection_plan(commits, args.inspection_limit)
+    inspection_plan = build_inspection_plan(repo, commits, args.inspection_limit)
     diff_samples = collect_diff_samples(repo, args, inspection_plan, redaction_patterns) if args.with_diffs else []
     order = "size" if args.top_by_size else "oldest" if args.oldest_first else "newest"
     payload = {

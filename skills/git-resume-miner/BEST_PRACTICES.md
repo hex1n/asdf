@@ -57,6 +57,7 @@ Then prune aggressively:
 
 - Merge overlapping candidates into the stronger problem theme.
 - Downgrade deleted or absent historical code to interview backup unless the user asks for history.
+- Use current-file presence as a triage signal, not a verdict: missing paths can mean deletion, rename, extraction, or generated output. Verify the reason before turning the work into a final claim.
 - Keep broad early work as project context when a later workstream has stronger evidence and resume value.
 - Prefer four strong bullets over six complete but diluted bullets.
 
@@ -102,6 +103,8 @@ Use this checklist before returning `resume-ready` or `compact` output:
 - Use `--top-by-size` to discover large changes, but do not rank resume value by line count.
 - Use repo-native workstream candidates to discover likely themes from code identifiers and co-changed paths. Validate every candidate against current code and representative diffs before turning it into a claim.
 - Use `--with-diffs` for local preview only. Final claims still require reading representative full diffs and current surrounding code.
+- Use inspection-plan `Current file presence` to decide whether to inspect current code first, search for renamed paths, or downgrade the commit to historical/interview evidence.
+- Treat `current_relevance_factor` as a ranking aid only. It reduces the rank of absent historical paths so active evidence surfaces first; it does not prove product value or ownership.
 - Do not build an exhaustive taxonomy in Python or config. Business domains, workstreams, and ownership boundaries must come from reading diffs and code.
 - Do not depend on external config for labels, categories, or redaction. The script should remain self-contained; add human judgment in the analysis, not config files.
 - Treat built-in redaction as best effort for common credential patterns across all output fields. Manually review private repository excerpts for customer names, internal hostnames, and proprietary identifiers before quoting.

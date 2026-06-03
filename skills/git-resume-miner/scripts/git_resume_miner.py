@@ -9,6 +9,7 @@ import json
 import os
 import pathlib
 import re
+import shlex
 import subprocess
 import sys
 from typing import Any
@@ -34,6 +35,17 @@ BUILT_IN_REDACTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL),
         "[REDACTED]",
     ),
+    (
+        re.compile(r"(authorization\s*[:=]\s*bearer\s+)[A-Za-z0-9._~+/=-]+", re.IGNORECASE),
+        r"\1[REDACTED]",
+    ),
+    (re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]+", re.IGNORECASE), "Bearer [REDACTED]"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b"), "[REDACTED]"),
+    (
+        re.compile(r"([A-Za-z][A-Za-z0-9+.-]*://)([^/@\s:]+):([^/@\s]+)@"),
+        r"\1[REDACTED]@",
+    ),
+    (re.compile(r"\bjdbc:[^'\"\s]+", re.IGNORECASE), "jdbc:[REDACTED]"),
 ]
 LOW_SIGNAL_SUBJECT_RE = re.compile(
     r"^(init|initial|format|reformat|vendor|generated|代码迁移|代码调整|删除不需要的代码)$",
@@ -85,6 +97,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diff-commits", type=int, default=5, help="Number of inspection commits to sample with --with-diffs.")
     parser.add_argument("--diff-context", type=int, default=3, help="Unified diff context lines for --with-diffs.")
     parser.add_argument("--max-diff-lines", type=int, default=160, help="Maximum diff lines per sampled commit.")
+    parser.add_argument(
+        "--privacy",
+        choices=["standard", "strict"],
+        default="standard",
+        help="Use strict to omit diff excerpts and render metadata only.",
+    )
     parser.add_argument("--format", choices=["json", "markdown"], default="json")
     parser.add_argument("--out", help="Write output to this file instead of stdout.")
     args = parser.parse_args()
@@ -158,10 +176,40 @@ def topic_candidates_for_commit(commit: dict[str, Any], limit: int = 8) -> list[
     return [topic for topic, _count in counter.most_common(limit * 2)]
 
 
+def current_path_candidates(git_path: str) -> list[str]:
+    path = (git_path or "").strip()
+    if not path:
+        return []
+    candidates = [path]
+    if "=>" in path:
+        if "{" in path and "}" in path:
+            def replace_brace(match: re.Match[str]) -> str:
+                inner = match.group(1)
+                if "=>" not in inner:
+                    return inner
+                return inner.split("=>", 1)[1].strip()
+
+            candidates.append(re.sub(r"\{([^{}]+)\}", replace_brace, path))
+        else:
+            candidates.append(path.split("=>", 1)[1].strip())
+
+    cleaned: list[str] = []
+    for candidate in candidates:
+        candidate = candidate.strip()
+        if candidate and candidate not in cleaned:
+            cleaned.append(candidate)
+    return cleaned
+
+
+def current_existing_path(repo: str, git_path: str) -> str | None:
+    for candidate in current_path_candidates(git_path):
+        if os.path.exists(os.path.join(repo, candidate.replace("/", os.sep))):
+            return candidate
+    return None
+
+
 def current_path_exists(repo: str, git_path: str) -> bool:
-    if not git_path or "{" in git_path or "=>" in git_path:
-        return False
-    return os.path.exists(os.path.join(repo, git_path.replace("/", os.sep)))
+    return current_existing_path(repo, git_path) is not None
 
 
 def current_file_presence(repo: str, files: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
@@ -169,11 +217,27 @@ def current_file_presence(repo: str, files: list[dict[str, Any]]) -> tuple[list[
     missing: list[str] = []
     for file_info in files:
         path = file_info["path"]
-        if current_path_exists(repo, path):
-            present.append(path)
+        current_path = current_existing_path(repo, path)
+        if current_path:
+            present.append(current_path)
         else:
-            missing.append(path)
+            candidates = current_path_candidates(path)
+            missing.append(candidates[-1] if candidates else path)
     return present, missing
+
+
+def summarize_authors(commits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    authors: collections.Counter[tuple[str, str]] = collections.Counter()
+    for commit in commits:
+        authors[(commit["author_name"], commit["author_email"])] += 1
+    return [
+        {
+            "author_name": name,
+            "author_email": email,
+            "commit_count": count,
+        }
+        for (name, email), count in authors.most_common()
+    ]
 
 
 def percentile(values: list[int], ratio: float) -> int:
@@ -454,6 +518,43 @@ def score_commit(commit: dict[str, Any]) -> tuple[float, list[str]]:
     return round(score, 2), reasons
 
 
+def command_string(args: list[str]) -> str:
+    return shlex.join(args)
+
+
+def inspection_commands_for_item(item: dict[str, Any]) -> list[dict[str, str]]:
+    commands = [
+        {
+            "label": "full diff",
+            "command": command_string(["git", "show", "--find-renames", item["hash"]]),
+        }
+    ]
+    path = (
+        item["current_files_present"][0]
+        if item["current_files_present"]
+        else item["current_files_missing"][0]
+        if item["current_files_missing"]
+        else item["files"][0]
+        if item["files"]
+        else ""
+    )
+    if path:
+        commands.append(
+            {
+                "label": "path history",
+                "command": command_string(["git", "log", "--follow", "--", path]),
+            }
+        )
+        if item["current_files_present"]:
+            commands.append(
+                {
+                    "label": "current file",
+                    "command": command_string(["git", "show", f"HEAD:{item['current_files_present'][0]}"]),
+                }
+            )
+    return commands
+
+
 def build_inspection_plan(repo: str, commits: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
     candidates = []
     for commit in commits:
@@ -461,24 +562,24 @@ def build_inspection_plan(repo: str, commits: list[dict[str, Any]], limit: int) 
         current_files_present, current_files_missing = current_file_presence(repo, commit["files"])
         current_file_total = len(commit["files"])
         current_presence_ratio = round(len(current_files_present) / current_file_total, 3) if current_file_total else 0
-        candidates.append(
-            {
-                "hash": commit["hash"],
-                "short_hash": commit["short_hash"],
-                "date": commit["date"],
-                "subject": commit["subject"],
-                "score": score,
-                "reasons": reasons,
-                "subject_terms": commit["subject_terms"],
-                "path_terms": commit["path_terms"],
-                "files": [item["path"] for item in commit["files"][:8]],
-                "current_file_hits": len(current_files_present),
-                "current_file_total": current_file_total,
-                "current_presence_ratio": current_presence_ratio,
-                "current_files_present": current_files_present[:8],
-                "current_files_missing": current_files_missing[:8],
-            }
-        )
+        entry = {
+            "hash": commit["hash"],
+            "short_hash": commit["short_hash"],
+            "date": commit["date"],
+            "subject": commit["subject"],
+            "score": score,
+            "reasons": reasons,
+            "subject_terms": commit["subject_terms"],
+            "path_terms": commit["path_terms"],
+            "files": [item["path"] for item in commit["files"][:8]],
+            "current_file_hits": len(current_files_present),
+            "current_file_total": current_file_total,
+            "current_presence_ratio": current_presence_ratio,
+            "current_files_present": current_files_present[:8],
+            "current_files_missing": current_files_missing[:8],
+        }
+        entry["inspection_commands"] = inspection_commands_for_item(entry)
+        candidates.append(entry)
     candidates.sort(key=lambda item: (item["score"], item["date"], item["short_hash"]), reverse=True)
     return candidates[: max(limit, 0)]
 
@@ -525,6 +626,7 @@ def collect_diff_samples(
     redaction_patterns: list[tuple[re.Pattern[str], str]],
 ) -> list[dict[str, Any]]:
     samples: list[dict[str, Any]] = []
+    strict_privacy = args.privacy == "strict"
     for item in inspection_plan[: max(args.diff_commits, 0)]:
         git_args = [
             "show",
@@ -538,9 +640,11 @@ def collect_diff_samples(
             git_args.extend(["--", *args.paths])
         raw_diff = run_git(repo, git_args)
         files, hunk_symbols = extract_diff_metadata(raw_diff)
+        if strict_privacy:
+            hunk_symbols = []
         diff_lines = redact_sensitive(raw_diff, redaction_patterns).splitlines()
         max_lines = max(args.max_diff_lines, 0)
-        excerpt = "\n".join(diff_lines[:max_lines])
+        excerpt = "[omitted by --privacy strict]" if strict_privacy else "\n".join(diff_lines[:max_lines])
         samples.append(
             {
                 "hash": item["hash"],
@@ -549,7 +653,8 @@ def collect_diff_samples(
                 "files": [redact_sensitive(file, redaction_patterns) for file in files],
                 "hunk_symbols": [redact_sensitive(symbol, redaction_patterns) for symbol in hunk_symbols],
                 "diff_excerpt": excerpt,
-                "truncated": len(diff_lines) > max_lines,
+                "truncated": False if strict_privacy else len(diff_lines) > max_lines,
+                "privacy": args.privacy,
             }
         )
     return samples
@@ -557,6 +662,30 @@ def collect_diff_samples(
 
 def format_terms(terms: list[tuple[str, int]]) -> str:
     return ", ".join(f"{term}={count}" for term, count in terms) or "n/a"
+
+
+def build_evidence_warnings(
+    args: argparse.Namespace,
+    summary: dict[str, Any],
+    matched_authors: list[dict[str, Any]],
+    inspection_plan: list[dict[str, Any]],
+) -> list[str]:
+    warnings: list[str] = []
+    if summary["commit_count"] == 0:
+        warnings.append("No matching commits found; verify --author, --rev, date range, and path filters before concluding there is no contribution evidence.")
+    if len(matched_authors) > 1:
+        warnings.append("Multiple author identities matched; confirm they belong to the same person before calibrating ownership language.")
+    if args.max_commits > 0:
+        warnings.append("--max-commits capped history collection; use this only for exploration and rerun uncapped before final claims.")
+    low_presence = [
+        item for item in inspection_plan
+        if item["current_file_total"] > 0 and item["current_presence_ratio"] < 0.5
+    ]
+    if low_presence:
+        warnings.append("Some inspection candidates have low current-file presence; check for rename, deletion, generated output, or replacement before using them as primary resume evidence.")
+    if args.privacy == "strict" and args.with_diffs:
+        warnings.append("--privacy strict omitted diff excerpts; inspect full diffs locally before writing final claims.")
+    return warnings
 
 
 def render_markdown(payload: dict[str, Any]) -> str:
@@ -573,6 +702,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
         f"- Include merges: `{payload['include_merges']}`",
         f"- Order: `{payload['order']}`",
         f"- With diffs: `{payload['with_diffs']}`",
+        f"- Privacy: `{payload['privacy']}`",
         "",
         "## Summary",
     ]
@@ -586,6 +716,20 @@ def render_markdown(payload: dict[str, Any]) -> str:
             f"- Top terms: {format_terms(summary['top_terms'])}",
         ]
     )
+
+    if payload["evidence_warnings"]:
+        lines.extend(["", "## Evidence Warnings"])
+        for warning in payload["evidence_warnings"]:
+            lines.append(f"- {warning}")
+
+    lines.extend(["", "## Matched Authors"])
+    if payload["matched_authors"]:
+        for author in payload["matched_authors"]:
+            lines.append(
+                f"- {author['author_name']} <{author['author_email']}>: {author['commit_count']} commits"
+            )
+    else:
+        lines.append("- n/a")
 
     if payload["workstream_candidates"]:
         lines.extend(["", "## Repo-Native Workstream Candidates"])
@@ -617,6 +761,8 @@ def render_markdown(payload: dict[str, Any]) -> str:
                 f"  - Files: {files or 'n/a'}",
             ]
         )
+        for command in item["inspection_commands"]:
+            lines.append(f"  - Next check ({command['label']}): `{command['command']}`")
 
     lines.extend(["", "## Representative Commits"])
     for commit in payload["commits"][:50]:
@@ -638,6 +784,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
                     f"### `{sample['short_hash']}` {sample['subject']}",
                     f"- Files: {', '.join(sample['files']) or 'n/a'}",
                     f"- Hunk symbols: {', '.join(sample['hunk_symbols']) or 'n/a'}",
+                    f"- Privacy: `{sample['privacy']}`",
                     f"- Truncated: `{sample['truncated']}`",
                     "",
                     "```diff",
@@ -658,6 +805,8 @@ def build_payload(
     inspection_plan = build_inspection_plan(repo, commits, args.inspection_limit)
     diff_samples = collect_diff_samples(repo, args, inspection_plan, redaction_patterns) if args.with_diffs else []
     order = "size" if args.top_by_size else "oldest" if args.oldest_first else "newest"
+    summary = summarize(commits)
+    matched_authors = summarize_authors(commits)
     payload = {
         "repo": repo,
         "author": args.author,
@@ -668,7 +817,10 @@ def build_payload(
         "include_merges": args.include_merges,
         "order": order,
         "with_diffs": args.with_diffs,
-        "summary": summarize(commits),
+        "privacy": args.privacy,
+        "summary": summary,
+        "matched_authors": matched_authors,
+        "evidence_warnings": build_evidence_warnings(args, summary, matched_authors, inspection_plan),
         "workstream_candidates": build_workstream_candidates(repo, commits),
         "inspection_plan": inspection_plan,
         "diff_samples": diff_samples,

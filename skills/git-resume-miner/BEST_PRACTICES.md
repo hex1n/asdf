@@ -99,10 +99,14 @@ Use this checklist before returning `resume-ready` or `compact` output:
 
 - Treat script output as an index, not the final analysis. The inspection plan prioritizes commits to read; it does not prove behavior or ownership by itself.
 - Prefer a full-history pass for final analysis. Use `--max-commits` only as a stated sampling constraint, then remove it before drawing project-level conclusions.
+- Read `Matched Authors` before interpreting the rest of the output. Multiple names/emails can mean renamed accounts, personal/company email drift, bot commits, or an over-broad regex. Resolve that identity boundary before using ownership verbs.
+- Read `Evidence Warnings` as gates, not decoration. A zero-commit result means scope might be wrong; low current-file presence means the work may be deleted, renamed, generated, or replaced; strict privacy means you still need a local full-diff read.
 - Use `--path` to focus on the subsystem the user owned before drawing project conclusions.
 - Use `--top-by-size` to discover large changes, but do not rank resume value by line count.
 - Use repo-native workstream candidates to discover likely themes from code identifiers and co-changed paths. Validate every candidate against current code and representative diffs before turning it into a claim.
 - Use `--with-diffs` for local preview only. Final claims still require reading representative full diffs and current surrounding code.
+- Use `--privacy strict` when output may be stored, shared, or pasted into chat; it keeps metadata and omits diff excerpts. In strict mode, manually run the `Next check` commands locally before final writing.
+- Use inspection-plan `Next check` commands as a minimum, not a complete investigation: `git show` proves the diff, `git log --follow` checks rename/history, and `git show HEAD:<path>` gives the current file snapshot.
 - Use inspection-plan `Current file presence` to decide whether to inspect current code first, search for renamed paths, or downgrade the commit to historical/interview evidence.
 - Treat `current_relevance_factor` as a ranking aid only. It reduces the rank of absent historical paths so active evidence surfaces first; it does not prove product value or ownership.
 - Do not build an exhaustive taxonomy in Python or config. Business domains, workstreams, and ownership boundaries must come from reading diffs and code.

@@ -13,7 +13,7 @@ When the user provides a repository and Git author, collect evidence first:
 python3 scripts/git_resume_miner.py --repo . --author "name-or-email" --since 2024-01-01 --until 2024-12-31 --format markdown
 ```
 
-On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and does not read project-specific configuration. It scans the full matching history by default; add `--max-commits N` only for an explicitly bounded exploratory pass. Add `--path service --path api` to narrow scope and `--with-diffs` to include built-in redacted diff excerpts for top inspection commits. The script emits UTF-8 output and includes repo-native workstream candidates derived from code identifiers and co-changed paths, plus current-file presence checks that show whether inspected commit paths still exist on the current branch.
+On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and does not read project-specific configuration. It scans the full matching history by default; add `--max-commits N` only for an explicitly bounded exploratory pass. Add `--path service --path api` to narrow scope, `--with-diffs` for built-in redacted diff excerpts, and `--privacy strict` when diff content should not be printed. The script emits UTF-8 output and includes matched-author summaries, evidence warnings, repo-native workstream candidates, current-file presence checks, and next inspection commands.
 
 Use script output only as an index. Final claims must come from representative diffs, current code context, data models, integration points, workflow behavior, and tests. If no author is provided, ask for the Git author name or email.
 
@@ -24,7 +24,7 @@ Use script output only as an index. Final claims must come from representative d
 
 ## Workflow
 
-1. Extract evidence: commits, dates, subjects, changed files, insertions/deletions, top paths, repo-derived terms, current-file presence, inspection plan, and optional diff excerpts. Exclude merges unless ownership matters.
+1. Extract evidence: commits, dates, matched author identities, subjects, changed files, insertions/deletions, top paths, repo-derived terms, current-file presence, inspection plan, evidence warnings, and optional diff excerpts. Exclude merges unless ownership matters.
 2. Establish project positioning before feature narrative: large system, subsystem/domain, user-owned workstream, and feature evidence. Apply evidence priority: user-provided or corrected framing > authoritative product/architecture docs > current workflow code and tests > repo names, package names, README/POM descriptions, dominant modules, and high-frequency script candidates. Treat weak metadata as clues only; if sources conflict, use a neutral framing and state uncertainty instead of asserting a project title.
 3. Cluster candidate workstreams from repo-native evidence: co-changed paths, code identifiers, representative diffs, current code, data models, integration boundaries, operational hooks, tests, and domain workflow. Use script candidates as hints, not labels.
 4. Build a contribution ledger with confidence labels: `observed`, `inferred`, and `needs confirmation`. Treat vague commit subjects as weak evidence until code confirms them, and mark commits with low current-file presence as historical evidence until current code, release notes, or user context proves they still matter.
@@ -50,7 +50,9 @@ Use script output only as an index. Final claims must come from representative d
 ## Evidence Gates
 
 - Use full-history script output to choose what to inspect; do not write final bullets from the script summary alone.
+- Confirm `Matched Authors` first. If zero commits or multiple identities appear, resolve the author/date/path scope before writing ownership claims.
 - For each kept workstream, inspect at least one representative full diff and one current surrounding code path unless the output is explicitly historical.
+- Use the script's `Next check` commands as the minimum follow-up: inspect the full diff, path history, and current file before promoting a theme.
 - Treat `Current file presence` as a pruning signal: high presence strengthens current relevance; low presence requires checking whether the work was deleted, renamed, generated, or replaced before using it as resume value.
 - Promote a contribution from `inferred` to `observed` only after code or tests show the workflow, boundary, failure mode, or data model behind the commit subject.
 - If the user asks for archaeology or interview preparation, keep deleted but meaningful work as an interview backup instead of a primary resume bullet.

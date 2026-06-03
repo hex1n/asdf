@@ -17,6 +17,7 @@ python3 scripts/git_resume_miner.py \
   --path service \
   --path domain \
   --with-diffs \
+  --privacy strict \
   --format markdown
 ```
 
@@ -24,7 +25,7 @@ Merge commits are excluded by default because they usually add weak resume evide
 
 The script is self-contained. It does not read category, taxonomy, or redaction config files; business meaning comes from reading diffs and surrounding code. Repo-native workstream candidates are generated from identifiers and co-changed paths; treat them as prompts for inspection, not final labels.
 
-The inspection plan reports `Current file presence` for each candidate commit. Use it to decide whether to inspect current code, search for renames, or treat the commit as historical evidence before writing a resume bullet.
+The inspection plan reports `Matched Authors`, `Evidence Warnings`, `Current file presence`, and `Next check` commands. Use them to confirm the author boundary, decide whether to inspect current code, search for renames, or treat the commit as historical evidence before writing a resume bullet.
 
 ## Project Positioning Example
 
@@ -56,6 +57,14 @@ Inputs:
 - Range: 2024-01-01..2024-09-30
 - Target: Java backend resume, Chinese interview prep
 - Paths: service, domain
+- Privacy: strict
+
+Evidence Warnings:
+- Multiple author identities matched; confirm they belong to the same person before calibrating ownership language.
+
+Matched Authors:
+- Developer Name <developer@example.com>: 18 commits
+- Developer Name <developer@users.noreply.example>: 3 commits
 
 Project Positioning:
 - Large project: multi-tenant order fulfillment and settlement platform.
@@ -73,6 +82,9 @@ Inspection Plan:
   Current file presence: 5/6 (0.833)
   Present now: service/OrderWorkflowService.java, domain/OrderState.java
   Missing now: database/migration/20240101_add_order_audit.sql
+  Next check (full diff): git show --find-renames a1b2c3d
+  Next check (path history): git log --follow -- service/OrderWorkflowService.java
+  Next check (current file): git show HEAD:service/OrderWorkflowService.java
   Subject terms: product=1, order=1, workflow=1
   Path terms: service=2, domain=2, order=2
   Files: service/OrderWorkflowService.java, domain/OrderState.java

@@ -148,16 +148,23 @@ repeat the same reasoning in both action plan and analysis.
 
 ## Artifact Location
 
-For Plan mode, save Markdown by default:
+For saved Markdown artifacts:
 
 1. Use the user-provided path when present.
-2. Else use the environment's designated user-facing output directory when one
+2. Else use the target workspace's existing docs taxonomy when one exists,
+   matching the artifact's type rather than the skill name.
+3. Else create and use a type-specific directory under the target workspace:
+   `docs/plans/` for implementation/architecture plans, or `docs/decisions/`
+   for explicitly saved decision/tradeoff memos.
+4. Else use the environment's designated user-facing output directory when one
    exists.
-3. Else use the OS temp directory and return the full path.
+5. Else use the OS temp directory and return the full path, explicitly noting
+   why no workspace docs location was available.
 
-Do not write into repository docs, ADRs, issue files, or memory files by default.
-Use those durable repo locations only when the user asks to persist the plan in
-the repo or provides a target path.
+Do not write into ADRs, issue files, memory files, or canonical project docs by
+default. Planner artifacts belong in clearly labeled planning or decision areas
+such as `docs/plans/` or `docs/decisions/`; use canonical repo locations only
+when the user asks to persist the artifact there or provides a target path.
 
 ## Plan File Output
 

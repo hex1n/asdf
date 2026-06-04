@@ -79,7 +79,7 @@ Quick answers stay in chat unless the user asks for a file.
 
 For Standard/Deep, save findings when the result is durable or likely to be reused and an appropriate writable location exists, unless the user asks for chat-only. Classify artifacts as canonical (stable source of truth), supporting (evidence or one-time analysis), or temporary (scratch investigation).
 
-Match the workspace/project docs taxonomy. Never save investigation outputs inside the skill's own folder. If no taxonomy exists, use a clearly named research location and state that default. Only update or recommend canonical docs such as `CONTEXT.md`, ADRs, or project profiles when the research confirms stable terminology, boundaries, decisions, or reusable facts. Use [REFERENCE.md](REFERENCE.md#saved-artifact-headers) for localized artifact headers.
+Match the workspace/project docs taxonomy. Never save investigation outputs inside the skill's own folder. If no taxonomy exists, create/use `docs/research/` under the target workspace and state that default; use OS temp only when no writable target workspace or user-facing output directory is available, and explain that fallback. Only update or recommend canonical docs such as `CONTEXT.md`, ADRs, or project profiles when the research confirms stable terminology, boundaries, decisions, or reusable facts. Use [REFERENCE.md](REFERENCE.md#saved-artifact-headers) for localized artifact headers.
 
 ## Anti-Patterns
 - State a confident conclusion before verifying the evidence in this session.

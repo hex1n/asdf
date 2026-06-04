@@ -81,6 +81,8 @@ For Standard/Deep, save findings when the result is durable or likely to be reus
 
 Match the workspace/project docs taxonomy. Never save investigation outputs inside the skill's own folder. If no taxonomy exists, create/use `docs/research/` under the target workspace and state that default; use OS temp only when no writable target workspace or user-facing output directory is available, and explain that fallback. Only update or recommend canonical docs such as `CONTEXT.md`, ADRs, or project profiles when the research confirms stable terminology, boundaries, decisions, or reusable facts. Use [REFERENCE.md](REFERENCE.md#saved-artifact-headers) for localized artifact headers.
 
+Name saved research artifacts with `YYYY-MM-DD-topic.md` by default. Prefer updating the same file for the same topic on the same day; add `-2` or `-HHmm` only when multiple same-day artifacts must coexist. Use clock time for temporary snapshots, runtime/current-state checks, or other time-sensitive artifacts. Do not add dates to canonical docs such as `CONTEXT.md`, ADRs, or project profiles.
+
 ## Anti-Patterns
 - State a confident conclusion before verifying the evidence in this session.
 - Keep reading broadly because the request says "deep" after the decision boundary is already answered.

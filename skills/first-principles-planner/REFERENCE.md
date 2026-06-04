@@ -166,6 +166,13 @@ default. Planner artifacts belong in clearly labeled planning or decision areas
 such as `docs/plans/` or `docs/decisions/`; use canonical repo locations only
 when the user asks to persist the artifact there or provides a target path.
 
+Name saved planner artifacts with `YYYY-MM-DD-topic.md` by default. Prefer
+updating the same file for the same topic on the same day; add `-2` or `-HHmm`
+only when multiple same-day artifacts must coexist. Use clock time for
+temporary snapshots, runtime/current-state checks, or other time-sensitive
+artifacts. Do not add dates to canonical docs such as `CONTEXT.md`, ADRs, or
+project profiles.
+
 ## Plan File Output
 
 When saving a plan:

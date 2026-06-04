@@ -37,8 +37,8 @@ If running as a subagent, use the full planner only for delegated planning, arch
 - If the stated solution is not tied to an outcome, rewrite the problem statement before comparing options.
 - If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default.
 - If the plan has no independently verifiable next step, shrink it to a vertical slice or a decision.
-- For Plan mode, write a Markdown artifact by default unless the user asks for chat-only output. Save to the user path, else the designated output directory, else OS temp.
-- For Decision mode, do not create durable artifacts unless explicitly asked.
+- For Plan mode, write a Markdown artifact by default unless the user asks for chat-only output. Save to the user path, else the target workspace docs location that matches the artifact type (`docs/plans/` for plans by default), else the designated output directory, else OS temp.
+- For Decision mode, do not create durable artifacts unless explicitly asked. If the user asks to save a Decision-mode output, save to the user path, else the target workspace docs location that matches the artifact type (`docs/decisions/` for decision/tradeoff memos by default), else the designated output directory, else OS temp.
 
 ## Output Mode
 

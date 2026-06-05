@@ -37,6 +37,8 @@ When there is more than one plausible target, write a compact candidate decision
 |---|---|---|---|---|---|---|
 | concrete file/flow | 1-6 | P0-P4 | command/code/scanner/inference | files/modules touched | test/compile/source check | choose/reject + why |
 
+For 3+ plausible targets or high-impact choices, run a lightweight candidate tournament: compare candidates pairwise by the table criteria, drop weaker or duplicate candidates, then challenge the winner with the strongest reason it could be wrong. Keep it only if it still wins on risk, proof, blast radius, and verification.
+
 Choose the candidate that has the best mix of high risk, bounded blast radius, and available proof. Reject candidates that are only broad cleanup, require external side effects, cannot be verified in the current environment, or would turn a legacy-wide pattern into an incidental rewrite.
 
 Proof tiers:

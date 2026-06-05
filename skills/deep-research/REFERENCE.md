@@ -87,11 +87,12 @@ For Chinese Standard/Deep saved findings:
 **问题**: ...
 **深度**: Standard | Deep
 **核心结论**: ...
-**TL;DR**: ...
 **产物类型**: canonical | supporting | temporary
 **验证状态**: code-only | current-state checked | external-call tested | UI/runtime tested | not run
 **开放问题**: N - see end.
 ```
+
+If needed, put `## TL;DR` in the body after the header only when it adds non-duplicative scan value: implications, risks, key evidence, current status, or next actions. Omit it when it would only restate `核心结论`.
 
 ### Orientation Diagrams
 

@@ -151,6 +151,9 @@ SCENARIOS = (
             "partially supported",
             "inferred",
             "not checked",
+            "optional body tl;dr",
+            "non-duplicative scan value",
+            "would only restate the conclusion",
         ),
         scoped_markers=(
             "independent evidence lanes",
@@ -165,6 +168,9 @@ SCENARIOS = (
             "explicitly supported",
             "partially supported",
             "not checked",
+            "optional body tl;dr",
+            "non-duplicative scan value",
+            "would only restate the conclusion",
         ),
     ),
     SkillScenario(
@@ -244,6 +250,18 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md)", resume_skill)
         self.assertIn("Best-Version Tournament Funnel", resume_practices)
         self.assertIn("Adversarial Post-Output Self-Review", resume_practices)
+
+    def test_deep_research_saved_header_uses_core_conclusion_not_header_tldr(self) -> None:
+        skill = read_text("skills/deep-research/SKILL.md").lower()
+        reference = read_text("skills/deep-research/REFERENCE.md")
+        saved_header_section = reference.split("For Chinese Standard/Deep saved findings:", 1)[1]
+        header_block = saved_header_section.split("```md", 1)[1].split("```", 1)[0]
+
+        self.assertIn("**核心结论**", header_block)
+        self.assertNotIn("**TL;DR**", header_block)
+        self.assertIn("## TL;DR", reference)
+        self.assertIn("optional body tl;dr", skill)
+        self.assertIn("non-duplicative scan value", skill)
 
     def test_tournament_does_not_leak_resume_candidate_rankings_to_final_output(self) -> None:
         resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()

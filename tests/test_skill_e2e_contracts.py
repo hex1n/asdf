@@ -153,7 +153,11 @@ SCENARIOS = (
             "not checked",
             "optional body tl;dr",
             "non-duplicative scan value",
-            "would only restate the conclusion",
+            "save consistency check",
+            "header counts match corresponding body sections",
+            "smallest orientation form",
+            "decision-shaped",
+            "what remains unverified",
         ),
         scoped_markers=(
             "independent evidence lanes",
@@ -170,7 +174,8 @@ SCENARIOS = (
             "not checked",
             "optional body tl;dr",
             "non-duplicative scan value",
-            "would only restate the conclusion",
+            "save consistency check",
+            "header counts match corresponding body sections",
         ),
     ),
     SkillScenario(
@@ -262,6 +267,25 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("## TL;DR", reference)
         self.assertIn("optional body tl;dr", skill)
         self.assertIn("non-duplicative scan value", skill)
+        self.assertIn("save consistency check", skill)
+        self.assertIn("header counts match corresponding body sections", skill)
+        self.assertIn("exactly N open questions", reference)
+
+    def test_deep_research_orientation_diagrams_choose_smallest_effective_form(self) -> None:
+        reference = read_text("skills/deep-research/REFERENCE.md")
+        section = reference.split("### Orientation Diagrams", 1)[1].split(
+            "For version/environment applicability", 1
+        )[0]
+        lower_section = section.lower()
+
+        self.assertIn("choose the smallest orientation form", lower_section)
+        self.assertIn("mermaid flowchart", lower_section)
+        self.assertIn("mermaid sequencediagram", lower_section)
+        self.assertIn("mermaid statediagram", lower_section)
+        self.assertIn("no diagram", lower_section)
+        self.assertIn("decision-shaped", lower_section)
+        self.assertIn("what remains unverified", lower_section)
+        self.assertIn("Establishes:", section)
 
     def test_tournament_does_not_leak_resume_candidate_rankings_to_final_output(self) -> None:
         resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()

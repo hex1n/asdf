@@ -74,7 +74,9 @@ Pick the smallest shape that answers the decision boundary:
 - Code walkthrough: orientation map, key files/functions, control/data flow, edge cases.
 - Research-to-work handoff: decision, evidence, risk, verification, next workflow.
 
-For Standard/Deep, include only the relevant pieces: answer, TL;DR, refined diagram with remaining `?`, key evidence, weakest point, what this does not decide (boundaries/non-goals), open questions that could change the conclusion, verification status, and artifact status. When a conclusion rests on external or versioned sources, surface version/date/channel context by default, or mark it unknown.
+For Standard/Deep, include only the relevant pieces: answer/core conclusion, optional body TL;DR, refined diagram with remaining `?`, key evidence, weakest point, what this does not decide (boundaries/non-goals), open questions that could change the conclusion, verification status, and artifact status. When a conclusion rests on external or versioned sources, surface version/date/channel context by default, or mark it unknown.
+
+In saved artifacts, header `核心结论` answers the main question in one sentence. Use body `## TL;DR` only when it adds non-duplicative scan value: implications, risks, key evidence, current status, or next actions. Omit it when it would only restate the conclusion.
 
 ## 5. Save
 Quick answers stay in chat unless the user asks for a file.

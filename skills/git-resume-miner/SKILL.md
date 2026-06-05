@@ -32,8 +32,9 @@ Use script output only as an index. Final claims must come from representative d
    - use `designed`, `owned`, or `delivered` only when commits, current code, and diffs support direct ownership of the core design or implementation
    - use `expanded`, `refactored`, `improved`, or `drove` when the work is substantial but the subsystem is clearly multi-author
    - use `participated in` or `contributed to` when evidence shows meaningful work but not end-to-end ownership
-6. Run the best-version funnel before writing final bullets:
+6. Run the best-version tournament before writing final bullets:
    - rank candidates by current-code evidence, ownership, senior complexity, distinct failure mode, and business/platform value
+   - when 3+ candidates remain, compare them pairwise and eliminate weaker, overlapping, or less defensible themes
    - downgrade historical code that is deleted or absent from the current branch unless the user asks for archaeology
    - merge candidates that solve the same problem; keep weaker real themes as interview backup
    - choose the strongest four resume bullets by value, not chronology, commit count, or changed lines
@@ -44,7 +45,7 @@ Use script output only as an index. Final claims must come from representative d
    - `interview`: STAR stories, architecture narrative, trade-offs, and likely follow-ups
 8. Default to `resume-ready` or `compact` when the user asks for "一版", "最佳", "简历版", or a directly usable result. Include only a short evidence note unless the user explicitly asks for full analysis.
 9. For `resume-ready` and `compact`, output only the final project framing, strongest bullets, and metric questions. Do not include code paths, contribution maps, candidate rankings, or confidence labels unless the user asks.
-10. Run a post-output self-review and rewrite once if needed: remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
+10. Run an adversarial post-output self-review and rewrite once if needed: argue against the strongest bullet and the project framing, then remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
 11. Run the final acceptance gate: one project framing, four strong bullets by default, no low-level artifact lists, no invented metrics, no duplicate problem themes, missing metrics separated as questions, and ownership verbs matching evidence strength.
 
 ## Evidence Gates

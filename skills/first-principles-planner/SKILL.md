@@ -63,7 +63,7 @@ For Standard/Deep work, state `Mode`, `Depth`, and input sources actually read i
 1. **Preflight**: gather only context needed for the selected mode; list load-bearing unknowns and research any unknown that could change the root.
 2. **Root trace**: use Five Whys for one solution-shaped request; for systems, trace business/user, technical, historical, and operational roots.
 3. **Constraint split**: classify load-bearing factors as true constraints, conventions, or unverified assumptions.
-4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk.
+4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode.
 5. **Recommend**: pick the approach that solves the root under true constraints; if rejecting the user's approach, include what would justify it.
 6. **Synthesize**: make Plan outputs specific enough to predict what changes, in what order, and why.
 

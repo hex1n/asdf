@@ -43,7 +43,7 @@ Use implementation names only in `analysis` mode as evidence anchors. In `resume
 - `compact`: produce one project description and four strongest bullets for direct resume insertion.
 - If the user asks for "一版", "最佳", "简历版", or a directly usable result, default to `resume-ready`/`compact`, not a full evidence dump.
 
-## Best-Version Funnel
+## Best-Version Tournament Funnel
 
 Before final resume output, rank every candidate workstream on five signals:
 
@@ -55,6 +55,7 @@ Before final resume output, rank every candidate workstream on five signals:
 
 Then prune aggressively:
 
+- When 3+ candidates remain, compare them pairwise by evidence, ownership, senior complexity, distinctness, and result value; drop the weaker candidate or merge overlapping themes before polishing.
 - Merge overlapping candidates into the stronger problem theme.
 - Downgrade deleted or absent historical code to interview backup unless the user asks for history.
 - Use current-file presence as a triage signal, not a verdict: missing paths can mean deletion, rename, extraction, or generated output. Verify the reason before turning the work into a final claim.
@@ -71,10 +72,11 @@ Before polishing bullets, choose verbs by evidence strength rather than ambition
 - If current class comments, early history, or dense co-author commits point to shared ownership, avoid "responsible for the whole system" phrasing. State the concrete workstream instead.
 - Do not let commit count alone upgrade ownership language. Commit count is an evidence lead, not proof of authorship scope.
 
-## Post-Output Self-Review
+## Adversarial Post-Output Self-Review
 
 After writing a resume-ready version, review it once before returning:
 
+- What is the strongest evidence-based argument against the project framing or top bullet?
 - Does the project description imply total ownership of a multi-author system?
 - Are the strongest bullets first, and are support tools moved to interview backup unless they add distinct senior-level value?
 - Does each bullet solve a different problem rather than repeating "integration", "reliability", or "configuration" in new words?

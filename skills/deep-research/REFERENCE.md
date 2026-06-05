@@ -92,11 +92,22 @@ For Chinese Standard/Deep saved findings:
 **开放问题**: N - see end.
 ```
 
-If needed, put `## TL;DR` in the body after the header only when it adds non-duplicative scan value: implications, risks, key evidence, current status, or next actions. Omit it when it would only restate `核心结论`.
+Before saving, verify the header and body agree. If `开放问题: N` is present, include exactly N open questions in a matching body section; do not count risks as open questions unless they are phrased as unresolved questions. If needed, put `## TL;DR` in the body after the header only when it adds non-duplicative scan value: implications, risks, key evidence, current status, or next actions. Omit it when it would only restate `核心结论`.
 
 ### Orientation Diagrams
 
-Produce the step-2 orientation map before deep evidence gathering, then refine it in the final output. Use Mermaid in saved artifacts; Mermaid or ASCII in chat. Keep it to the components in scope, not the whole system. For codebase maps, label the edges the question turns on — whatever is decision-relevant for that domain (a transactional service: tx boundaries and locks; a UI: state and effect flow; a pipeline: transforms and idempotency; most things: concurrency and failure/retry) — not just component names. Mark unverified nodes or edges with `?`; keep the `?` on anything still unverified in the final map.
+Produce the step-2 orientation map before deep evidence gathering, then refine it in the final output.
+
+Choose the smallest orientation form that clarifies the decision boundary:
+
+- Mermaid flowchart: architecture boundary, control/data flow, component responsibility.
+- Mermaid sequenceDiagram: ordered protocol, request lifecycle, async handoff.
+- Mermaid stateDiagram: lifecycle or state transition questions.
+- ASCII: quick chat answers or terminals where rendering may fail.
+- Table: version/environment gates, option comparison, claim/source audit.
+- No diagram: when one sentence or a table is clearer.
+
+Every orientation diagram must be decision-shaped: name what question it orients, keep only scoped components, label edges with decision-relevant mechanisms, mark unverified nodes/edges with `?`, and add one sentence after the diagram stating what the map establishes and what remains unverified. Mermaid is the default for saved artifacts when a graph helps; ASCII is a fallback, not the default.
 
 Codebase (one domain — a transactional service; adapt the edge labels to your question):
 
@@ -108,6 +119,8 @@ flowchart LR
   Svc -.->|"async, retry x3 ?"| Queue[[events queue]]
 ```
 
+Establishes: request path, lock, and transaction boundary; still unverified: async retry behavior.
+
 External (option comparison / decision):
 
 ```mermaid
@@ -116,6 +129,8 @@ flowchart TD
   Q -->|no| B[candidate B]
   A -.->|"? bundling maturity"| V[verify in docs]
 ```
+
+Establishes: the option split; still unverified: candidate A's bundling maturity.
 
 ASCII fallback for chat:
 

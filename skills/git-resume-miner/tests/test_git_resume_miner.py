@@ -71,6 +71,188 @@ class GitResumeMinerTest(unittest.TestCase):
         self.assertEqual(by_topic["feat_remove"]["current_presence_ratio"], 0)
         self.assertEqual(by_topic["feat_add"]["current_presence_ratio"], 1)
 
+    def test_workstream_score_downranks_support_surface_heavy_topics(self) -> None:
+        miner = load_miner()
+
+        with tempfile.TemporaryDirectory() as repo:
+            service_file = pathlib.Path(repo) / "src" / "service" / "payment.py"
+            service_file.parent.mkdir(parents=True)
+            service_file.write_text("def process_payment():\n    return True\n", encoding="utf-8")
+
+            config_paths = [
+                "src/main/resources/application-development.yml",
+                "src/main/resources/application-production.yml",
+                "src/main/resources/application-test-a.yml",
+                "src/main/resources/application-test-b.yml",
+                "src/main/resources/application-prepublish.yml",
+                "src/main/resources/application-local.yml",
+                "src/main/resources/application-qa.yml",
+                "src/main/resources/application-staging.yml",
+            ]
+            for config_path in config_paths:
+                file_path = pathlib.Path(repo) / config_path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text("feature:\n  enabled: true\n", encoding="utf-8")
+
+            config_commit = {
+                "hash": "333333333333",
+                "short_hash": "33333333",
+                "date": "2024-03-01",
+                "subject": "application environment config",
+                "files": [
+                    {"path": config_path, "insertions": 800, "deletions": 0}
+                    for config_path in config_paths
+                ],
+                "insertions": 6400,
+                "deletions": 0,
+            }
+            workflow_commit = {
+                "hash": "444444444444",
+                "short_hash": "44444444",
+                "date": "2024-04-01",
+                "subject": "payment callback workflow",
+                "files": [{"path": "src/service/payment.py", "insertions": 300, "deletions": 0}],
+                "insertions": 300,
+                "deletions": 0,
+            }
+
+            config_score, config_reasons = miner.score_commit(config_commit)
+            workflow_score, _workflow_reasons = miner.score_commit(workflow_commit)
+            candidates = miner.build_workstream_candidates(repo, [config_commit, workflow_commit])
+
+        self.assertIn("support_surface_heavy", config_reasons)
+        self.assertLess(config_score, workflow_score)
+        support_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate["support_surface_ratio"] == 1
+            and "support_surface_heavy" in candidate["ranking_notes"]
+        ]
+        workflow_candidates = [
+            candidate for candidate in candidates
+            if candidate["topic"] == "payment_callback"
+        ]
+        self.assertTrue(support_candidates)
+        self.assertTrue(workflow_candidates)
+        self.assertLess(max(candidate["score"] for candidate in support_candidates), workflow_candidates[0]["score"])
+
+    def test_workstream_score_downranks_docs_prototype_exports(self) -> None:
+        miner = load_miner()
+
+        with tempfile.TemporaryDirectory() as repo:
+            service_file = pathlib.Path(repo) / "internal" / "mcp" / "invoke.go"
+            service_file.parent.mkdir(parents=True)
+            service_file.write_text("package mcp\nfunc Invoke() bool { return true }\n", encoding="utf-8")
+
+            prototype_paths = [
+                "docs/prototypes/sofarpc_cli_high.html",
+                "docs/prototypes/sofarpc_cli_balsamiq.html",
+                "docs/prototypes/sofarpc_cli_high.png",
+                "docs/prototypes/sofarpc_cli_balsamiq.png",
+            ]
+            for prototype_path in prototype_paths:
+                file_path = pathlib.Path(repo) / prototype_path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                file_path.write_text("prototype export\n", encoding="utf-8")
+
+            prototype_commit = {
+                "hash": "666666666666",
+                "short_hash": "66666666",
+                "date": "2024-06-01",
+                "subject": "add sofarpc cli prototype exports",
+                "files": [
+                    {"path": prototype_path, "insertions": 1200, "deletions": 0}
+                    for prototype_path in prototype_paths
+                ],
+                "insertions": 4800,
+                "deletions": 0,
+            }
+            workflow_commit = {
+                "hash": "777777777777",
+                "short_hash": "77777777",
+                "date": "2024-07-01",
+                "subject": "invoke guardrails workflow",
+                "files": [{"path": "internal/mcp/invoke.go", "insertions": 220, "deletions": 0}],
+                "insertions": 220,
+                "deletions": 0,
+            }
+
+            prototype_score, prototype_reasons = miner.score_commit(prototype_commit)
+            workflow_score, _workflow_reasons = miner.score_commit(workflow_commit)
+            candidates = miner.build_workstream_candidates(repo, [prototype_commit, workflow_commit])
+
+        self.assertIn("support_surface_heavy", prototype_reasons)
+        self.assertLess(prototype_score, workflow_score)
+        support_candidates = [
+            candidate
+            for candidate in candidates
+            if candidate["support_surface_ratio"] == 1
+            and "support_surface_heavy" in candidate["ranking_notes"]
+        ]
+        workflow_candidates = [
+            candidate for candidate in candidates
+            if candidate["topic"] == "invoke_guardrails"
+        ]
+        self.assertTrue(support_candidates)
+        self.assertTrue(workflow_candidates)
+        self.assertLess(max(candidate["score"] for candidate in support_candidates), workflow_candidates[0]["score"])
+        self.assertFalse(any("balsamiq" in candidate["topic"] for candidate in candidates))
+        self.assertFalse(any("high" in candidate["topic"] for candidate in candidates))
+
+    def test_workstream_candidates_merge_near_duplicate_topics(self) -> None:
+        miner = load_miner()
+
+        with tempfile.TemporaryDirectory() as repo:
+            service_file = pathlib.Path(repo) / "src" / "service" / "payment_callback.py"
+            service_file.parent.mkdir(parents=True)
+            service_file.write_text("def handle_callback():\n    return True\n", encoding="utf-8")
+
+            commit = {
+                "hash": "555555555555",
+                "short_hash": "55555555",
+                "date": "2024-05-01",
+                "subject": "payment callback workflow",
+                "files": [{"path": "src/service/payment_callback.py", "insertions": 120, "deletions": 0}],
+                "insertions": 120,
+                "deletions": 0,
+            }
+
+            candidates = miner.build_workstream_candidates(repo, [commit], limit=10)
+            rendered = miner.render_markdown(
+                {
+                    "repo": repo,
+                    "author": "alice",
+                    "since": None,
+                    "until": None,
+                    "rev": "--all",
+                    "paths": None,
+                    "include_merges": False,
+                    "order": "newest",
+                    "with_diffs": False,
+                    "privacy": "standard",
+                    "summary": {
+                        "commit_count": 1,
+                        "insertions": 120,
+                        "deletions": 0,
+                        "top_directories": [],
+                        "top_terms": [],
+                    },
+                    "evidence_warnings": [],
+                    "matched_authors": [],
+                    "related_author_identities": [],
+                    "workstream_candidates": candidates,
+                    "inspection_plan": [],
+                    "representative_commits": [],
+                    "diff_samples": [],
+                    "commits": [],
+                }
+            )
+
+        self.assertEqual(len(candidates), 1)
+        self.assertIn("payment_callback", candidates[0]["topic"])
+        self.assertTrue(candidates[0]["related_topics"])
+        self.assertIn("Related topics merged", rendered)
+
     def test_path_filter_inspection_and_diff_sampling(self) -> None:
         miner = load_miner()
         calls: list[list[str]] = []
@@ -252,6 +434,62 @@ class GitResumeMinerTest(unittest.TestCase):
         self.assertTrue(any("No matching commits" in warning for warning in payload["evidence_warnings"]))
         self.assertIn("## Evidence Warnings", rendered)
         self.assertIn("- n/a", rendered)
+
+    def test_related_author_identities_are_reported_for_same_name_email_drift(self) -> None:
+        miner = load_miner()
+
+        def fake_run_git(repo: str, args: list[str]) -> str:
+            if args[0] == "log" and any(part.startswith("--author=") for part in args):
+                return (
+                    f"{miner.RECORD_SEP}"
+                    f"aaaa1111bbbb{miner.FIELD_SEP}2024-01-01{miner.FIELD_SEP}Hex User"
+                    f"{miner.FIELD_SEP}hexin@company.example{miner.FIELD_SEP}feat: add payment callback\n"
+                    "10\t0\tsrc/payment/callback.py\n"
+                )
+            if args[0] == "log":
+                return "\n".join(
+                    [
+                        f"Hex User{miner.FIELD_SEP}hexin@company.example",
+                        f"Hex User{miner.FIELD_SEP}personal@example.com",
+                        f"Other User{miner.FIELD_SEP}other@example.com",
+                    ]
+                )
+            raise AssertionError(f"unexpected git command: {args}")
+
+        miner.run_git = fake_run_git
+
+        with tempfile.TemporaryDirectory() as repo:
+            callback_file = pathlib.Path(repo) / "src" / "payment" / "callback.py"
+            callback_file.parent.mkdir(parents=True)
+            callback_file.write_text("def callback():\n    return True\n", encoding="utf-8")
+
+            args = types.SimpleNamespace(
+                repo=".",
+                author="hexin",
+                since=None,
+                until=None,
+                rev="--all",
+                paths=None,
+                max_commits=0,
+                include_merges=False,
+                oldest_first=False,
+                top_by_size=False,
+                inspection_limit=5,
+                with_diffs=False,
+                diff_commits=0,
+                diff_context=3,
+                max_diff_lines=20,
+                privacy="standard",
+            )
+
+            payload = miner.build_payload(repo, args, miner.BUILT_IN_REDACTION_PATTERNS)
+            rendered = miner.render_markdown(payload)
+
+        self.assertEqual(payload["matched_authors"][0]["author_email"], "hexin@company.example")
+        self.assertEqual(payload["related_author_identities"][0]["author_email"], "personal@example.com")
+        self.assertTrue(any("Related author identities" in warning for warning in payload["evidence_warnings"]))
+        self.assertIn("## Related Author Identities", rendered)
+        self.assertIn("personal@example.com", rendered)
 
 
 if __name__ == "__main__":

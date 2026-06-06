@@ -10,7 +10,7 @@
 - Metrics are strongest when known. When metrics are unavailable, use concrete scope: critical path, external systems integrated, consistency boundaries, failure modes handled, reusable pattern, or workflows owned.
 - Mark missing quantified impact explicitly as `needs user metric`; do not hide the gap behind vague value claims.
 - Apply a 20-second scan test: scope, technical judgment, solved problem, and result value should be visible without close reading.
-- Keep implementation artifacts as evidence, not final selling points: DTOs, constants, fields, mapper methods, query APIs, config keys, and migration fragments.
+- Keep implementation artifacts as evidence, not final selling points: DTOs, constants, fields, mapper methods, query APIs, config keys, migration fragments, prototype exports, and media files.
 - Prefer four bullets for resume-ready project experience. Use five only when the fifth adds a distinct senior-level problem, decision, and result.
 
 ## Project Description Vs Bullets
@@ -71,6 +71,14 @@ Before polishing bullets, choose verbs by evidence strength rather than ambition
 - Use `participated in`, `contributed to`, or `supported` when the evidence proves meaningful work but not end-to-end ownership.
 - If current class comments, early history, or dense co-author commits point to shared ownership, avoid "responsible for the whole system" phrasing. State the concrete workstream instead.
 - Do not let commit count alone upgrade ownership language. Commit count is an evidence lead, not proof of authorship scope.
+- For every strong verb, run a direct interviewer question: "Did you design this, or implement one part of it?" If the answer would require nuance, use `contributed to`, `helped build`, `implemented`, or a narrower workstream phrase.
+
+## Author Identity Expansion
+
+- Treat same display name with different emails as a scope warning, especially when one query matches only a company email or only a personal email.
+- When `Related Author Identities` appears, pause final resume writing until the user confirms whether those identities belong to the same person, or rerun with an expanded author scope when local evidence makes that safe.
+- If author scope is intentionally narrow, state that constraint in analysis mode and avoid project-level ownership language that depends on excluded commits.
+- Do not infer same-person identity from similar names alone when the repo has many authors; use related identities as a prompt for confirmation, not proof.
 
 ## Adversarial Post-Output Self-Review
 
@@ -84,6 +92,8 @@ After writing a resume-ready version, review it once before returning:
 - Does the project description avoid code-structure inventories and instead describe business workflows or system responsibilities?
 - Are all metrics observed or user-provided? If not, move them into focused metric questions.
 - Would the candidate be comfortable defending every verb under interview questioning?
+- Would a senior interviewer see one concrete problem, one technical decision, and one result value in each bullet within 20 seconds?
+- Does any bullet read like a task list with four or more stages, artifacts, fields, or files? If yes, compress it into one workflow problem or move details to interview evidence.
 
 ## Final Acceptance Checklist
 
@@ -106,11 +116,13 @@ Use this checklist before returning `resume-ready` or `compact` output:
 - Use `--path` to focus on the subsystem the user owned before drawing project conclusions.
 - Use `--top-by-size` to discover large changes, but do not rank resume value by line count.
 - Use repo-native workstream candidates to discover likely themes from code identifiers and co-changed paths. Validate every candidate against current code and representative diffs before turning it into a claim.
+- Treat `Related topics merged` as aliases for the same evidence cluster, not separate resume themes.
 - Use `--with-diffs` for local preview only. Final claims still require reading representative full diffs and current surrounding code.
 - Use `--privacy strict` when output may be stored, shared, or pasted into chat; it keeps metadata and omits diff excerpts. In strict mode, manually run the `Next check` commands locally before final writing.
 - Use inspection-plan `Next check` commands as a minimum, not a complete investigation: `git show` proves the diff, `git log --follow` checks rename/history, and `git show HEAD:<path>` gives the current file snapshot.
 - Use inspection-plan `Current file presence` to decide whether to inspect current code first, search for renamed paths, or downgrade the commit to historical/interview evidence.
 - Treat `current_relevance_factor` as a ranking aid only. It reduces the rank of absent historical paths so active evidence surfaces first; it does not prove product value or ownership.
+- Treat `support_surface_heavy` and `support_surface_mixed` as ranking aids only. Config, migration, resource, and build files can support a durable capability, but should not become primary bullets without current workflow code that explains the system behavior.
 - Do not build an exhaustive taxonomy in Python or config. Business domains, workstreams, and ownership boundaries must come from reading diffs and code.
 - Do not depend on external config for labels, categories, or redaction. The script should remain self-contained; add human judgment in the analysis, not config files.
 - Treat built-in redaction as best effort for common credential patterns across all output fields. Manually review private repository excerpts for customer names, internal hostnames, and proprietary identifiers before quoting.
@@ -129,6 +141,44 @@ Examples:
 
 Avoid labels like `State machine orchestration`, `Async idempotency`, or `DTO modeling`; they sound like implementation tags rather than senior-level contributions.
 
+## Result Value Classification
+
+Before accepting a final bullet, assign one primary result class:
+
+- `metric`: observed or user-provided numbers such as latency, failure rate, throughput, cost, volume, or adoption.
+- `operational value`: easier diagnosis, automatic progression, fewer manual handoffs, clearer recovery, or simpler on-call handling.
+- `risk reduction`: duplicate processing prevention, consistency protection, validation before persistence, safer retries, or better failure isolation.
+- `platform extensibility`: reusable workflow nodes, provider isolation, shared contracts, or lower coupling for future products.
+
+If the result only says "improved extensibility", "reduced coupling", "protected consistency", or similar abstract value, rewrite it to show the mechanism and defended class. If no class is defensible from evidence, demote the candidate or ask for a metric.
+
+## Failure Mode Extraction
+
+For every integration, callback, state transition, or payment/order workflow, look for the failure mode before polishing the bullet. Useful evidence signals include locks, idempotency keys, status guards, retries, timeout handling, result query/reconciliation, external-to-internal code mapping, validation before state updates, and compensating updates.
+
+Name the failure mode in the bullet when it is senior-level value: duplicate callbacks, concurrent notifications, partial external success, ambiguous processing status, stale state advancement, inconsistent downstream data, or provider protocol drift. If the code only adds happy-path fields or wrappers, frame it as feature delivery or support evidence, not reliability ownership.
+
+## Flow List Compression
+
+Bullets with 3+ workflow stages, artifacts, fields, or files usually scan as task lists. Replace the list with the workflow problem or system boundary, then keep details in interview backup.
+
+- Weak: "Implemented contract generation, signing notice, payment request, repayment-plan fetch, and downstream notice."
+- Stronger: "Integrated a product-specific critical path into the shared lifecycle so contract completion could automatically advance into payment and downstream servicing."
+
+Use stage names only when they distinguish the decision. Otherwise, use phrases such as `critical path`, `state progression`, `provider boundary`, `callback chain`, or `consistency boundary`.
+
+## Interview Defense Prompts
+
+Run these prompts on every strong verb and value claim:
+
+- Ownership: "Did the candidate design this boundary or implement one node in a shared design?"
+- Before state: "What failure, manual step, coupling, or ambiguity existed before this work?"
+- Decision: "What technical choice was made instead of just adding fields or calling an API?"
+- Result: "Is the result a metric, operational value, risk reduction, or platform extensibility?"
+- Scope: "Would a direct interviewer question force a weaker answer than the resume verb implies?"
+
+If a bullet cannot survive these prompts, narrow the verb, merge it into a stronger theme, or move it to interview evidence.
+
 ## Density And De-Duplication
 
 - Before finalizing resume-ready output, group bullets by solved problem and result value.
@@ -137,6 +187,8 @@ Avoid labels like `State machine orchestration`, `Async idempotency`, or `DTO mo
 - Keep each final bullet to one core idea and one sentence when possible.
 - Remove repeated product or module names from bullets when the project description already names the ownership scope.
 - Replace long stage lists with a compact phrase when the list slows scanning without adding senior-level value.
+- If two bullets both center on status consistency, external integration, or callback handling, split them by failure mode or merge them. Different implementation surfaces do not create distinct resume value by themselves.
+- Keep database migrations, DTOs, config changes, logging, field validation, and generated artifacts out of primary bullets unless they are the mechanism behind a durable system capability.
 
 ## Contribution Title Naming
 

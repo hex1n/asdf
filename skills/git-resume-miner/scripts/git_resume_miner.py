@@ -51,6 +51,27 @@ LOW_SIGNAL_SUBJECT_RE = re.compile(
     r"^(init|initial|format|reformat|vendor|generated|代码迁移|代码调整|删除不需要的代码)$",
     re.IGNORECASE,
 )
+SUPPORT_SURFACE_FILENAMES = {
+    "build.gradle",
+    "package-lock.json",
+    "pom.xml",
+    "settings.gradle",
+    "yarn.lock",
+}
+SUPPORT_SURFACE_CONFIG_EXTENSIONS = {".conf", ".properties", ".xml", ".yaml", ".yml"}
+SUPPORT_SURFACE_ARTIFACT_EXTENSIONS = {".lock", ".md", ".sql"}
+SUPPORT_SURFACE_DOC_EXPORT_EXTENSIONS = {
+    ".gif",
+    ".htm",
+    ".html",
+    ".jpeg",
+    ".jpg",
+    ".png",
+    ".svg",
+    ".webp",
+}
+SUPPORT_SURFACE_DOC_DIRS = {"doc", "docs", "documentation"}
+SUPPORT_SURFACE_PROTOTYPE_DIRS = {"export", "exports", "mockup", "mockups", "prototype", "prototypes", "screenshot", "screenshots"}
 
 
 def configure_utf8_stdio() -> None:
@@ -172,7 +193,8 @@ def topic_candidates_for_commit(commit: dict[str, Any], limit: int = 8) -> list[
     add_phrases(commit["subject"], 4)
     for file_info in commit["files"]:
         path = pathlib.PurePosixPath(file_info["path"].replace("\\", "/"))
-        add_phrases(path.stem, 3)
+        if not is_support_surface_path(file_info["path"]):
+            add_phrases(path.stem, 3)
     return [topic for topic, _count in counter.most_common(limit * 2)]
 
 
@@ -212,6 +234,31 @@ def current_path_exists(repo: str, git_path: str) -> bool:
     return current_existing_path(repo, git_path) is not None
 
 
+def is_support_surface_path(git_path: str) -> bool:
+    candidates = current_path_candidates(git_path)
+    path_text = (candidates[-1] if candidates else git_path).replace("\\", "/")
+    path = pathlib.PurePosixPath(path_text)
+    parts = [part.lower() for part in path.parts]
+    joined = "/".join(parts)
+    name = path.name.lower()
+    suffix = path.suffix.lower()
+
+    if name in SUPPORT_SURFACE_FILENAMES:
+        return True
+    if suffix in SUPPORT_SURFACE_ARTIFACT_EXTENSIONS:
+        return True
+    if name.startswith("application") and suffix in SUPPORT_SURFACE_CONFIG_EXTENSIONS:
+        return True
+    if "src/main/resources" in joined and suffix in SUPPORT_SURFACE_CONFIG_EXTENSIONS:
+        return True
+    if suffix in SUPPORT_SURFACE_DOC_EXPORT_EXTENSIONS and (
+        any(part in SUPPORT_SURFACE_DOC_DIRS for part in parts)
+        or any(part in SUPPORT_SURFACE_PROTOTYPE_DIRS for part in parts)
+    ):
+        return True
+    return "database/migration" in joined or "database/seeds" in joined
+
+
 def current_file_presence(repo: str, files: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
     present: list[str] = []
     missing: list[str] = []
@@ -238,6 +285,80 @@ def summarize_authors(commits: list[dict[str, Any]]) -> list[dict[str, Any]]:
         }
         for (name, email), count in authors.most_common()
     ]
+
+
+def collect_repo_author_identities(repo: str, args: argparse.Namespace) -> list[dict[str, Any]]:
+    git_args = [
+        "log",
+        args.rev,
+        f"--pretty=format:%an{FIELD_SEP}%ae",
+    ]
+    if not args.include_merges:
+        git_args.append("--no-merges")
+    if args.since:
+        git_args.append(f"--since={args.since}")
+    if args.until:
+        git_args.append(f"--until={args.until}")
+    if args.paths:
+        git_args.extend(["--", *args.paths])
+
+    raw = run_git(repo, git_args)
+    authors: collections.Counter[tuple[str, str]] = collections.Counter()
+    for line in raw.splitlines():
+        fields = line.split(FIELD_SEP)
+        if len(fields) != 2:
+            continue
+        authors[(fields[0], fields[1])] += 1
+
+    return [
+        {
+            "author_name": name,
+            "author_email": email,
+            "commit_count": count,
+        }
+        for (name, email), count in authors.most_common()
+    ]
+
+
+def normalized_identity_piece(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.lower())
+
+
+def related_author_identities(
+    author_query: str,
+    matched_authors: list[dict[str, Any]],
+    repo_authors: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    matched_keys = {
+        (author["author_name"], author["author_email"])
+        for author in matched_authors
+    }
+    matched_names = {
+        normalized_identity_piece(author["author_name"])
+        for author in matched_authors
+        if normalized_identity_piece(author["author_name"])
+    }
+    matched_email_locals = {
+        normalized_identity_piece(author["author_email"].split("@", 1)[0])
+        for author in matched_authors
+        if normalized_identity_piece(author["author_email"].split("@", 1)[0])
+    }
+    query = normalized_identity_piece(author_query)
+
+    related: list[dict[str, Any]] = []
+    for author in repo_authors:
+        key = (author["author_name"], author["author_email"])
+        if key in matched_keys:
+            continue
+        name = normalized_identity_piece(author["author_name"])
+        email_local = normalized_identity_piece(author["author_email"].split("@", 1)[0])
+        if (
+            name in matched_names
+            or email_local in matched_email_locals
+            or (not matched_authors and query and (query in name or query in email_local))
+        ):
+            related.append(author)
+    return related[:10]
 
 
 def percentile(values: list[int], ratio: float) -> int:
@@ -297,6 +418,47 @@ def is_repo_wide_topic(
     )
 
 
+def jaccard_similarity(left: set[str], right: set[str]) -> float:
+    if not left and not right:
+        return 0.0
+    return len(left & right) / len(left | right)
+
+
+def candidate_commit_set(candidate: dict[str, Any]) -> set[str]:
+    return {
+        commit["short_hash"]
+        for commit in candidate.get("representative_commits", [])
+        if commit.get("short_hash")
+    }
+
+
+def candidate_path_set(candidate: dict[str, Any]) -> set[str]:
+    return set(candidate.get("representative_paths", []))
+
+
+def deduplicate_workstream_candidates(candidates: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    kept: list[dict[str, Any]] = []
+    for candidate in candidates:
+        duplicate_of: dict[str, Any] | None = None
+        candidate_commits = candidate_commit_set(candidate)
+        candidate_paths = candidate_path_set(candidate)
+        for existing in kept:
+            commit_similarity = jaccard_similarity(candidate_commits, candidate_commit_set(existing))
+            path_similarity = jaccard_similarity(candidate_paths, candidate_path_set(existing))
+            if commit_similarity >= 0.8 and path_similarity >= 0.5:
+                duplicate_of = existing
+                break
+
+        if duplicate_of:
+            duplicate_of.setdefault("related_topics", []).append(candidate["topic"])
+            continue
+
+        candidate.setdefault("related_topics", [])
+        if len(kept) < max(limit, 0):
+            kept.append(candidate)
+    return kept
+
+
 def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit: int = 15) -> list[dict[str, Any]]:
     clusters: dict[str, dict[str, Any]] = {}
     token_doc_counts = build_token_document_counts(commits)
@@ -316,6 +478,7 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                     "deletions": 0,
                     "latest_date": "",
                     "current_file_hits": 0,
+                    "support_surface_refs": 0,
                     "total_file_refs": 0,
                     "path_counter": collections.Counter(),
                     "parent_counter": collections.Counter(),
@@ -332,6 +495,8 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                 cluster["total_file_refs"] += 1
                 cluster["path_counter"][path] += 1
                 cluster["parent_counter"][parent] += 1
+                if is_support_surface_path(path):
+                    cluster["support_surface_refs"] += 1
                 if current_path_exists(repo, path):
                     cluster["current_file_hits"] += 1
             cluster["representative_commits"].append(
@@ -358,6 +523,7 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
             continue
         total_refs = cluster["total_file_refs"]
         current_ratio = round(cluster["current_file_hits"] / total_refs, 3) if total_refs else 0
+        support_surface_ratio = round(cluster["support_surface_refs"] / total_refs, 3) if total_refs else 0
         concentration = round(parent_concentration(cluster), 3)
         base_score = (
             cluster["commit_count"] * 2
@@ -366,7 +532,15 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
             + concentration * 5
         )
         current_relevance_factor = 0.4 + current_ratio * 0.6
-        cluster_score = base_score * current_relevance_factor
+        support_surface_factor = 1.0
+        ranking_notes: list[str] = []
+        if support_surface_ratio >= 0.85:
+            support_surface_factor = 0.35
+            ranking_notes.append("support_surface_heavy")
+        elif support_surface_ratio >= 0.5:
+            support_surface_factor = 0.7
+            ranking_notes.append("support_surface_mixed")
+        cluster_score = base_score * current_relevance_factor * support_surface_factor
         representatives = sorted(
             cluster["representative_commits"],
             key=lambda item: (item["score"], item["change_size"], item["date"]),
@@ -384,6 +558,9 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                 "total_file_refs": total_refs,
                 "current_presence_ratio": current_ratio,
                 "current_relevance_factor": round(current_relevance_factor, 3),
+                "support_surface_ratio": support_surface_ratio,
+                "support_surface_factor": support_surface_factor,
+                "ranking_notes": ranking_notes,
                 "path_concentration": concentration,
                 "representative_paths": [
                     path for path, _count in cluster["path_counter"].most_common(8)
@@ -393,7 +570,7 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
         )
 
     candidates.sort(key=lambda item: (item["score"], item["commit_count"], item["latest_date"]), reverse=True)
-    return candidates[: max(limit, 0)]
+    return deduplicate_workstream_candidates(candidates, limit)
 
 
 def collect_commits(repo: str, args: argparse.Namespace) -> list[dict[str, Any]]:
@@ -499,6 +676,8 @@ def score_commit(commit: dict[str, Any]) -> tuple[float, list[str]]:
         file_info["path"].split("/", 1)[0] if "/" in file_info["path"] else "."
         for file_info in files
     }
+    support_surface_refs = sum(1 for file_info in files if is_support_surface_path(file_info["path"]))
+    support_surface_ratio = support_surface_refs / len(files) if files else 0
 
     score = min(size, 500) / 100
     score += min(len(files), 10) * 0.5
@@ -515,6 +694,12 @@ def score_commit(commit: dict[str, Any]) -> tuple[float, list[str]]:
     if len(files) >= 100:
         score -= 2
         reasons.append("large_file_count_penalty")
+    if support_surface_ratio >= 0.85:
+        score *= 0.35
+        reasons.append("support_surface_heavy")
+    elif support_surface_ratio >= 0.5:
+        score *= 0.7
+        reasons.append("support_surface_mixed")
     return round(score, 2), reasons
 
 
@@ -668,6 +853,7 @@ def build_evidence_warnings(
     args: argparse.Namespace,
     summary: dict[str, Any],
     matched_authors: list[dict[str, Any]],
+    related_authors: list[dict[str, Any]],
     inspection_plan: list[dict[str, Any]],
 ) -> list[str]:
     warnings: list[str] = []
@@ -675,6 +861,8 @@ def build_evidence_warnings(
         warnings.append("No matching commits found; verify --author, --rev, date range, and path filters before concluding there is no contribution evidence.")
     if len(matched_authors) > 1:
         warnings.append("Multiple author identities matched; confirm they belong to the same person before calibrating ownership language.")
+    if related_authors:
+        warnings.append("Related author identities were found outside the --author filter; confirm whether to rerun with the expanded author scope before final resume claims.")
     if args.max_commits > 0:
         warnings.append("--max-commits capped history collection; use this only for exploration and rerun uncapped before final claims.")
     low_presence = [
@@ -731,6 +919,13 @@ def render_markdown(payload: dict[str, Any]) -> str:
     else:
         lines.append("- n/a")
 
+    if payload["related_author_identities"]:
+        lines.extend(["", "## Related Author Identities"])
+        for author in payload["related_author_identities"]:
+            lines.append(
+                f"- {author['author_name']} <{author['author_email']}>: {author['commit_count']} commits"
+            )
+
     if payload["workstream_candidates"]:
         lines.extend(["", "## Repo-Native Workstream Candidates"])
         for candidate in payload["workstream_candidates"]:
@@ -740,9 +935,14 @@ def render_markdown(payload: dict[str, Any]) -> str:
                     f"  - Change size: +{candidate['insertions']} -{candidate['deletions']}",
                     f"  - Current file presence: {candidate['current_file_hits']}/{candidate['total_file_refs']} ({candidate['current_presence_ratio']})",
                     f"  - Current relevance factor: {candidate['current_relevance_factor']}",
+                    f"  - Support surface ratio: {candidate['support_surface_ratio']} (factor={candidate['support_surface_factor']})",
                     f"  - Representative paths: {', '.join(candidate['representative_paths'][:5]) or 'n/a'}",
                 ]
             )
+            if candidate["ranking_notes"]:
+                lines.append(f"  - Ranking notes: {', '.join(candidate['ranking_notes'])}")
+            if candidate["related_topics"]:
+                lines.append(f"  - Related topics merged: {', '.join(candidate['related_topics'][:8])}")
 
     lines.extend(["", "## Inspection Plan"])
     for item in payload["inspection_plan"]:
@@ -807,6 +1007,8 @@ def build_payload(
     order = "size" if args.top_by_size else "oldest" if args.oldest_first else "newest"
     summary = summarize(commits)
     matched_authors = summarize_authors(commits)
+    repo_authors = collect_repo_author_identities(repo, args)
+    related_authors = related_author_identities(args.author, matched_authors, repo_authors)
     payload = {
         "repo": repo,
         "author": args.author,
@@ -820,7 +1022,8 @@ def build_payload(
         "privacy": args.privacy,
         "summary": summary,
         "matched_authors": matched_authors,
-        "evidence_warnings": build_evidence_warnings(args, summary, matched_authors, inspection_plan),
+        "related_author_identities": related_authors,
+        "evidence_warnings": build_evidence_warnings(args, summary, matched_authors, related_authors, inspection_plan),
         "workstream_candidates": build_workstream_candidates(repo, commits),
         "inspection_plan": inspection_plan,
         "diff_samples": diff_samples,

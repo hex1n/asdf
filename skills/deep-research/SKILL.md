@@ -1,7 +1,7 @@
 ---
 name: deep-research
 description: >
-  Conducts evidence-backed technical investigations to determine what is true, why behavior occurs, or what decision follows. Use for technical research, causal analysis, system tracing, comparison, or evaluation when the user asks to "调研", "分析", "深度分析", "追踪", "梳理", "为什么", "对比", "比较", "评估", "research", "investigate", "figure out why", "trace", "compare", or "evaluate"; use diagnose for active bug reproduction/fixes, including "排查", "定位", or "根因" requests that require reproducing, debugging, or fixing a live failure.
+  Conducts evidence-backed technical investigations to determine what is true, why behavior occurs, or what decision follows. Use for technical research, causal analysis, system tracing, comparison, or evaluation when the user asks to "调研", "分析", "深度分析", "追踪", "梳理", "为什么", "对比", "比较", "评估", "research", "investigate", "figure out why", "trace", "compare", or "evaluate"; use diagnose for active bug reproduction/fixes, including "排查", "定位", or "根因" requests that require reproducing, debugging, or fixing a live failure; use first-principles-planner when the deliverable is a plan or an adopt/replace/upgrade decision rather than evidence findings.
 ---
 
 # Deep Research

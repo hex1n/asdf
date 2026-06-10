@@ -67,7 +67,8 @@ Focus on load-bearing assumptions only. The dangerous assumptions are the ones
 that feel like facts.
 
 Phase gate: if an assumption can change the root problem or eliminate the
-recommended approach, verify it before solution design.
+recommended approach, verify it before solution design, or ask one focused
+question with a recommended default.
 
 ## Solution Reconstruction
 
@@ -87,7 +88,7 @@ If only one approach is viable, explain why alternatives fail.
 
 ### Inversion Test
 
-For the leading candidate, ask:
+For the leading candidate (the option tournament's winner), ask:
 
 > Under what conditions would this be the worst approach?
 
@@ -134,13 +135,14 @@ Use a priority table with a total row:
 
 | Priority | Change | Effort | Risk | Value |
 |---|---|---:|---|---|
+| **Total** | | sum | | |
 
 Lead with actionable content in the first 20 lines. Put analysis last. Do not
 repeat the same reasoning in both action plan and analysis.
 
 ## Evidence Conventions
 
-- `verified`: source read in this session.
+- `verified`: read, fetched, queried, invoked, or ran in this session.
 - `? unverified`: recalled, inferred, or not checked.
 - Quantify feasibility, scale, and effort where possible.
 - Present tradeoffs honestly. Do not force a pick when constraints do not
@@ -168,10 +170,9 @@ when the user asks to persist the artifact there or provides a target path.
 
 Name saved planner artifacts with `YYYY-MM-DD-topic.md` by default. Prefer
 updating the same file for the same topic on the same day; add `-2` or `-HHmm`
-only when multiple same-day artifacts must coexist. Use clock time for
-temporary snapshots, runtime/current-state checks, or other time-sensitive
-artifacts. Do not add dates to canonical docs such as `CONTEXT.md`, ADRs, or
-project profiles.
+only when multiple same-day artifacts must coexist, preferring `-HHmm` for
+time-sensitive snapshots such as runtime/current-state checks. Do not add
+dates to canonical docs such as `CONTEXT.md`, ADRs, or project profiles.
 
 ## Plan File Output
 

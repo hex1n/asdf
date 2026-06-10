@@ -53,14 +53,14 @@ Use `--category security,concurrency,jdk` or `--max-findings 20` when a broad sc
 
 When scan output is mostly broad maintainability signal, deliberately look for a stronger scoped risk before editing: a reachable security issue, correctness bug, concurrency/resource issue, or build/runtime compatibility failure. If none is in scope, keep the patch small and report that it is cleanup rather than a production fix.
 
-If the work reveals stable repo facts worth preserving, follow [PROFILE.md](PROFILE.md). Update `docs/agents/java-stack-profile.md` only when the user asked for profile capture or docs edits are already in scope; otherwise include a suggested profile update in the result.
+If the work reveals stable repo facts worth preserving, follow [PROFILE.md](PROFILE.md): update `docs/agents/java-stack-profile.md` only under the path rule there; otherwise include a suggested profile update in the result.
 
 ## Step W4: Write with flexible defaults
 
 - Match project conventions for style, package layout, DTO mapping, and test style.
 - Do not propagate conventions that create correctness, security, or concurrency defects.
 - Keep abstractions tied to real variation points. If there is one permanent implementation, inline or use the existing concrete type.
-- Prefer constructor injection and `final` dependencies for new or touched Spring beans. In legacy Spring codebases dominated by field injection, do not migrate a bean only because the scanner found it; choose it when the bean is already touched for a real correctness/security/concurrency/testability reason, or when the user asked for DI cleanup.
+- Prefer constructor injection and `final` dependencies for new or touched Spring beans. In legacy Spring codebases dominated by field injection, do not migrate a bean only because the scanner found it; follow the field-injection policy in [RISK_ROUTER.md](RISK_ROUTER.md#scanner-calibration), or migrate when the user asked for DI cleanup.
 - Keep Java syntax within the detected target. For JDK 8, avoid `var`, `record`, `List.of`, `Stream.toList`, text blocks, and switch expressions.
 - Add or update behavior tests when the change affects logic. For mechanical refactors, a compile or focused existing test may be enough.
 

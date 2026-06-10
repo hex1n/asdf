@@ -1,6 +1,9 @@
 ---
 name: java-stack-craft
-description: Writes and reviews version-appropriate Java stack code by detecting the target JDK from Maven/Gradle, matching local conventions, and applying Spring/Java quality gates. Use when writing, editing, refactoring, or reviewing Java stack code in Maven, Gradle, or Spring Boot projects, especially when JDK compatibility, Spring conventions, dependency injection, concurrency, tests, or application architecture quality matter.
+description: >
+  Writes and reviews version-appropriate Java stack code by detecting the target JDK from Maven/Gradle, matching local conventions, and applying Spring/Java quality gates.
+  Use when writing, editing, refactoring, or reviewing Java stack code in Maven, Gradle, or Spring Boot projects — including 写/重构/审查 Java 代码, Spring Boot 接口/服务, Java 并发, JDK 兼容性, 依赖注入, 事务, 优化 Java/Spring 项目 requests — especially when JDK compatibility, Spring conventions, dependency injection, concurrency, tests, or application architecture quality matter.
+  Do not use for reproducing/fixing a live JVM incident (use diagnose) or pure what-is-true system investigation (use deep-research) unless the task includes writing or reviewing Java code.
 ---
 
 # Java Stack Craft
@@ -23,7 +26,7 @@ The manifest splits features into **use freely** (final at the target), **previe
 
 The defaults below are illustrations of principles, not a house style to impose. Detect what the project already does by reading existing code, and match it — error handling, DTO mapping, package layout (by-feature vs by-layer), naming, config, and test idioms.
 
-If the project uses a framework, detect and follow its conventions first. **Spring Boot projects: actually open and read [SPRING_BOOT.md](SPRING_BOOT.md) before writing or reviewing Spring code** — don't work from memory. It covers the entry style (REST / MVC / WebFlux / GraphQL / messaging / none — never convert one into another), validation approach, and the proxy/transaction/bean rules. The compile-critical `jakarta`/`javax` namespace gate and the web stack (MVC / WebFlux / **mixed**) are already reported by the Step 1 detector, so trust that even if you skip the file.
+If the project uses a framework, detect and follow its conventions first. **Spring Boot projects: actually open and read [SPRING_BOOT.md](SPRING_BOOT.md) before writing or reviewing Spring code** — don't work from memory. It covers the entry style (REST / MVC / WebFlux / GraphQL / messaging / none — never convert one into another), validation approach, and the proxy/transaction/bean rules. The compile-critical `jakarta`/`javax` namespace gate and the web stack (MVC / WebFlux / **mixed**) are already reported by the Step 1 detector; trust the detector for those two facts — they do not require reading SPRING_BOOT.md.
 
 When conventions are absent or inconsistent, prefer the principles below and say which default you chose. For formatting (naming case, import order, column width, brace style), follow and run the project's formatter (google-java-format / Spotless / the P3C plugin) rather than hand-aligning or encoding style rules here.
 
@@ -36,7 +39,6 @@ When conventions are absent or inconsistent, prefer the principles below and say
 - **Writing/editing/refactoring:** read [WRITING.md](WRITING.md) before editing. It defines smoke patch vs production fix vs architecture fix, dirty-worktree handling, advisory scanning, and the writing output contract.
 - **Reviewing:** read [REVIEW.md](REVIEW.md) before reporting findings. It defines diff review vs focused review vs repo audit, evidence levels, severity calibration, and the review output format.
 - **Optional advisory scan:** for non-trivial Spring/Java stack work, run `python3 scripts/java_advisory_scan.py --dir . --format markdown`. The scan is a signal, not an oracle; confirm important findings from code and context. It emits proof tiers, exits 0 by default, and only gates when called with `--fail-on`.
-- **Runtime portability:** this skill is intended for both Codex and Claude-style agents. Keep instructions in standard Markdown, keep helper scripts stdlib-only, and avoid relying on runtime-specific metadata or tools unless the user explicitly asks.
 
 ## Step 3 - Write to the version, not below it
 
@@ -66,7 +68,7 @@ Anti-patterns to reject: interface with one permanent implementation, strategy f
 
 ## Step 5 - Extensibility & quality bar (review every change against this)
 
-- **Depend on abstractions**: program to interfaces; prefer constructor injection and explicit dependencies for new or touched Spring code. In legacy code, field injection is a maintainability signal unless tied to a concrete lifecycle, construction, correctness, or testability failure.
+- **Depend on abstractions**: program to interfaces; prefer constructor injection and explicit dependencies for new or touched Spring code. In legacy code, apply the field-injection policy in [RISK_ROUTER.md](RISK_ROUTER.md#scanner-calibration).
 - **Layering**: keep entry → service → persistence boundaries clean (names vary by project); no SQL or transport types leaking across boundaries; map persistence entities to DTOs/models at the edge.
 - **Put new code where it's cohesive**: add it to the type whose responsibility it already shares (often an existing owner) — but split off a new focused type when piling on would bloat a class or mix concerns (cohesion beats reuse). Either way, don't create an accidental parallel/duplicate of something that exists, and match where sibling types live, including which module in a multi-module build (published API types on the api/facade module, internal projections in the service module).
 - **Immutability first**: `final` fields, `record`s, unmodifiable collections; copy on input/output of mutable state.
@@ -81,5 +83,6 @@ Check every change against [REFERENCE.md](REFERENCE.md#review-checklist) (and [S
 
 ## Output contracts
 
+- **Language:** use the user's language for chat, findings, and saved reports; keep code identifiers, commands, and file paths as-is.
 - **Writing:** follow [WRITING.md](WRITING.md#step-w5-report-the-result). Scale the report to the change; do not recite irrelevant checklist items.
 - **Review:** follow [REVIEW.md](REVIEW.md#step-r5-output-findings). Report findings, not a rewrite, unless the user asks for patches.

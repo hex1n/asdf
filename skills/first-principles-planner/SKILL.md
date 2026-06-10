@@ -6,16 +6,15 @@ description: >
   the user asks for 第一性原理, 第一性原理计划, 最佳方案, 最佳实现, 最好的方案,
   还有更好, 有没有更好, 给出方案, 先不coding, 不coding,
   先写方案, 先不写代码, 先不要写代码, 不要直接改代码, 架构演进, 优化方案,
-  取舍, should we X or Y, tradeoff analysis, or a plan beyond the first viable
-  solution. Do not use for pure research, bug diagnosis, implementation,
+  取舍, adopt/replace/upgrade decisions, should we X or Y, tradeoff analysis,
+  or a plan beyond the first viable solution. Do not use for pure what-is-true
+  research (use deep-research), bug diagnosis, implementation,
   plan/document/code review, 计划评审, 方案评审, 审查计划, 审查方案, durable
   ADR/CONTEXT capture, or skill-writing audits unless explicitly asked to
   re-plan from first principles.
 ---
 
 # First-Principles Planner
-
-Keep shared Codex and Claude Code copies byte-identical. Project-local copies may override only with an explicit reason.
 
 ## Core Move
 
@@ -37,12 +36,12 @@ If running as a subagent, use the full planner only for delegated planning, arch
 - If the stated solution is not tied to an outcome, rewrite the problem statement before comparing options.
 - If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default.
 - If the plan has no independently verifiable next step, shrink it to a vertical slice or a decision.
-- For Plan mode, write a Markdown artifact by default unless the user asks for chat-only output. Save to the user path, else the target workspace docs location that matches the artifact type (`docs/plans/` for plans by default), else the designated output directory, else OS temp.
-- For Decision mode, do not create durable artifacts unless explicitly asked. If the user asks to save a Decision-mode output, save to the user path, else the target workspace docs location that matches the artifact type (`docs/decisions/` for decision/tradeoff memos by default), else the designated output directory, else OS temp.
+- For Plan mode, write a Markdown artifact by default unless the user asks for chat-only output; place it per the artifact-location ladder in [REFERENCE.md](REFERENCE.md#artifact-location) (`docs/plans/` by default).
+- For Decision mode, do not create durable artifacts unless explicitly asked; an explicitly saved decision/tradeoff memo follows the same ladder (`docs/decisions/` by default).
 
 ## Output Mode
 
-For Standard/Deep work, state `Mode`, `Depth`, and input sources actually read in this session. For Light decisions, keep the first line compact. Do not add external sources just to make a plan look researched.
+Use the user's language for chat and saved artifacts. For Standard or deeper work, state `Mode`, `Depth`, and input sources actually read in this session. For Light decisions, keep the first line compact. Do not add external sources just to make a plan look researched.
 
 | Mode | Use when | Shape |
 |---|---|---|
@@ -55,16 +54,16 @@ For Standard/Deep work, state `Mode`, `Depth`, and input sources actually read i
 |---|---|
 | Narrow, well-understood choice | Light |
 | Multiple viable approaches | Standard |
-| User states a solution, not the problem | Standard+ |
+| User states a solution, not the problem | Standard+ (Standard with a mandatory root reframe) |
 | Recurring/stuck/conventional problem | Deep |
 
 ## Process
 
 1. **Preflight**: gather only context needed for the selected mode; list load-bearing unknowns and research any unknown that could change the root.
-2. **Root trace**: use Five Whys for one solution-shaped request; for systems, trace business/user, technical, historical, and operational roots.
+2. **Root trace**: use Five Whys for a single solution-shaped statement; for systems, trace business/user, technical, historical, and operational roots.
 3. **Constraint split**: classify load-bearing factors as true constraints, conventions, or unverified assumptions.
-4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode.
-5. **Recommend**: pick the approach that solves the root under true constraints; if rejecting the user's approach, include what would justify it.
+4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)).
+5. **Recommend**: pick the approach that solves the root under true constraints after the inversion test (skip it only for Light depth or obvious low-risk decisions); if rejecting the user's approach, include what would justify it.
 6. **Synthesize**: make Plan outputs specific enough to predict what changes, in what order, and why.
 
 For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE.md) before writing the final answer.

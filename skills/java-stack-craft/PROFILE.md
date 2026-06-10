@@ -89,7 +89,7 @@ Suggested review-memory template:
 - Last reviewed:
 ```
 
-Good memory entries are narrow. For example, "project-wide field injection is backlog signal only" is useful only when paired with "still report when it affects a touched/cohesive component, circular dependency, lifecycle safety, null-safety, or testability."
+Good memory entries are narrow. For example, "project-wide field injection is backlog signal only" is useful only when paired with "still report when it affects construction, lifecycle safety, null-safety, testability, circular dependencies, or a touched/cohesive component."
 
 ## Consumption rules
 

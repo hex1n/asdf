@@ -159,19 +159,19 @@ class Config {
 
 ## 6. Review output (what a finding looks like)
 
-In Review mode, report findings — don't rewrite. One finding = `severity · file:line · rule · one-line fix`, ordered blocker-first. Example over the discarded-stream bug:
+In Review mode, report findings — don't rewrite. The finding format is defined once in [REVIEW.md](REVIEW.md#step-r5-output-findings): `severity · category · confidence/proof-tier · file:line · rule broken · impact path · one-line fix`, ordered blocker-first. The expanded examples below carry the same leading fields, with the impact path and fix in the body:
 
 ```
-Blocker · OrderService.java:174 · stream result discarded (no-op sort)
+Blocker · correctness · confirmed/P1 · OrderService.java:174 · stream result discarded (no-op sort)
   plans.stream().sorted(comparing(Plan::getTerm)).collect(toList());  // result thrown away
   Code below keeps using the ORIGINAL unsorted `plans` → wrong order.
   Fix: plans = plans.stream().sorted(comparing(Plan::getTerm)).collect(toList());
 
-Major · OrderService.java:106-145 · field injection (20+ @Autowired)
+Major · maintainability · likely/P3 · OrderService.java:106-145 · field injection (20+ @Autowired)
   Prefer constructor injection. NOTE: pervasive project convention (3k+ uses) —
   apply to new/changed code only; do not mass-rewrite. (style→convention wins)
 
-Minor · OrderService.java:493 · SLF4J placeholder/arg mismatch
+Minor · correctness · likely/P3 · OrderService.java:493 · SLF4J placeholder/arg mismatch
   log.info("applyNo:{}, productId:{}", applyNo);  // 2 placeholders, 1 arg
   Fix: pass productId too, or drop the placeholder.
 ```

@@ -44,7 +44,7 @@ Severity is contextual:
 
 Use these as defaults, not rigid labels. If a normally major issue is unreachable in this project, lower it and say why. If a normally minor issue is on a critical path, raise it and show the impact path.
 
-In legacy Spring repos, broad field-injection findings are usually backlog signal, not top repo-audit findings. Rank field injection only when it affects a changed/cohesive component with concrete construction, lifecycle, null-safety, testability, or circular-dependency impact. Otherwise mention it as a pattern note or omit it from top findings.
+In legacy Spring repos, broad field-injection findings are usually backlog signal, not top repo-audit findings. Rank them by the field-injection policy in [RISK_ROUTER.md](RISK_ROUTER.md#scanner-calibration); findings that do not pass it become a pattern note or are omitted from top findings.
 
 For each candidate finding, apply the [RISK_ROUTER.md](RISK_ROUTER.md) evidence ladder before reporting it:
 

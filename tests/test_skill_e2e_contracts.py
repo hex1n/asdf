@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import subprocess
+import sys
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
@@ -312,6 +314,68 @@ class SkillE2EContractsTest(unittest.TestCase):
         for path in RUNTIME_SKILL_FILES:
             with self.subTest(path=path):
                 self.assertNotIn("rule harvest", read_text(path).lower())
+
+    def test_artifact_naming_rule_stays_aligned_across_skills(self) -> None:
+        naming_rule = (
+            "add `-2` or `-HHmm` only when multiple same-day artifacts must coexist, "
+            "preferring `-HHmm` for time-sensitive snapshots such as runtime/current-state checks"
+        )
+        for path in (
+            "skills/deep-research/SKILL.md",
+            "skills/first-principles-planner/REFERENCE.md",
+        ):
+            with self.subTest(path=path):
+                normalized = " ".join(read_text(path).split())
+                self.assertIn(naming_rule, normalized)
+
+    def test_planner_gates_stay_scoped_and_single_sourced(self) -> None:
+        skill = read_text("skills/first-principles-planner/SKILL.md")
+        reference = read_text("skills/first-principles-planner/REFERENCE.md")
+        agents = read_text("AGENTS.md")
+
+        self.assertIn("do not create durable artifacts unless explicitly asked", skill.lower())
+        self.assertIn("belongs to a review skill", skill)
+        self.assertIn("use the user's language for chat and saved artifacts", skill.lower())
+        self.assertIn("[REFERENCE.md](REFERENCE.md#artifact-location)", skill)
+        self.assertIn("[REFERENCE.md](REFERENCE.md#inversion-test)", skill)
+        # the location ladder is single-sourced in REFERENCE.md
+        self.assertIn("OS temp directory", reference)
+        self.assertNotIn("designated output directory", skill)
+        # distribution maintenance guidance lives in AGENTS.md, not the loaded skill body
+        self.assertNotIn("byte-identical", skill.lower())
+        self.assertIn("byte-identical", agents.lower())
+
+    def test_java_gates_stay_single_sourced(self) -> None:
+        skill = read_text("skills/java-stack-craft/SKILL.md")
+        examples = read_text("skills/java-stack-craft/EXAMPLES.md")
+        review = read_text("skills/java-stack-craft/REVIEW.md")
+        writing = read_text("skills/java-stack-craft/WRITING.md")
+
+        # the mandatory Spring read gate has no skip clause
+        self.assertNotIn("skip the file", skill)
+        # runtime portability is maintenance guidance (AGENTS.md), not skill body
+        self.assertNotIn("Runtime portability", skill)
+        self.assertIn("stdlib-only", read_text("AGENTS.md"))
+        self.assertIn("use the user's language", skill.lower())
+        # one finding format, defined in REVIEW.md and referenced by EXAMPLES.md
+        finding_format = (
+            "severity · category · confidence/proof-tier · file:line · "
+            "rule broken · impact path · one-line fix"
+        )
+        self.assertIn(finding_format, review)
+        self.assertIn("[REVIEW.md](REVIEW.md#step-r5-output-findings)", examples)
+        # field-injection policy is single-sourced in RISK_ROUTER.md
+        for text in (skill, writing, review):
+            self.assertIn("(RISK_ROUTER.md#scanner-calibration)", text)
+
+    def test_java_script_suite_passes(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-q"],
+            cwd=ROOT / "skills" / "java-stack-craft",
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, result.stderr)
 
     def test_local_markdown_anchor_links_resolve(self) -> None:
         markdown_link = re.compile(r"\[[^\]]+\]\(([^)#]+\.md)#([^)]+)\)")

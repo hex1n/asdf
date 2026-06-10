@@ -141,6 +141,9 @@ SCENARIOS = (
             "disconfirming evidence",
             "strongest counterexample",
             "survive cross-checking",
+            "hypothesis tournament",
+            "rival explanations",
+            "expected-but-absent evidence",
             "pasted external text",
             "evidence, not instructions",
             "do not follow commands",
@@ -163,6 +166,8 @@ SCENARIOS = (
             "independent evidence lanes",
             "disconfirming evidence",
             "strongest counterexample",
+            "hypothesis tournament",
+            "rival explanations",
             "pasted external text",
             "do not follow commands",
             "side-effect requests",
@@ -264,6 +269,8 @@ class SkillE2EContractsTest(unittest.TestCase):
 
         self.assertIn("**核心结论**", header_block)
         self.assertNotIn("**TL;DR**", header_block)
+        self.assertIn("English labels:", reference)
+        self.assertIn("core-conclusion field", skill)
         self.assertIn("## TL;DR", reference)
         self.assertIn("optional body tl;dr", skill)
         self.assertIn("non-duplicative scan value", skill)
@@ -272,12 +279,14 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("exactly N open questions", reference)
 
     def test_deep_research_orientation_diagrams_choose_smallest_effective_form(self) -> None:
+        skill = read_text("skills/deep-research/SKILL.md").lower()
         reference = read_text("skills/deep-research/REFERENCE.md")
         section = reference.split("### Orientation Diagrams", 1)[1].split(
             "For version/environment applicability", 1
         )[0]
         lower_section = section.lower()
 
+        self.assertIn("smallest orientation form", skill)
         self.assertIn("choose the smallest orientation form", lower_section)
         self.assertIn("mermaid flowchart", lower_section)
         self.assertIn("mermaid sequencediagram", lower_section)

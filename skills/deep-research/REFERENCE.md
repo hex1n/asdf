@@ -24,7 +24,7 @@ Rules:
 
 ## Session-History Research
 
-For session histories, persistent memory, skills, automations, or repeated workflows, use the closest available workflow-compounding, profile, or history-analysis tool.
+For session histories, persistent memory, skills, automations, or repeated workflows, use the closest available session-history, profile, or workflow-analysis tool.
 
 Raw session logs are noisy. Do not treat these as user intent without corroboration:
 
@@ -81,7 +81,7 @@ Use the user's language for headings and table labels. Use tables for comparison
 
 ### Saved Artifact Headers
 
-For Chinese Standard/Deep saved findings:
+Standard/Deep saved findings open with a header whose fields are question, depth, core conclusion, artifact type, verification status, and open-question count, labeled in the user's language. English labels: `Question`, `Depth`, `Core conclusion`, `Artifact type`, `Verification status`, `Open questions`. For Chinese Standard/Deep saved findings:
 
 ```md
 **问题**: ...
@@ -89,14 +89,14 @@ For Chinese Standard/Deep saved findings:
 **核心结论**: ...
 **产物类型**: canonical | supporting | temporary
 **验证状态**: code-only | current-state checked | external-call tested | UI/runtime tested | not run
-**开放问题**: N - see end.
+**开放问题**: N - 见文末
 ```
 
-Before saving, verify the header and body agree. If `开放问题: N` is present, include exactly N open questions in a matching body section; do not count risks as open questions unless they are phrased as unresolved questions. If needed, put `## TL;DR` in the body after the header only when it adds non-duplicative scan value: implications, risks, key evidence, current status, or next actions. Omit it when it would only restate `核心结论`.
+Before saving, verify the header and body agree. If the open-question count `N` is present, include exactly N open questions in a matching body section; do not count risks as open questions unless they are phrased as unresolved questions. Put `## TL;DR` in the body after the header only when it adds non-duplicative scan value: implications, risks, key evidence, current status, or next actions. Omit it when it would only restate the core conclusion.
 
 ### Orientation Diagrams
 
-Produce the step-2 orientation map before deep evidence gathering, then refine it in the final output.
+Orient before deep evidence gathering; refine the orientation in the final output.
 
 Choose the smallest orientation form that clarifies the decision boundary:
 
@@ -107,7 +107,7 @@ Choose the smallest orientation form that clarifies the decision boundary:
 - Table: version/environment gates, option comparison, claim/source audit.
 - No diagram: when one sentence or a table is clearer.
 
-Every orientation diagram must be decision-shaped: name what question it orients, keep only scoped components, label edges with decision-relevant mechanisms, mark unverified nodes/edges with `?`, and add one sentence after the diagram stating what the map establishes and what remains unverified. Mermaid is the default for saved artifacts when a graph helps; ASCII is a fallback, not the default.
+Every orientation form must be decision-shaped: name what question it orients, keep only scoped components, label edges or fields with decision-relevant mechanisms, and mark unverified elements with `?`. After a diagram or table, add one sentence stating what it establishes and what remains unverified. Mermaid is the default for saved artifacts when a graph helps; ASCII is a fallback, not the default.
 
 Codebase (one domain — a transactional service; adapt the edge labels to your question):
 

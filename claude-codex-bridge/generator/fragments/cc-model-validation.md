@@ -1,1 +1,0 @@
-A `--model` value must match `[A-Za-z0-9._-]+` — it is spliced onto the claude command line while the {noun} travels via stdin. If the token after `--model` does not match, treat both tokens as {noun} text and pass no `--model`.

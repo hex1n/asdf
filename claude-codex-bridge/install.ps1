@@ -28,6 +28,15 @@ foreach ($staleName in $stalePrompts) {
     }
 }
 
+$bridgeDst = Join-Path $env:USERPROFILE '.codex\bridge'
+New-Item -ItemType Directory -Force $bridgeDst | Out-Null
+Copy-Item (Join-Path $PSScriptRoot 'plugins\cx\bridge\bridge.ts') (Join-Path $bridgeDst 'bridge.ts') -Force
+Write-Host "installed: bridge.ts -> $bridgeDst\bridge.ts"
+
+if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
+    Write-Warning "bun is not on PATH. The cc-* prompts and /cx:* commands run 'bun bridge.ts'; install Bun first (https://bun.sh)."
+}
+
 if ($env:ANTHROPIC_API_KEY) {
     Write-Warning "ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the cc-* prompts."
 }

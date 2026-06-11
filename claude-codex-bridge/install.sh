@@ -33,6 +33,15 @@ for stale_name in claude-ask.md claude-review.md claude-task.md claude-resume.md
   fi
 done
 
+BRIDGE_DST="$HOME/.codex/bridge"
+mkdir -p "$BRIDGE_DST"
+cp "$SCRIPT_DIR/plugins/cx/bridge/bridge.ts" "$BRIDGE_DST/bridge.ts"
+echo "installed: bridge.ts -> $BRIDGE_DST/bridge.ts"
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "warning: bun is not on PATH. The cc-* prompts and /cx:* commands run 'bun bridge.ts'; install Bun first (https://bun.sh)." >&2
+fi
+
 if [ "${ANTHROPIC_API_KEY:-}" ]; then
   echo "warning: ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the cc-* prompts." >&2
 fi

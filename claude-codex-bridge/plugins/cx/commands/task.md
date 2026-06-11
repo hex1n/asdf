@@ -48,6 +48,7 @@ Resume run — send only the delta instruction (the new task text), not the full
 Hard rules:
 - Pass the prompt via stdin (`-`), never as a command-line argument — the Windows `codex.cmd` shim mangles nested quotes.
 - Always pass `--color never -o <result-file>`; the stdout event stream goes to a log file.
+- Heredoc collision guard: if the assembled prompt contains a line equal to the heredoc delimiter (`CODEX_PROMPT`), or, on PowerShell, a line equal to `'@`, the here-doc/here-string terminates early. In that case write the prompt to a temp file and feed it with `codex exec ... - < promptfile` instead of the heredoc. Do not silently truncate.
 
 Fresh foreground, POSIX shell:
 ```sh
@@ -84,9 +85,10 @@ After a successful fresh run, parse the JSONL event log for a session id and wri
 
 Bridge state registry:
 - Store state outside the repository, keyed by the absolute repository path hash.
+- `<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path. Compute it this exact way every time; any other algorithm, casing, or length makes later resume lookups miss.
 - PowerShell base: `$env:LOCALAPPDATA\claude-codex-bridge\sessions\<repo-hash>\`
 - POSIX base: `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-bridge/sessions/<repo-hash>/`
-- Keep `cx-last-session` for the last bridge-owned Codex session and `cx-sessions.json` for known sessions.
+- Keep `cx-last-session` (a plain file holding the last bridge-owned Codex session id) and `cx-sessions.json` (a JSON object mapping `session_id` → `{ "session_id", "cwd" }`) for known sessions.
 
 Resume (foreground): same platform-specific shape, but `codex exec resume <session-id> -c sandbox_mode="workspace-write" -o <result-file> -` and the delta prompt via stdin. The session id must come from the explicit `--resume <session-id>` argument or the bridge state registry; never use `--last`. Note: the `resume` and `review` subcommands do not accept `--color`; only the plain `codex exec` form does.
 Replace `<optional model/effort args>` before running; never include placeholder text or square-bracket notation literally.

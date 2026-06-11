@@ -39,6 +39,8 @@ Two hard rules:
 - Pass the prompt via stdin (the `-` argument), never as a command-line argument — the Windows `codex.cmd` shim mangles nested quotes.
 - Always pass `-o <tempfile>` so Codex writes its final answer to a file. The event stream on stdout is noisy (network retries, exec echoes, can exceed 100KB); the `-o` file is the clean answer.
 
+Heredoc collision guard: if the assembled prompt contains a line equal to the heredoc delimiter (`CODEX_PROMPT`), or, on PowerShell, a line equal to `'@`, the here-doc/here-string would terminate early. In that case write the prompt to a temp file and feed it with `codex exec ... - < promptfile` instead of the heredoc. Do not silently truncate.
+
 POSIX shell:
 ```sh
 OUT="$(mktemp)" ; LOG="$(mktemp)"

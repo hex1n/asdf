@@ -14,11 +14,11 @@ Steps — follow exactly:
 
 2. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, unset it for the child process only (PowerShell: run the command in a scope where `$env:ANTHROPIC_API_KEY = $null`; POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`). Never pass `--bare` and never use `--continue`.
 
-3. Write the following prompt to a temp file (fill in the scope and focus), then pipe it to claude via stdin:
+3. Write the following prompt to a temp file (fill in the scope description and focus), then pipe it to claude via stdin. Do not run git or inline any diff yourself — Claude has read-only git permission and runs the scope commands itself. The `Scope:` line only *names* the commands that define the review surface; leave them as literal instructions for Claude to run.
 
    ```
-   Review the local git changes in this repository.
-   Scope: {git status --short + git diff HEAD + git ls-files --others --exclude-standard | git diff <base>...HEAD}
+   Review the local git changes in this repository. Run these git commands yourself to establish the scope, then review their output:
+   Scope: uncommitted changes via `git status --short`, `git diff HEAD`, and `git ls-files --others --exclude-standard` — OR, if a base branch was given, `git diff <base>...HEAD`.
    Focus: {user focus, or "general correctness, bugs, and risky changes"}
 
    Output contract — for each finding, one line:
@@ -28,14 +28,15 @@ Steps — follow exactly:
 
 4. Run from the repository root (allow up to 10 minutes). Use the current platform's shell equivalent:
 
-   PowerShell:
+   PowerShell (the leading line is the step-2 billing guard, baked in so it cannot be skipped):
    ```powershell
+   $env:ANTHROPIC_API_KEY = $null
    Get-Content <tmpfile> -Raw | claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" <optional model arg>
    ```
 
-   POSIX shell:
+   POSIX shell (the `env -u` prefix is the step-2 billing guard, baked in so it cannot be skipped):
    ```sh
-   claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" <optional model arg> < "$tmpfile"
+   env -u ANTHROPIC_API_KEY claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" <optional model arg> < "$tmpfile"
    ```
 
    Replace `<optional model arg>` before running; never include placeholder text literally.

@@ -17,14 +17,15 @@ Steps — follow exactly:
 
 4. Run from the repository root (foreground, allow up to 10 minutes). Use the current platform's shell equivalent:
 
-   PowerShell:
+   PowerShell (the leading line is the step-2 billing guard, baked in so it cannot be skipped):
    ```powershell
+   $env:ANTHROPIC_API_KEY = $null
    Get-Content <tmpfile> -Raw | claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" <optional model arg>
    ```
 
-   POSIX shell:
+   POSIX shell (the `env -u` prefix is the step-2 billing guard, baked in so it cannot be skipped):
    ```sh
-   claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" <optional model arg> < "$tmpfile"
+   env -u ANTHROPIC_API_KEY claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" <optional model arg> < "$tmpfile"
    ```
 
    Replace `<optional model arg>` before running; never include placeholder text literally.
@@ -33,7 +34,7 @@ Steps — follow exactly:
 
 6. Persist session metadata for follow-ups in the bridge state registry, not in the repository. Store both the last session and a registry entry keyed by `session_id`.
 
-   State directory:
+   State directory (`<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path; compute it this exact way every time or resume lookups will miss):
    - PowerShell: `$env:LOCALAPPDATA\claude-codex-bridge\sessions\<repo-hash>\`
    - POSIX: `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-bridge/sessions/<repo-hash>/`
 

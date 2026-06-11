@@ -15,6 +15,7 @@ Steps — follow exactly:
    - `--model <model>` passes through to Claude as `--model <model>`.
 
 2. Read session metadata from the bridge state registry outside the repository.
+   - `<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path. The writer (`/cc-ask`, `/cc-task`, `/cc-review`) computes it the same way; if you compute it differently here, every lookup misses.
    - PowerShell base: `$env:LOCALAPPDATA\claude-codex-bridge\sessions\<repo-hash>\`
    - POSIX base: `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-bridge/sessions/<repo-hash>/`
    - Registry file: `cc-sessions.json`
@@ -49,6 +50,7 @@ Steps — follow exactly:
        "review" { @("--strict-mcp-config", "--tools", "Read,Grep,Glob,Bash", "--allowedTools", "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)") }
        "task" { @("--strict-mcp-config", "--tools", "Read,Edit,Write,Grep,Glob,Bash", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)") }
    }
+   $env:ANTHROPIC_API_KEY = $null  # step-2 billing guard, baked in so it cannot be skipped
    Get-Content <tmpfile> -Raw | claude --print --resume <session-id> --output-format json @modeArgs <optional model arg>
    ```
 
@@ -59,7 +61,7 @@ Steps — follow exactly:
      review) set -- --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" ;;
      task) set -- --strict-mcp-config --tools "Read,Edit,Write,Grep,Glob,Bash" --permission-mode acceptEdits --allowedTools "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)" ;;
    esac
-   claude --print --resume "$session_id" --output-format json "$@" <optional model arg> < "$tmpfile"
+   env -u ANTHROPIC_API_KEY claude --print --resume "$session_id" --output-format json "$@" <optional model arg> < "$tmpfile"
    ```
 
    Replace `<optional model arg>` before running; never include placeholder text literally.

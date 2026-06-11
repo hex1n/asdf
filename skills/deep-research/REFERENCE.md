@@ -156,3 +156,19 @@ For unresolved contradictions in Chinese requests:
 - 区分性检查: ...
 - 状态: 已通过 ... 解决 | 仍开放，因为 ...
 ```
+
+## Worked Example
+
+A compressed Standard run. What transfers is the decisions — what was skipped, what earned a second check, when it stopped — not the sequence; a real run follows uncertainty, not these paragraphs in order.
+
+Request: "为什么订单创建偶尔超时？" No reproduction or fix was asked, so this stays in deep-research; had the user said "帮我修一下", it would route to diagnose instead.
+
+Standard, not Deep: several components and a causal question, but no irreversible decision rides on the answer. No written plan either — the whole investigation hangs on one unknown, stated in one line: is event publishing inside the transaction boundary?
+
+Reading `OrderService.create()` settled that directly: publish happens inside `@Transactional` (`src/.../OrderService.java:88`). The same read produced the orientation for free — Client → API → OrderService → DB in one transaction, publish inside it — so no separate diagram pass was needed; one structural sentence carried it.
+
+Code alone proves "could be slow", not "is the cause", and a rival explanation — DB lock contention — was still alive. That made a second lane worth its cost: slow traces in the app logs spend ~2s in the publish span when the broker is degraded, with no lock-wait time. The lock hypothesis dies on expected-but-absent evidence, not just on the winner looking good.
+
+One attack before concluding: if publish-in-transaction were the cause, healthy-broker periods should show no timeouts. The same logs confirm it. A third lane (DB metrics) could only re-confirm what two lanes already agree on, so the investigation stops there.
+
+Delivered as a causal trace in chat: conclusion first, mechanism, two receipts, weakest point named (only three days of logs). No save trigger fired — no file requested, no handoff — so it ends with a one-line offer to save, not a file.

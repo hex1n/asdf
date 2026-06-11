@@ -101,10 +101,47 @@ class BridgeContractsTest(unittest.TestCase):
         for path in (
             BRIDGE / "plugins/cx/commands/task.md",
             BRIDGE / "codex-prompts/cc-ask.md",
+            BRIDGE / "codex-prompts/cc-task.md",
+            BRIDGE / "codex-prompts/cc-review.md",
             BRIDGE / "codex-prompts/cc-resume.md",
         ):
             with self.subTest(path=path.name):
                 self.assertIn(REPO_HASH_RULE, read(path))
+
+    def test_flag_values_are_shape_checked_before_the_host_command_line(self) -> None:
+        # Prompt bodies travel via stdin; flag values land on the host command
+        # line. Every file that splices a value must carry its shape check, or
+        # `--model "$(...)"` style input executes on the host.
+        expectations = {
+            "plugins/cx/commands/ask.md": ("[A-Za-z0-9._-]+",),
+            "plugins/cx/commands/task.md": ("[A-Za-z0-9._-]+", "UUID-shaped"),
+            "plugins/cx/commands/review.md": ("[A-Za-z0-9._/-]+", "[0-9a-fA-F]{4,40}"),
+            "codex-prompts/cc-ask.md": ("[A-Za-z0-9._-]+",),
+            "codex-prompts/cc-task.md": ("[A-Za-z0-9._-]+",),
+            "codex-prompts/cc-review.md": ("[A-Za-z0-9._-]+", "[A-Za-z0-9._/-]+"),
+            "codex-prompts/cc-resume.md": ("[A-Za-z0-9._-]+", "UUID-shaped"),
+        }
+        for rel, markers in expectations.items():
+            text = read(BRIDGE / rel)
+            for marker in markers:
+                with self.subTest(path=rel, marker=marker):
+                    self.assertIn(marker, text)
+
+    def test_heredoc_collision_guard_on_every_cx_stdin_path(self) -> None:
+        for path in CX_COMMANDS:
+            with self.subTest(path=path.name):
+                self.assertIn("collision guard", read(path))
+
+    def test_cc_registry_filenames_named_by_every_writer_and_reader(self) -> None:
+        for name in ("cc-ask.md", "cc-task.md", "cc-review.md", "cc-resume.md"):
+            text = read(BRIDGE / "codex-prompts" / name)
+            with self.subTest(path=name):
+                self.assertIn("cc-sessions.json", text)
+                self.assertIn("cc-last-session.json", text)
+
+    def test_installers_preserve_the_first_backup(self) -> None:
+        self.assertIn('[ ! -e "$target.bak" ]', read(BRIDGE / "install.sh"))
+        self.assertIn('-not (Test-Path "$target.bak")', read(BRIDGE / "install.ps1"))
 
     def test_resume_uses_explicit_session_id_not_last_shortcut(self) -> None:
         task = read(BRIDGE / "plugins/cx/commands/task.md")

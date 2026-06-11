@@ -16,6 +16,8 @@ Routing flags are execution controls. Strip them from the question text; everyth
 - `--model <m>` → add `-m <m>` to the codex command. Map `spark` to `gpt-5.3-codex-spark`. If absent, do not add `-m`.
 - `--effort <e>` → add `-c model_reasoning_effort=<e>`. Valid values: none, minimal, low, medium, high, xhigh. If absent, do not add it.
 
+Value validation (hard rule): the prompt travels via stdin, but these flag values are spliced into the host command line. A `--model` value must match `[A-Za-z0-9._-]+`; an `--effort` value must be exactly one of the listed words. If a value fails its check, do not treat the pair as a routing flag — leave both tokens in the question text and add nothing to the command line. Never splice an unvalidated value.
+
 ## 2. Assemble the prompt
 
 Prompt Codex like an operator: one task, explicit output contract, grounding rules. Shape:

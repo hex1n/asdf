@@ -68,6 +68,7 @@ sh ./install.sh
 
 - **薄转发铁律**:两侧的命令/prompt 都只做"组 prompt → 跑一次 CLI → 原样返回结果";转发者不自己分析、不复述、不重试、失败不兜底。
 - **prompt 一律走 stdin**:Windows 的 `codex.cmd` shim 会弄碎命令行参数里的嵌套引号,各平台 shell 也会插值不同字符。`codex exec -` / `claude --print < prompt` + heredoc/here-string/temp file 是硬规则。
+- **旗标值先校验再上命令行**:prompt 走 stdin,但 `--model/--effort/--base/--commit` 的值和 session id 会拼进宿主命令行。值必须通过形状校验(模型/分支名字符集、effort 枚举、commit 十六进制、session id 必须 UUID),不合格就把整对 token 留在任务文本里、不上命令行——这同时挡住命令注入和"任务文本里恰好含 `--model` 字样"的误剥离。
 - **task 合同通用**:`/cx:task` 与 `/cc-task` 使用同一套完成标准、验证循环和动作安全边界;差异只在外层 CLI、权限和沙箱。
 - **task 白名单是防误操作,不是安全沙箱**:`/cc-task` 在 `acceptEdits` 下放行 `Bash(npm run *)`、`Bash(make test *)` 等脚本入口,被委派的 Claude 完全可以先改 `package.json`/`Makefile` 再触发这些脚本。白名单挡的是无关的 drive-by 命令,挡不住有意为之;真正的安全边界是"只把任务委派给你信任的本机改动",不要据此把它当沙箱用。
 - **repo-hash 算法钉死**:registry 按仓库分目录的 `<repo-hash>` = 绝对仓库路径的 SHA-256 取前 16 位小写十六进制。写入(cx-task/cc-ask/cc-task/cc-review)和读取(cc-resume、cx-task resume)必须用同一算法,否则 resume 永远查不到 session。
@@ -87,4 +88,5 @@ sh ./install.sh
 ## 卸载
 
 - Claude 侧:`/plugin uninstall cx@claude-codex-bridge`,再 `/plugin marketplace remove claude-codex-bridge`
-- Codex 侧:删除 `~/.codex/prompts/cc-*.md`(安装时若覆盖过同名文件或迁移过旧 `claude-*` 命令,旁边有 `.bak` 备份)。
+- Codex 侧:删除 `~/.codex/prompts/cc-*.md`(安装时若覆盖过同名文件或迁移过旧 `claude-*` 命令,旁边有 `.bak` 备份;重复安装不会覆盖首次备份)。
+- session registry:如需彻底清理,删除用户状态目录 `claude-codex-bridge/`(Windows `%LOCALAPPDATA%\claude-codex-bridge\`,macOS/Linux `${XDG_STATE_HOME:-~/.local/state}/claude-codex-bridge/`)。

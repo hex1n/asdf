@@ -129,7 +129,9 @@ For Plan mode, make the plan operationally specific:
 Prefer independently verifiable vertical slices over layer-by-layer work. A
 slice should prove one user/system outcome end to end, even if thin. Avoid
 plans that say "DB first, then API, then UI" unless the ordering is forced by a
-true dependency.
+true dependency. Name how each slice is verified: the outcome to observe, plus
+the boundary or failure path that matters when one applies. This is a
+verification cue, not a test matrix — skip categories that do not apply.
 
 Use a priority table with a total row:
 

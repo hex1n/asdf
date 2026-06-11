@@ -14,7 +14,7 @@ Steps — follow exactly:
 1. Parse routing flags. Strip them from the follow-up text:
    - `--session <session-id>` selects a specific Claude session instead of the latest bridge-recorded session.
    - `--mode ask|review|task` supplies the permission mode when the selected session is not already in the registry.
-   - `--model <model>` passes through to Claude as `--model <model>`. A `--model` value must match `[A-Za-z0-9._-]+` — it is spliced onto the claude command line while the follow-up travels via stdin. If the token after `--model` does not match, treat both tokens as follow-up text and pass no `--model`.
+   - `--model <model>` passes through to Claude as `--model <model>`. {{include:cc-model-validation noun=follow-up}}
 
 2. Read session metadata from the bridge state registry outside the repository.
    - `<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path. The writer (`/cc-ask`, `/cc-task`, `/cc-review`) computes it the same way; if you compute it differently here, every lookup misses.
@@ -29,7 +29,7 @@ Steps — follow exactly:
    - If `source`/`--mode` is not one of `ask`, `review`, or `task`, stop and report that the session metadata is invalid.
    - Validate that session ids are UUID-shaped before passing them to `claude --resume`.
 
-3. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, make sure the claude invocation does not see it (POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`; PowerShell: set `$env:ANTHROPIC_API_KEY = $null` before the call — Codex starts a fresh shell per command, so this does not leak beyond the invocation). Never pass `--bare` and never use `--continue`.
+3. {{include:cc-billing-guard}}.
 
 4. Write the follow-up text to a temp file, preserving it exactly. Send only the follow-up text — do not restate the original task.
 
@@ -41,7 +41,7 @@ Steps — follow exactly:
    Substitute the mode-specific argument exactly:
    - ask: `--allowedTools "Read,Grep,Glob"`
    - review: `--allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)"`
-   - task: `--permission-mode acceptEdits --allowedTools "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)"`
+   - task: `--permission-mode acceptEdits --allowedTools "{{include:task-allowed-tools}}"`
 
    Use the current platform's shell equivalent:
 
@@ -50,7 +50,7 @@ Steps — follow exactly:
    $modeArgs = switch ("<source>") {
        "ask" { @("--strict-mcp-config", "--tools", "Read,Grep,Glob", "--allowedTools", "Read,Grep,Glob") }
        "review" { @("--strict-mcp-config", "--tools", "Read,Grep,Glob,Bash", "--allowedTools", "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)") }
-       "task" { @("--strict-mcp-config", "--tools", "Read,Edit,Write,Grep,Glob,Bash", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)") }
+       "task" { @("--strict-mcp-config", "--tools", "Read,Edit,Write,Grep,Glob,Bash", "--permission-mode", "acceptEdits", "--allowedTools", "{{include:task-allowed-tools}}") }
    }
    $env:ANTHROPIC_API_KEY = $null  # step-2 billing guard, baked in so it cannot be skipped
    Get-Content <tmpfile> -Raw | claude --print --resume <session-id> --output-format json @modeArgs <optional model arg>
@@ -61,7 +61,7 @@ Steps — follow exactly:
    case "$source" in
      ask) set -- --strict-mcp-config --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" ;;
      review) set -- --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" ;;
-     task) set -- --strict-mcp-config --tools "Read,Edit,Write,Grep,Glob,Bash" --permission-mode acceptEdits --allowedTools "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)" ;;
+     task) set -- --strict-mcp-config --tools "Read,Edit,Write,Grep,Glob,Bash" --permission-mode acceptEdits --allowedTools "{{include:task-allowed-tools}}" ;;
    esac
    env -u ANTHROPIC_API_KEY claude --print --resume "$session_id" --output-format json "$@" <optional model arg> < "$tmpfile"
    ```

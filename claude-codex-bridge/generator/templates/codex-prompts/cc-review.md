@@ -12,11 +12,11 @@ Review scope / focus from the user: $ARGUMENTS
 
 Steps — follow exactly:
 
-1. Parse routing flags. Strip `--model <model>` from the review scope/focus text and pass it to Claude as `--model <model>`. Everything else remains the scope/focus text. A `--model` value must match `[A-Za-z0-9._-]+` — it is spliced onto the claude command line while the focus travels via stdin. If the token after `--model` does not match, treat both tokens as focus text and pass no `--model`.
+1. Parse routing flags. Strip `--model <model>` from the review scope/focus text and pass it to Claude as `--model <model>`. Everything else remains the scope/focus text. {{include:cc-model-validation noun=focus}}
 
    Base-branch rule: treat a token as the base branch only when the text clearly designates it as a base (e.g. "against main", "base develop") and it matches `[A-Za-z0-9._/-]+`; when ambiguous, treat it as review focus. The base lands inside the `git diff <base>...HEAD` instruction that Claude executes under its git allowlist, so never use a token that fails the check.
 
-2. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, make sure the claude invocation does not see it (POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`; PowerShell: set `$env:ANTHROPIC_API_KEY = $null` before the call — Codex starts a fresh shell per command, so this does not leak beyond the invocation). Never pass `--bare` and never use `--continue`.
+2. {{include:cc-billing-guard}}.
 
 3. Write the following prompt to a temp file (unique name via `mktemp` / `New-TemporaryFile`; delete it after the run; fill in the scope description and focus), then pipe it to claude via stdin. Do not run git or inline any diff yourself — Claude has read-only git permission and runs the scope commands itself. The `Scope:` line only *names* the commands that define the review surface; leave them as literal instructions for Claude to run.
 
@@ -49,11 +49,7 @@ Steps — follow exactly:
 
 6. Persist session metadata for follow-ups in the bridge state registry, not in the repository. Store both the last session and a registry entry keyed by `session_id`.
 
-   State directory (`<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path; compute it this exact way every time or resume lookups will miss):
-   - PowerShell: `$env:LOCALAPPDATA\claude-codex-bridge\sessions\<repo-hash>\`
-   - POSIX: `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-bridge/sessions/<repo-hash>/`
-
-   Files (must match what `/cc-resume` reads): `cc-sessions.json` is a JSON object mapping `session_id` → entry; `cc-last-session.json` holds the entry for the most recent session. Update files atomically: write to a temp file in the same directory, then rename over the target; rebuild a file that fails to parse.
+   {{include:cc-state-registry}}
 
    ```json
    { "session_id": "<session_id>", "source": "review", "cwd": "<absolute repository path>" }

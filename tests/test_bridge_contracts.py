@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -138,6 +140,17 @@ class BridgeContractsTest(unittest.TestCase):
             with self.subTest(path=name):
                 self.assertIn("cc-sessions.json", text)
                 self.assertIn("cc-last-session.json", text)
+
+    def test_generated_files_match_generator_output(self) -> None:
+        # Runtime files are rendered from generator/templates + fragments.
+        # A direct edit to a generated file (or a template change without
+        # re-rendering) must fail here, not drift silently.
+        result = subprocess.run(
+            [sys.executable, str(BRIDGE / "generator" / "render.py"), "--check"],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
     def test_installers_preserve_the_first_backup(self) -> None:
         self.assertIn('[ ! -e "$target.bak" ]', read(BRIDGE / "install.sh"))

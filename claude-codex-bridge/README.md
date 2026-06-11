@@ -64,6 +64,16 @@ sh ./install.sh
 - **不要设置 `ANTHROPIC_API_KEY` 环境变量**:存在时 `claude --print` 优先用它按 API 计费。安装脚本和各 prompt 都有检查,但根治办法是移除该变量。
 - **禁用 `--bare`**:它跳过 OAuth 只认 API key,等于强制 API 计费。
 
+## 改动方式(单一来源)
+
+`plugins/cx/` 与 `codex-prompts/` 下的全部运行时文件均由生成器渲染,**不要直接编辑**(文件头有 GENERATED 标记,直改会被合同测试打红):
+
+1. 改 `generator/templates/`(每个运行时文件一个模板)或 `generator/fragments/`(跨文件共享块:task 合同、task 工具白名单、cc 状态目录、计费防护、model 校验)。
+2. 跑 `python claude-codex-bridge/generator/render.py` 重新渲染;CI 用 `--check` 校验渲染结果与提交一致。
+3. 新增桥命令时:新建模板 + 引用现有片段,共享规则自动同步,不再手抄。
+
+模板指令语法:`{{include:片段名}}`(整行 = 块引用,继承该行缩进;行内 = 单行引用),`{{include:片段名 key=value}}` 替换片段中的 `{key}`。
+
 ## 设计规则(改动前先读)
 
 - **薄转发铁律**:两侧的命令/prompt 都只做"组 prompt → 跑一次 CLI → 原样返回结果";转发者不自己分析、不复述、不重试、失败不兜底。

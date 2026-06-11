@@ -3,6 +3,8 @@ description: Delegate a task to Claude Code (headless, write-capable)
 argument-hint: <task> [--model <model>]
 ---
 
+<!-- GENERATED FILE — edit claude-codex-bridge/generator/ (templates + fragments), then run: python claude-codex-bridge/generator/render.py. Direct edits are overwritten and fail the contract tests. -->
+
 Forward the following task to Claude Code running headless, then report its result. Do not do the task yourself.
 
 Task: $ARGUMENTS

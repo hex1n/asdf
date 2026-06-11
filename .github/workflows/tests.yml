@@ -12,7 +12,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # Bridge contract tests (includes generator render --check).
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      # Bridge tests: bridge.ts integration (stub codex/claude) + markdown
+      # shell contracts + packaging checks.
       - run: python -m unittest tests.test_bridge_contracts -v
       # java-stack-craft helper-script suite.
       - run: python -m unittest discover -s tests -q

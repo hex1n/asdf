@@ -22,6 +22,10 @@ Strip these from the text; whatever remains is the custom review focus (may be e
 
 `codex exec review` carries its own built-in review contract — do not add your own prompt structure. Only pass the user's custom focus, if any, via stdin (`-`); never as a command-line argument (the Windows `codex.cmd` shim mangles nested quotes).
 
+Value validation (hard rule): the custom focus travels via stdin, but `--base`, `--commit`, and `--model` values are spliced into the host command line. A `--base` value must match `[A-Za-z0-9._/-]+`; a `--commit` value must match `[0-9a-fA-F]{4,40}`; a `--model` value must match `[A-Za-z0-9._-]+`. If a value fails its check, do not treat the pair as a routing flag — leave both tokens in the review-focus text and add nothing to the command line.
+
+Heredoc collision guard: if the custom focus contains a line equal to the heredoc delimiter (`CODEX_PROMPT`), or, on PowerShell, a line equal to `'@`, the here-doc/here-string terminates early. In that case write the focus to a temp file and feed it with `codex exec review {scope} ... - < focusfile` instead of the heredoc. Do not silently truncate.
+
 POSIX shell:
 ```sh
 OUT="$(mktemp)" ; LOG="$(mktemp)"

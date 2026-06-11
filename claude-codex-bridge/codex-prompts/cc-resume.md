@@ -12,7 +12,7 @@ Steps — follow exactly:
 1. Parse routing flags. Strip them from the follow-up text:
    - `--session <session-id>` selects a specific Claude session instead of the latest bridge-recorded session.
    - `--mode ask|review|task` supplies the permission mode when the selected session is not already in the registry.
-   - `--model <model>` passes through to Claude as `--model <model>`.
+   - `--model <model>` passes through to Claude as `--model <model>`. A `--model` value must match `[A-Za-z0-9._-]+` — it is spliced onto the claude command line; if the token after `--model` does not match, treat both tokens as follow-up text and pass no `--model`.
 
 2. Read session metadata from the bridge state registry outside the repository.
    - `<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path. The writer (`/cc-ask`, `/cc-task`, `/cc-review`) computes it the same way; if you compute it differently here, every lookup misses.
@@ -27,7 +27,7 @@ Steps — follow exactly:
    - If `source`/`--mode` is not one of `ask`, `review`, or `task`, stop and report that the session metadata is invalid.
    - Validate that session ids are UUID-shaped before passing them to `claude --resume`.
 
-3. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, unset it for the child process only (PowerShell: run the command in a scope where `$env:ANTHROPIC_API_KEY = $null`; POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`). Never pass `--bare` and never use `--continue`.
+3. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, make sure the claude invocation does not see it (POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`; PowerShell: set `$env:ANTHROPIC_API_KEY = $null` before the call — Codex starts a fresh shell per command, so this does not leak beyond the invocation). Never pass `--bare` and never use `--continue`.
 
 4. Write the follow-up text to a temp file, preserving it exactly. Send only the follow-up text — do not restate the original task.
 
@@ -68,7 +68,7 @@ Steps — follow exactly:
 
 6. Parse the JSON: `result`, `session_id`, `total_cost_usd`, `is_error`.
 
-7. Update the bridge state registry with the returned `session_id`, same `source`, and current cwd. Also update the last-session pointer to the returned session.
+7. Update the bridge state registry with the returned `session_id`, same `source`, and current cwd. Also update the last-session pointer to the returned session. Update files atomically: write to a temp file in the same directory, then rename over the target.
 
 8. Report to the user:
    - the full `result` text, unmodified

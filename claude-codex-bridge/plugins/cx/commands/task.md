@@ -18,8 +18,10 @@ Routing flags are execution controls. Strip them from the task text; everything 
 - `--resume [session-id]` → resume that explicit Codex session id. If `--resume` has no id, read the id from the bridge state registry in the user state directory; if no last bridge-owned session exists, stop and tell the user there is no bridge-owned Codex session to resume. Never use `codex exec resume --last`.
 - `--fresh` → force a fresh run.
 - `--background` → run the Bash call with `run_in_background: true`.
-- Neither `--resume` nor `--fresh` given: if this conversation had a recent `/cx:task` run that this task clearly follows up on ("continue", "keep going", "apply the change", "dig deeper") and the bridge state registry has a last session for this repository, use that recorded id; otherwise fresh. Do not ask the user.
-- `--background` not given: prefer foreground for small bounded tasks; prefer background for open-ended, multi-step, or long-running tasks.
+- Neither `--resume` nor `--fresh` given: if this conversation had a recent `/cx:task` run that this task clearly follows up on ("continue", "keep going", "apply the change", "dig deeper") and the bridge state registry has a last session for this repository, use that recorded id; otherwise fresh. Do not ask the user. When in doubt, prefer fresh.
+- `--background` not given: prefer foreground for small bounded tasks; prefer background for open-ended, multi-step, or long-running tasks. `--background` combines with both fresh and resume runs.
+
+Value validation (hard rule): the prompt travels via stdin, but flag values are spliced into the host command line. A `--model` value must match `[A-Za-z0-9._-]+`; an `--effort` value must be exactly one of the listed words; any session id (from `--resume`, the registry, or the event log) must be UUID-shaped. A token after `--resume` that is not UUID-shaped is task text and `--resume` is treated as bare. If any other flag's value fails its check, leave both tokens in the task text and add nothing to the command line. Never splice an unvalidated value.
 
 ## 2. Assemble the prompt
 
@@ -89,12 +91,13 @@ Bridge state registry:
 - PowerShell base: `$env:LOCALAPPDATA\claude-codex-bridge\sessions\<repo-hash>\`
 - POSIX base: `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-bridge/sessions/<repo-hash>/`
 - Keep `cx-last-session` (a plain file holding the last bridge-owned Codex session id) and `cx-sessions.json` (a JSON object mapping `session_id` → `{ "session_id", "cwd" }`) for known sessions.
+- Update registry files atomically: write to a temp file in the same directory, then rename over the target. If an existing registry file fails to parse, rebuild it; do not crash.
 
-Resume (foreground): same platform-specific shape, but `codex exec resume <session-id> -c sandbox_mode="workspace-write" -o <result-file> -` and the delta prompt via stdin. The session id must come from the explicit `--resume <session-id>` argument or the bridge state registry; never use `--last`. Note: the `resume` and `review` subcommands do not accept `--color`; only the plain `codex exec` form does.
+Resume (foreground): same platform-specific shape, but `codex exec resume <session-id> -c sandbox_mode="workspace-write" -o <result-file> -` and the delta prompt via stdin. The session id must come from the explicit `--resume <session-id>` argument or the bridge state registry, and must be UUID-shaped — if it is not, stop and report a corrupted registry instead of running the command; never use `--last`. Note: the `resume` and `review` subcommands do not accept `--color`; only the plain `codex exec` form does.
 Replace `<optional model/effort args>` before running; never include placeholder text or square-bracket notation literally.
 
 Background: same platform-specific command, but
-- result file must be a timestamped file in the repository root: `.cx-result-<yyyyMMdd-HHmmss>.md` (so parallel runs never collide), and
+- result file must be a unique file in the repository root: `.cx-result-<yyyyMMdd-HHmmss>-<4 random hex chars>.md` (a second-resolution timestamp alone can collide when several background tasks start together), and
 - run the Bash call with `run_in_background: true`, then immediately tell the user the task is running and where the result file is. When the background task completes, return the result file content as-is.
 
 Foreground timeout: 600000 ms.

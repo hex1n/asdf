@@ -10,8 +10,8 @@ New-Item -ItemType Directory -Force $dst | Out-Null
 
 Get-ChildItem $src -Filter *.md | ForEach-Object {
     $target = Join-Path $dst $_.Name
-    if (Test-Path $target) {
-        Copy-Item $target "$target.bak" -Force
+    if ((Test-Path $target) -and -not (Test-Path "$target.bak")) {
+        Copy-Item $target "$target.bak"
         Write-Host "backup:    $($_.Name) -> $($_.Name).bak"
     }
     Copy-Item $_.FullName $target -Force
@@ -22,7 +22,7 @@ $stalePrompts = @('claude-ask.md', 'claude-review.md', 'claude-task.md', 'claude
 foreach ($staleName in $stalePrompts) {
     $stalePrompt = Join-Path $dst $staleName
     if (Test-Path $stalePrompt) {
-        Copy-Item $stalePrompt "$stalePrompt.bak" -Force
+        if (-not (Test-Path "$stalePrompt.bak")) { Copy-Item $stalePrompt "$stalePrompt.bak" }
         Remove-Item $stalePrompt -Force
         Write-Host "removed stale: $staleName -> $staleName.bak"
     }

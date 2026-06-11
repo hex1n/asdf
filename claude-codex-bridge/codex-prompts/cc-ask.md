@@ -9,11 +9,11 @@ Question: $ARGUMENTS
 
 Steps — follow exactly:
 
-1. Parse routing flags. Strip `--model <model>` from the question text and pass it to Claude as `--model <model>`. Everything else is the question, preserved exactly.
+1. Parse routing flags. Strip `--model <model>` from the question text and pass it to Claude as `--model <model>`. Everything else is the question, preserved exactly. A `--model` value must match `[A-Za-z0-9._-]+` — it is spliced onto the claude command line while the question travels via stdin. If the token after `--model` does not match, treat both tokens as question text and pass no `--model`.
 
-2. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, unset it for the child process only (PowerShell: run the command in a scope where `$env:ANTHROPIC_API_KEY = $null`; POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`). Never pass `--bare` and never use `--continue` — both break subscription billing or session isolation.
+2. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, make sure the claude invocation does not see it (POSIX shell: prefix the command with `env -u ANTHROPIC_API_KEY`; PowerShell: set `$env:ANTHROPIC_API_KEY = $null` before the call — Codex starts a fresh shell per command, so this does not leak beyond the invocation). Never pass `--bare` and never use `--continue` — both break subscription billing or session isolation.
 
-3. Write the question to a temp file, preserving it exactly. Always pipe stdin into Claude; do not inline the question as a command-line argument, because shell quoting and interpolation differ across platforms.
+3. Write the question to a temp file, preserving it exactly. Create the temp file with a unique name (`mktemp` / `New-TemporaryFile`) and delete it after the run. Always pipe stdin into Claude; do not inline the question as a command-line argument, because shell quoting and interpolation differ across platforms.
 
 4. Run from the repository root (foreground, allow up to 10 minutes). Use the current platform's shell equivalent:
 
@@ -37,6 +37,8 @@ Steps — follow exactly:
    State directory (`<repo-hash>` is the first 16 lowercase hex characters of the SHA-256 of the absolute repository path; compute it this exact way every time or resume lookups will miss):
    - PowerShell: `$env:LOCALAPPDATA\claude-codex-bridge\sessions\<repo-hash>\`
    - POSIX: `${XDG_STATE_HOME:-$HOME/.local/state}/claude-codex-bridge/sessions/<repo-hash>/`
+
+   Files (must match what `/cc-resume` reads): `cc-sessions.json` is a JSON object mapping `session_id` → entry; `cc-last-session.json` holds the entry for the most recent session. Update files atomically: write to a temp file in the same directory, then rename over the target; rebuild a file that fails to parse.
 
    Registry entry:
 

@@ -1,0 +1,40 @@
+# claude-codex-bridge installer (Codex side)
+# Copies codex-prompts/*.md to ~/.codex/prompts/ so they appear as slash commands in Codex.
+$ErrorActionPreference = 'Stop'
+
+$src = Join-Path $PSScriptRoot 'codex-prompts'
+$dst = Join-Path $env:USERPROFILE '.codex\prompts'
+
+if (-not (Test-Path $src)) { throw "codex-prompts directory not found next to install.ps1" }
+New-Item -ItemType Directory -Force $dst | Out-Null
+
+Get-ChildItem $src -Filter *.md | ForEach-Object {
+    $target = Join-Path $dst $_.Name
+    if (Test-Path $target) {
+        Copy-Item $target "$target.bak" -Force
+        Write-Host "backup:    $($_.Name) -> $($_.Name).bak"
+    }
+    Copy-Item $_.FullName $target -Force
+    Write-Host "installed: $($_.Name)"
+}
+
+$stalePrompts = @('claude-ask.md', 'claude-review.md', 'claude-task.md', 'claude-resume.md', 'claude-fix.md')
+foreach ($staleName in $stalePrompts) {
+    $stalePrompt = Join-Path $dst $staleName
+    if (Test-Path $stalePrompt) {
+        Copy-Item $stalePrompt "$stalePrompt.bak" -Force
+        Remove-Item $stalePrompt -Force
+        Write-Host "removed stale: $staleName -> $staleName.bak"
+    }
+}
+
+if ($env:ANTHROPIC_API_KEY) {
+    Write-Warning "ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the cc-* prompts."
+}
+
+Write-Host ""
+Write-Host "Codex side installed. Prompts available in Codex as /cc-ask (etc.) after restarting Codex."
+Write-Host ""
+Write-Host "Claude side: run these inside Claude Code:"
+Write-Host "  /plugin marketplace add `"$PSScriptRoot`""
+Write-Host "  /plugin install cx@claude-codex-bridge"

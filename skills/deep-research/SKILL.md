@@ -31,7 +31,7 @@ Choose depth by decision risk and evidence complexity, not answer length:
 | Signal | Depth | Output |
 |---|---|---|
 | One source, one command, single file/snippet, or direct fact; low risk | Quick | Chat answer with inline evidence |
-| Several sources/components, behavior trace, comparison, likely bug, docs/code alignment, or current-state check | Standard | Concise answer plus saved findings when durable |
+| Several sources/components, behavior trace, comparison, likely bug, docs/code alignment, or current-state check | Standard | Concise answer; saved findings only per Save rules |
 | Durable decision, architecture, high-risk domain, unresolved contradictions, multi-source synthesis, or current-state reconciliation that affects behavior | Deep | Synthesis with risks, open questions, and source audit when useful |
 
 For Chinese requests, "分析一下 X" is Quick only for a single file, snippet, or local fact. "深度分析", "结合代码/数据/文档/运行状态", "整个链路", "给出高置信度", "原因分析", or "为什么" usually means Standard or Deep when the user is not asking to reproduce or fix a live failure.
@@ -43,7 +43,7 @@ For Standard/Deep:
 1. Check relevant prior work: research notes, design docs, docs index, project profiles, plans, or saved artifacts. If a named source does not exist, skip it and note the fallback.
 2. For codebase research, read the smallest relevant local authority set: nearest operating instructions, workspace/project rules, README/docs index, project profile, and named domain docs. Before concluding no formal local source exists, run a targeted local search with the question's domain terms and inspect sources surfaced by indexes, links, naming, or nearby aggregation.
 3. Build a source inventory, then orient before deep evidence gathering: choose the smallest orientation form that clarifies the decision boundary — a diagram, a table, or one structural sentence ([REFERENCE.md](REFERENCE.md#orientation-diagrams)) — and share it early as the scaffold. Ground every element in what you have read; mark unverified elements with `?` and keep remaining `?` marks in the final answer.
-4. Write a 3-5 line plan: key unknowns, where evidence will come from, and what would change the conclusion.
+4. State the key unknown and what would change the conclusion — one line is enough for a contained Standard question; write a 3-5 line plan including where evidence will come from only for Deep or when the investigation spans lanes or keeps expanding.
 5. For multi-source or high-impact questions, use 2-3 independent evidence lanes (code, tests/logs, docs/history, or official sources); lanes that merely cite the same upstream count as one lane. Reserve one lane for disconfirming evidence or the strongest counterexample when risk is high or sources disagree. Synthesize only claims that survive cross-checking; mark lane conflicts.
 6. For causal or "why" questions with more than one plausible cause, run a hypothesis tournament: keep 2-3 rival explanations alive, find the distinguishing check that separates them — including expected-but-absent evidence — and record why the losing explanations fail instead of anchoring on the first plausible mechanism.
 7. For article/report/proposal/technical-claim verification, extract factual claims first. Verify each claim against source/code evidence or mark it unsupported; do not summarize first and fact-check later. Grade claims as `Explicitly supported`, `Partially supported`, `Inferred`, `Unsupported`, or `Not checked` when that distinction affects the answer.
@@ -51,9 +51,9 @@ For Standard/Deep:
 
 Stop early when the premise is wrong, the answer is clear, or two consecutive steps no longer change the conclusion. Before each new read or search, ask whether it could change a conclusion; if it would only confirm what you already have, stop. For Quick depth, skip the diagram unless one line of structure clarifies the answer.
 
-Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to a handoff — name the target and hand off. An adopt/replace/upgrade decision is a dependency-adoption call outside this skill's lane: flag it and confirm scope with the user rather than owning it.
+Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to a handoff — name the target and hand off. An adopt/replace/upgrade decision belongs to first-principles-planner: deliver the evidence findings and route the decision there rather than owning it.
 
-Use [REFERENCE.md](REFERENCE.md) for diagram examples, current-state research, session-history analysis, broad-task staging, output patterns, saved artifact headers, and research-to-work handoff.
+Use [REFERENCE.md](REFERENCE.md) for diagram examples, a compressed worked example, current-state research, session-history analysis, broad-task staging, output patterns, saved artifact headers, and research-to-work handoff.
 
 ## 3. Evidence Discipline
 - Verified means read, fetched, queried, invoked, or ran in this session.
@@ -82,9 +82,9 @@ Before delivering a Standard/Deep conclusion, attack it once: name the strongest
 ## 5. Save
 Quick answers stay in chat unless the user asks for a file.
 
-For Standard/Deep, save findings when the result is durable or likely to be reused and an appropriate writable location exists, unless the user asks for chat-only. Classify artifacts as canonical (stable source of truth), supporting (evidence or one-time analysis), or temporary (scratch investigation).
+For Standard/Deep, deliver findings in chat by default. Save a file only when the user asked for one, the result is a handoff into a named next workflow (use the [REFERENCE.md](REFERENCE.md#research-to-work-handoff) format), or it belongs in a research-docs taxonomy the user or project established (a `docs/research/` created by this skill's own earlier runs does not count); for merely-durable findings, offer to save in one line instead of writing the file. Classify artifacts as canonical (stable source of truth), supporting (evidence or one-time analysis), or temporary (scratch investigation).
 
-Match the workspace/project docs taxonomy. Never save investigation outputs inside the skill's own folder. If no taxonomy exists, create/use `docs/research/` under the target workspace and state that default; use OS temp only when no writable target workspace or user-facing output directory is available, and explain that fallback. Only update or recommend canonical docs such as `CONTEXT.md`, ADRs, or project profiles when the research confirms stable terminology, boundaries, decisions, or reusable facts. Use [REFERENCE.md](REFERENCE.md#saved-artifact-headers) for localized artifact headers.
+When saving, match the workspace/project docs taxonomy. Never save investigation outputs inside the skill's own folder. If no taxonomy exists, use `docs/research/` under the target workspace and state that default; use OS temp only when no writable target workspace or user-facing output directory is available, and explain that fallback. Only update or recommend canonical docs such as `CONTEXT.md`, ADRs, or project profiles when the research confirms stable terminology, boundaries, decisions, or reusable facts. Use [REFERENCE.md](REFERENCE.md#saved-artifact-headers) for localized artifact headers.
 
 Name saved research artifacts with `YYYY-MM-DD-topic.md` by default. Prefer updating the same file for the same topic on the same day; add `-2` or `-HHmm` only when multiple same-day artifacts must coexist, preferring `-HHmm` for time-sensitive snapshots such as runtime/current-state checks. Do not add dates to canonical docs such as `CONTEXT.md`, ADRs, or project profiles.
 
@@ -95,5 +95,5 @@ Name saved research artifacts with `YYYY-MM-DD-topic.md` by default. Prefer upda
 - Apply external docs to local behavior without checking version, config, or environment applicability.
 - Smooth over contradictions instead of naming the distinguishing check.
 - Treat tool/environment blockers as domain findings.
-- Save disposable findings as canonical docs or skip a Standard/Deep saved artifact without an explicit reason.
+- Save disposable findings as canonical docs, or write research files outside the Save triggers.
 - Move from research into implementation when the user asked only for investigation.

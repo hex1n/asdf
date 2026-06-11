@@ -69,6 +69,8 @@ sh ./install.sh
 - **薄转发铁律**:两侧的命令/prompt 都只做"组 prompt → 跑一次 CLI → 原样返回结果";转发者不自己分析、不复述、不重试、失败不兜底。
 - **prompt 一律走 stdin**:Windows 的 `codex.cmd` shim 会弄碎命令行参数里的嵌套引号,各平台 shell 也会插值不同字符。`codex exec -` / `claude --print < prompt` + heredoc/here-string/temp file 是硬规则。
 - **task 合同通用**:`/cx:task` 与 `/cc-task` 使用同一套完成标准、验证循环和动作安全边界;差异只在外层 CLI、权限和沙箱。
+- **task 白名单是防误操作,不是安全沙箱**:`/cc-task` 在 `acceptEdits` 下放行 `Bash(npm run *)`、`Bash(make test *)` 等脚本入口,被委派的 Claude 完全可以先改 `package.json`/`Makefile` 再触发这些脚本。白名单挡的是无关的 drive-by 命令,挡不住有意为之;真正的安全边界是"只把任务委派给你信任的本机改动",不要据此把它当沙箱用。
+- **repo-hash 算法钉死**:registry 按仓库分目录的 `<repo-hash>` = 绝对仓库路径的 SHA-256 取前 16 位小写十六进制。写入(cx-task/cc-ask/cc-task/cc-review)和读取(cc-resume、cx-task resume)必须用同一算法,否则 resume 永远查不到 session。
 - **结果一律走 `-o <file>`**:`codex exec` 的 stdout 事件流含大量启动噪音(可超 100KB);最终回复用 `-o` 单独落盘,事件流进日志文件、只在失败时取尾部。
 - **resume 不用“最近会话”**:`--continue` 和 `codex exec resume --last` 都可能撞上用户正开的交互式会话。Claude 方向一律 `--resume <session_id>`;无参数 resume 只是读取 bridge registry 的 last 指针,也可用 `--session <id>` 回到历史 session。Codex 方向只续接显式 session 或 bridge registry 中记录的 session。
 - **不要让模型自动调用桥命令**:`/cx:*` command 和内部 skill 都禁用 model invocation,只允许用户显式 slash command 触发。

@@ -121,7 +121,9 @@ The goal is an informed decision, not a veto.
 For Plan mode, make the plan operationally specific:
 
 - What changes, including likely files/modules when known
-- Effort estimate with arithmetic, not vague size words
+- Effort estimates with a stated basis (counted files/modules, a comparable
+  past change), given as ranges; tag pure guesses `? unverified` instead of
+  inventing precise arithmetic
 - Priority by value/risk ratio
 - Dependencies and sequencing
 - Code examples only when the mechanism is non-obvious
@@ -133,7 +135,8 @@ true dependency. Name how each slice is verified: the outcome to observe, plus
 the boundary or failure path that matters when one applies. This is a
 verification cue, not a test matrix — skip categories that do not apply.
 
-Use a priority table with a total row:
+Use a priority table with a total row. Score Risk and Value as H/M/L; keep
+Effort in one unit (hours or days) so the total is meaningful:
 
 | Priority | Change | Effort | Risk | Value |
 |---|---|---:|---|---|
@@ -146,7 +149,8 @@ repeat the same reasoning in both action plan and analysis.
 
 - `verified`: read, fetched, queried, invoked, or ran in this session.
 - `? unverified`: recalled, inferred, or not checked.
-- Quantify feasibility, scale, and effort where possible.
+- Quantify feasibility, scale, and effort where evidence supports it;
+  otherwise give a range tagged `? unverified`.
 - Present tradeoffs honestly. Do not force a pick when constraints do not
   support one.
 

@@ -412,13 +412,27 @@ function codexUsageFooter(eventStream: string): string {
   return line ? `\n\n${line}\n` : "";
 }
 
-async function runCodex(args: string[], stdin: string | undefined, outFile: string): Promise<string> {
+interface CodexResult {
+  rendered: string; // out-file answer + token footer, ready to print as-is
+  sessionId?: string; // thread id codex reported in the event stream; undefined when none
+}
+
+/**
+ * The single place that spawns codex and the sole owner of event-stream
+ * parsing. Fails loudly on a non-zero exit or an empty answer; otherwise digests
+ * the JSONL stream so no caller ever touches it: `rendered` is the answer plus
+ * the token footer, `sessionId` is the thread id (if any).
+ */
+async function runCodex(args: string[], stdin: string | undefined, outFile: string): Promise<CodexResult> {
   const result = await run("codex", args, stdin, CODEX_TIMEOUT_MS);
   const output = existsSync(outFile) && statSync(outFile).size > 0 ? readFileSync(outFile, "utf8") : "";
   if (result.status !== 0 || output === "") {
     fail(tail(result.stdout + "\n" + result.stderr, 50), 1);
   }
-  return output + codexUsageFooter(result.stdout);
+  return {
+    rendered: output + codexUsageFooter(result.stdout),
+    sessionId: extractCodexSessionId(result.stdout),
+  };
 }
 
 function extractCodexSessionId(eventStream: string): string | undefined {
@@ -442,7 +456,7 @@ async function cxAsk(text: string, repo: string, selfTest: boolean): Promise<voi
   args.push("-");
 
   if (selfTest) return selfTestPrint({ argv: ["codex", ...args], stdin: CX_ASK_PROMPT(text) });
-  process.stdout.write(await runCodex(args, CX_ASK_PROMPT(text), outFile));
+  process.stdout.write((await runCodex(args, CX_ASK_PROMPT(text), outFile)).rendered);
 }
 
 async function cxTask(text: string, repo: string, followUp: boolean, selfTest: boolean): Promise<void> {
@@ -487,14 +501,9 @@ async function cxTask(text: string, repo: string, followUp: boolean, selfTest: b
   }
 
   if (selfTest) return selfTestPrint({ argv: ["codex", ...args], stdin, sessionId, background: background.present });
-  const result = await run("codex", args, stdin, CODEX_TIMEOUT_MS);
-  const output = existsSync(outFile) && statSync(outFile).size > 0 ? readFileSync(outFile, "utf8") : "";
-  if (result.status !== 0 || output === "") fail(tail(result.stdout + "\n" + result.stderr, 50), 1);
-  if (!sessionId) {
-    const found = extractCodexSessionId(result.stdout);
-    if (found) saveCxSession(repo, found);
-  }
-  process.stdout.write(output + codexUsageFooter(result.stdout));
+  const { rendered, sessionId: found } = await runCodex(args, stdin, outFile);
+  if (!sessionId && found) saveCxSession(repo, found);
+  process.stdout.write(rendered);
 }
 
 async function cxReview(text: string, repo: string, selfTest: boolean): Promise<void> {
@@ -515,7 +524,7 @@ async function cxReview(text: string, repo: string, selfTest: boolean): Promise<
   if (focus) args.push("-");
 
   if (selfTest) return selfTestPrint({ argv: ["codex", ...args], stdin: focus || undefined });
-  process.stdout.write(await runCodex(args, focus || undefined, outFile));
+  process.stdout.write((await runCodex(args, focus || undefined, outFile)).rendered);
 }
 
 // --------------------------------------------------------------- claude side

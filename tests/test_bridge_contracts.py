@@ -34,13 +34,14 @@ prev=""; out=""
 for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
 [ -n "$out" ] && printf 'codex answer\\n' > "$out"
 printf '{"type":"session.created","session_id":"aaaabbbb-cccc-4ddd-8eee-ffff00001111"}\\n'
+printf '{"type":"turn.completed","usage":{"input_tokens":2000,"cached_input_tokens":500,"output_tokens":42,"reasoning_output_tokens":8}}\\n'
 """
 
 CLAUDE_STUB = """#!/bin/sh
 printf '%s\\n' "$@" > "$STUB_DIR/claude-argv.txt"
 cat > "$STUB_DIR/claude-stdin.txt"
 if [ -n "$ANTHROPIC_API_KEY" ]; then echo leaked > "$STUB_DIR/apikey-leak.txt"; fi
-printf '{"result":"claude answer","session_id":"99998888-7777-4666-8555-444433332222","total_cost_usd":0.0712,"is_error":false}\\n'
+printf '{"result":"claude answer","session_id":"99998888-7777-4666-8555-444433332222","total_cost_usd":0.0712,"usage":{"input_tokens":1200,"cache_read_input_tokens":300,"cache_creation_input_tokens":0,"output_tokens":456},"is_error":false}\\n'
 """
 
 
@@ -133,16 +134,26 @@ class BridgeScriptTest(unittest.TestCase):
     def test_review_scope_flags_validated(self) -> None:
         decision = self.self_test("cx-review", "--base main check error handling")
         self.assertIn("--base", decision["argv"])
+        self.assertIn("--json", decision["argv"])  # needed so token usage is captured
         bad = self.self_test("cx-review", "--base 'main;rm' check stuff")
         self.assertIn("--uncommitted", bad["argv"])
         self.assertNotIn("--base", bad["argv"])
+
+    def test_cx_ask_emits_json_and_token_footer(self) -> None:
+        result = self.bridge("cx-ask", "what is this")
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertIn("codex answer", result.stdout)
+        self.assertIn("tokens: in=2000 (cached 500) out=42 (reasoning 8)", result.stdout)
+        # token usage comes from the JSONL event stream, which requires --json
+        self.assertIn("--json", read(self.tmp / "codex-argv.txt"))
 
     # ----------------------------------------------------- registry round-trip
 
     def test_fresh_run_records_session_and_follow_up_resumes_it(self) -> None:
         first = self.bridge("cx-task", "do the thing")
         self.assertEqual(0, first.returncode, first.stderr)
-        self.assertEqual("codex answer\n", first.stdout)
+        self.assertTrue(first.stdout.startswith("codex answer\n"), first.stdout)
+        self.assertIn("tokens: in=2000 (cached 500) out=42 (reasoning 8)", first.stdout)
         second = self.bridge("cx-task", "keep going", "--follow-up")
         self.assertEqual(0, second.returncode, second.stderr)
         argv = read(self.tmp / "codex-argv.txt").split()
@@ -179,11 +190,14 @@ class BridgeScriptTest(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertFalse((self.tmp / "apikey-leak.txt").exists())
 
-    def test_cc_output_ends_with_cost_and_session_line(self) -> None:
+    def test_cc_output_ends_with_tokens_cost_and_session_line(self) -> None:
         result = self.bridge("cc-ask", "hello")
         self.assertEqual(0, result.returncode, result.stderr)
         self.assertIn("claude answer", result.stdout)
-        self.assertIn("cost: $0.07 | session: 99998888-7777-4666-8555-444433332222", result.stdout)
+        self.assertIn(
+            "tokens: in=1500 (cached 300) out=456 | cost: $0.07 | session: 99998888-7777-4666-8555-444433332222",
+            result.stdout,
+        )
 
     def test_cc_task_uses_accept_edits_and_whitelist(self) -> None:
         decision = self.self_test("cc-task", "fix the bug")

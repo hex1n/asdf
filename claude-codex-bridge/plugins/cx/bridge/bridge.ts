@@ -22,7 +22,7 @@
  * Exit codes: 0 ok · 1 child CLI failed · 2 usage/registry error
  */
 
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -235,26 +235,99 @@ interface RunResult {
   stderr: string;
 }
 
-function run(cmd: string, args: string[], stdin: string | undefined, timeoutMs: number, env?: NodeJS.ProcessEnv): RunResult {
-  const result = spawnSync(cmd, args, {
-    input: stdin,
-    encoding: "utf8",
-    timeout: timeoutMs,
-    maxBuffer: 64 * 1024 * 1024,
-    env,
-    shell: false, // argv arrays only — user text never meets a shell parser
-  });
-  if (result.error) {
-    const code = (result.error as NodeJS.ErrnoException).code;
-    const hint =
-      code === "ENOENT"
-        ? `${cmd} is not on PATH`
-        : code === "ETIMEDOUT"
-          ? `${cmd} exceeded ${timeoutMs} ms`
-          : String(result.error);
-    return { status: 1, stdout: result.stdout ?? "", stderr: `${result.stderr ?? ""}\nbridge: ${hint}` };
+const MAX_BUFFER = 64 * 1024 * 1024;
+
+/**
+ * Resolve a bare command name to a concrete executable path on Windows.
+ *
+ * Bun (the runtime this bridge ships on) does not honour PATHEXT for `spawn`
+ * when `shell: false`, so a bare `codex` / `claude` — which exist only as
+ * `.cmd` launchers — fail with ENOENT. We resolve the full path ourselves and
+ * hand spawn an absolute path, which Bun launches directly. This keeps
+ * `shell: false`, so no shell ever parses our argv or the user's text. On
+ * POSIX (and when the name already contains a path) the bare name is returned
+ * unchanged and spawn resolves it via PATH as before.
+ */
+function resolveExecutable(cmd: string): string {
+  if (process.platform !== "win32" || /[\\/]/.test(cmd)) return cmd;
+  const exts = (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").map((e) => e.trim()).filter(Boolean);
+  for (const dir of (process.env.PATH ?? "").split(";")) {
+    if (!dir) continue;
+    for (const ext of [...exts, ""]) {
+      const candidate = join(dir, cmd + ext);
+      try {
+        if (statSync(candidate).isFile()) return candidate;
+      } catch {
+        /* not here — keep looking */
+      }
+    }
   }
-  return { status: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+  return cmd; // let spawn surface a clear ENOENT
+}
+
+/**
+ * Spawn a child, feed it `stdin`, and collect its output. Asynchronous because
+ * Bun's *synchronous* spawn (spawnSync and Bun.spawnSync alike) is broken on
+ * Windows — it fails every call with `ENOTCONN: socket is not connected`.
+ * Async spawn works on both runtimes and all platforms.
+ */
+function run(cmd: string, args: string[], stdin: string | undefined, timeoutMs: number, env?: NodeJS.ProcessEnv): Promise<RunResult> {
+  return new Promise((settle) => {
+    const child = spawn(resolveExecutable(cmd), args, {
+      env,
+      shell: false, // argv arrays only — no shell ever parses our args or user text
+      windowsHide: true,
+    });
+
+    const outChunks: Buffer[] = [];
+    const errChunks: Buffer[] = [];
+    let outLen = 0;
+    let errLen = 0;
+    let done = false;
+    let timedOut = false;
+    let overflowed = false;
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
+
+    const finish = (status: number, hint?: string): void => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      const stderr = Buffer.concat(errChunks).toString("utf8") + (hint ? `\nbridge: ${hint}` : "");
+      settle({ status, stdout: Buffer.concat(outChunks).toString("utf8"), stderr });
+    };
+
+    child.stdout.on("data", (d: Buffer) => {
+      outLen += d.length;
+      if (outLen > MAX_BUFFER) {
+        overflowed = true;
+        child.kill();
+        return;
+      }
+      outChunks.push(d);
+    });
+    child.stderr.on("data", (d: Buffer) => {
+      errLen += d.length;
+      if (errLen <= MAX_BUFFER) errChunks.push(d);
+    });
+
+    child.on("error", (e: NodeJS.ErrnoException) => {
+      finish(1, e.code === "ENOENT" ? `${cmd} is not on PATH` : String(e));
+    });
+    child.on("close", (code) => {
+      if (timedOut) return finish(1, `${cmd} exceeded ${timeoutMs} ms`);
+      if (overflowed) return finish(1, `${cmd} output exceeded ${MAX_BUFFER} bytes`);
+      finish(code ?? 1);
+    });
+
+    // A child that exits before draining stdin yields EPIPE; that surfaces via
+    // the exit status, so the write error itself is safe to swallow.
+    child.stdin.on("error", () => {});
+    child.stdin.end(stdin ?? "");
+  });
 }
 
 function tail(text: string, lines: number): string {
@@ -285,13 +358,67 @@ function codexOutFile(repo: string, background: boolean): string {
   return join(resolve(repo), `.cx-result-${stamp}-${randomBytes(2).toString("hex")}.md`);
 }
 
-function runCodex(args: string[], stdin: string | undefined, outFile: string): string {
-  const result = run("codex", args, stdin, CODEX_TIMEOUT_MS);
+// --------------------------------------------------------------- usage report
+
+function num(x: unknown): number | undefined {
+  return typeof x === "number" && Number.isFinite(x) ? x : undefined;
+}
+
+interface TokenCounts {
+  in?: number;
+  cached?: number;
+  out?: number;
+  reasoning?: number;
+}
+
+/** Compact "tokens: in=… (cached …) out=… (reasoning …)" line; "" when nothing is known. */
+function tokenLine(t: TokenCounts): string {
+  const parts: string[] = [];
+  if (t.in !== undefined) parts.push(`in=${t.in}${t.cached ? ` (cached ${t.cached})` : ""}`);
+  if (t.out !== undefined) parts.push(`out=${t.out}${t.reasoning ? ` (reasoning ${t.reasoning})` : ""}`);
+  return parts.length ? `tokens: ${parts.join(" ")}` : "";
+}
+
+/**
+ * Codex (`--json`) emits a `turn.completed` event carrying token usage; codex
+ * never reports a dollar cost, so we surface tokens only. Last turn wins (a
+ * single `codex exec` has exactly one turn).
+ */
+function extractCodexUsage(eventStream: string): TokenCounts | undefined {
+  let usage: TokenCounts | undefined;
+  for (const line of eventStream.split("\n")) {
+    const s = line.trim();
+    if (!s.startsWith("{") || !s.includes('"turn.completed"')) continue;
+    try {
+      const u = (JSON.parse(s) as { usage?: Record<string, unknown> }).usage;
+      if (u && typeof u === "object") {
+        usage = {
+          in: num(u.input_tokens),
+          cached: num(u.cached_input_tokens),
+          out: num(u.output_tokens),
+          reasoning: num(u.reasoning_output_tokens),
+        };
+      }
+    } catch {
+      /* ignore malformed event lines */
+    }
+  }
+  return usage;
+}
+
+/** Blank-line-separated token footer for codex output, or "" when usage is absent. */
+function codexUsageFooter(eventStream: string): string {
+  const line = tokenLine(extractCodexUsage(eventStream) ?? {});
+  return line ? `\n\n${line}\n` : "";
+}
+
+async function runCodex(args: string[], stdin: string | undefined, outFile: string): Promise<string> {
+  const result = await run("codex", args, stdin, CODEX_TIMEOUT_MS);
   const output = existsSync(outFile) && statSync(outFile).size > 0 ? readFileSync(outFile, "utf8") : "";
   if (result.status !== 0 || output === "") {
     fail(tail(result.stdout + "\n" + result.stderr, 50), 1);
   }
-  return output;
+  return output + codexUsageFooter(result.stdout);
 }
 
 function extractCodexSessionId(eventStream: string): string | undefined {
@@ -301,23 +428,24 @@ function extractCodexSessionId(eventStream: string): string | undefined {
   return match && UUID_RE.test(match[1]) ? match[1].toLowerCase() : undefined;
 }
 
-function cxAsk(text: string, repo: string, selfTest: boolean): void {
+async function cxAsk(text: string, repo: string, selfTest: boolean): Promise<void> {
   let model: string | undefined, effort: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   ({ text, value: effort } = takeValueFlag(text, { flag: "--effort", validate: (v) => EFFORTS.has(v) }));
   model = model ? (MODEL_ALIASES[model] ?? model) : undefined;
 
   const outFile = codexOutFile(repo, false);
-  const args = ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "--color", "never", "-o", outFile];
+  // --json gives the JSONL event stream we parse for token usage; -o still holds the answer.
+  const args = ["exec", "--sandbox", "read-only", "--skip-git-repo-check", "--color", "never", "--json", "-o", outFile];
   if (model) args.push("-m", model);
   if (effort) args.push("-c", `model_reasoning_effort=${effort}`);
   args.push("-");
 
   if (selfTest) return selfTestPrint({ argv: ["codex", ...args], stdin: CX_ASK_PROMPT(text) });
-  process.stdout.write(runCodex(args, CX_ASK_PROMPT(text), outFile));
+  process.stdout.write(await runCodex(args, CX_ASK_PROMPT(text), outFile));
 }
 
-function cxTask(text: string, repo: string, followUp: boolean, selfTest: boolean): void {
+async function cxTask(text: string, repo: string, followUp: boolean, selfTest: boolean): Promise<void> {
   let model: string | undefined, effort: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   ({ text, value: effort } = takeValueFlag(text, { flag: "--effort", validate: (v) => EFFORTS.has(v) }));
@@ -344,8 +472,8 @@ function cxTask(text: string, repo: string, followUp: boolean, selfTest: boolean
   let args: string[];
   let stdin: string;
   if (sessionId) {
-    // resume/review subcommands do not accept --color; plain `codex exec` does.
-    args = ["exec", "resume", sessionId, "-c", "sandbox_mode=workspace-write", "-o", outFile];
+    // resume does not accept --color but does accept --json (token usage) and -o.
+    args = ["exec", "resume", sessionId, "-c", "sandbox_mode=workspace-write", "--json", "-o", outFile];
     if (model) args.push("-m", model);
     if (effort) args.push("-c", `model_reasoning_effort=${effort}`);
     args.push("-");
@@ -359,17 +487,17 @@ function cxTask(text: string, repo: string, followUp: boolean, selfTest: boolean
   }
 
   if (selfTest) return selfTestPrint({ argv: ["codex", ...args], stdin, sessionId, background: background.present });
-  const result = run("codex", args, stdin, CODEX_TIMEOUT_MS);
+  const result = await run("codex", args, stdin, CODEX_TIMEOUT_MS);
   const output = existsSync(outFile) && statSync(outFile).size > 0 ? readFileSync(outFile, "utf8") : "";
   if (result.status !== 0 || output === "") fail(tail(result.stdout + "\n" + result.stderr, 50), 1);
   if (!sessionId) {
     const found = extractCodexSessionId(result.stdout);
     if (found) saveCxSession(repo, found);
   }
-  process.stdout.write(output);
+  process.stdout.write(output + codexUsageFooter(result.stdout));
 }
 
-function cxReview(text: string, repo: string, selfTest: boolean): void {
+async function cxReview(text: string, repo: string, selfTest: boolean): Promise<void> {
   let model: string | undefined, base: string | undefined, commit: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   ({ text, value: base } = takeValueFlag(text, { flag: "--base", validate: (v) => BRANCH_RE.test(v) }));
@@ -382,27 +510,35 @@ function cxReview(text: string, repo: string, selfTest: boolean): void {
   if (base) args.push("--base", base);
   else if (commit) args.push("--commit", commit);
   else args.push("--uncommitted");
-  args.push("-o", outFile);
+  args.push("--json", "-o", outFile); // --json for token usage; review rejects --color
   if (model) args.push("-m", model);
   if (focus) args.push("-");
 
   if (selfTest) return selfTestPrint({ argv: ["codex", ...args], stdin: focus || undefined });
-  process.stdout.write(runCodex(args, focus || undefined, outFile));
+  process.stdout.write(await runCodex(args, focus || undefined, outFile));
 }
 
 // --------------------------------------------------------------- claude side
+
+interface ClaudeUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cache_read_input_tokens?: number;
+  cache_creation_input_tokens?: number;
+}
 
 interface ClaudeJson {
   result?: string;
   session_id?: string;
   total_cost_usd?: number;
   is_error?: boolean;
+  usage?: ClaudeUsage;
 }
 
-function runClaude(args: string[], stdin: string, timeoutMs: number, selfTest: boolean): ClaudeJson | void {
+async function runClaude(args: string[], stdin: string, timeoutMs: number, selfTest: boolean): Promise<ClaudeJson | void> {
   const argv = ["--print", "--output-format", "json", ...args];
   if (selfTest) return selfTestPrint({ argv: ["claude", ...argv], stdin, billingGuard: true });
-  const result = run("claude", argv, stdin, timeoutMs, claudeEnv());
+  const result = await run("claude", argv, stdin, timeoutMs, claudeEnv());
   if (result.status !== 0) fail(tail(result.stdout + "\n" + result.stderr, 50), 1);
   let parsed: ClaudeJson;
   try {
@@ -419,19 +555,32 @@ function reportClaude(parsed: ClaudeJson, repo: string, source: CcEntry["source"
     saveCcSession(repo, { session_id: parsed.session_id.toLowerCase(), source, cwd: resolve(repo) });
   }
   const cost = typeof parsed.total_cost_usd === "number" ? parsed.total_cost_usd.toFixed(2) : "?";
-  process.stdout.write(`${parsed.result ?? ""}\n\ncost: $${cost} | session: ${parsed.session_id ?? "unknown"}\n`);
+  const u = parsed.usage;
+  // Claude reports usage and a dollar cost. "in" is total input volume (fresh +
+  // cache create + cache read); the cached portion is annotated separately.
+  const tokens = tokenLine(
+    u
+      ? {
+          in: (num(u.input_tokens) ?? 0) + (num(u.cache_read_input_tokens) ?? 0) + (num(u.cache_creation_input_tokens) ?? 0) || undefined,
+          cached: num(u.cache_read_input_tokens),
+          out: num(u.output_tokens),
+        }
+      : {},
+  );
+  const meta = [tokens, `cost: $${cost}`, `session: ${parsed.session_id ?? "unknown"}`].filter(Boolean).join(" | ");
+  process.stdout.write(`${parsed.result ?? ""}\n\n${meta}\n`);
 }
 
-function ccAsk(text: string, repo: string, selfTest: boolean): void {
+async function ccAsk(text: string, repo: string, selfTest: boolean): Promise<void> {
   let model: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   const args = [...ccModeArgs("ask")];
   if (model) args.push("--model", model);
-  const parsed = runClaude(args, text, CLAUDE_ASK_TIMEOUT_MS, selfTest);
+  const parsed = await runClaude(args, text, CLAUDE_ASK_TIMEOUT_MS, selfTest);
   if (parsed) reportClaude(parsed, repo, "ask");
 }
 
-function ccReview(text: string, repo: string, selfTest: boolean): void {
+async function ccReview(text: string, repo: string, selfTest: boolean): Promise<void> {
   let model: string | undefined, base: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   ({ text, value: base } = takeValueFlag(text, { flag: "--base", validate: (v) => BRANCH_RE.test(v) }));
@@ -440,20 +589,20 @@ function ccReview(text: string, repo: string, selfTest: boolean): void {
     : "uncommitted changes via `git status --short`, `git diff HEAD`, and `git ls-files --others --exclude-standard`";
   const args = [...ccModeArgs("review")];
   if (model) args.push("--model", model);
-  const parsed = runClaude(args, CC_REVIEW_PROMPT(scope, text.trim()), CLAUDE_ASK_TIMEOUT_MS, selfTest);
+  const parsed = await runClaude(args, CC_REVIEW_PROMPT(scope, text.trim()), CLAUDE_ASK_TIMEOUT_MS, selfTest);
   if (parsed) reportClaude(parsed, repo, "review");
 }
 
-function ccTask(text: string, repo: string, selfTest: boolean): void {
+async function ccTask(text: string, repo: string, selfTest: boolean): Promise<void> {
   let model: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   const args = [...ccModeArgs("task")];
   if (model) args.push("--model", model);
-  const parsed = runClaude(args, CC_TASK_PROMPT(text), CLAUDE_TASK_TIMEOUT_MS, selfTest);
+  const parsed = await runClaude(args, CC_TASK_PROMPT(text), CLAUDE_TASK_TIMEOUT_MS, selfTest);
   if (parsed) reportClaude(parsed, repo, "task");
 }
 
-function ccResume(text: string, repo: string, selfTest: boolean): void {
+async function ccResume(text: string, repo: string, selfTest: boolean): Promise<void> {
   let model: string | undefined, session: string | undefined, mode: string | undefined;
   ({ text, value: model } = takeValueFlag(text, { flag: "--model", validate: (v) => MODEL_RE.test(v) }));
   ({ text, value: session } = takeValueFlag(text, { flag: "--session", validate: (v) => UUID_RE.test(v) }));
@@ -477,7 +626,7 @@ function ccResume(text: string, repo: string, selfTest: boolean): void {
 
   const args = [...ccModeArgs(entry.source), "--resume", entry.session_id];
   if (model) args.push("--model", model);
-  const parsed = runClaude(args, text, CLAUDE_TASK_TIMEOUT_MS, selfTest);
+  const parsed = await runClaude(args, text, CLAUDE_TASK_TIMEOUT_MS, selfTest);
   if (parsed) reportClaude(parsed, repo, entry.source);
 }
 
@@ -487,7 +636,7 @@ function selfTestPrint(decision: Record<string, unknown>): void {
   process.stdout.write(JSON.stringify(decision, null, 2) + "\n");
 }
 
-function main(argv: string[]): void {
+async function main(argv: string[]): Promise<void> {
   const [subcommand, ...rest] = argv;
   let textFile: string | undefined;
   let repo = process.cwd();
@@ -521,4 +670,6 @@ function main(argv: string[]): void {
   }
 }
 
-main(process.argv.slice(2));
+main(process.argv.slice(2)).catch((err) => {
+  fail(`bridge: ${err instanceof Error ? err.message : String(err)}`, 1);
+});

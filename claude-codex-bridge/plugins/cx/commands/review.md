@@ -1,6 +1,6 @@
 ---
 description: Have Codex review local git changes (native codex review contract)
-argument-hint: "[--base <branch>] [--commit <sha>] [--model <m>|spark] [custom review focus]"
+argument-hint: "[--base <branch>] [--commit <sha>] [--model <m>] [custom review focus]"
 allowed-tools: Bash
 disable-model-invocation: true
 ---
@@ -15,7 +15,7 @@ Strip these from the text; whatever remains is the custom review focus (may be e
 
 - `--base <branch>` → review changes against that base branch.
 - `--commit <sha>` → review the changes introduced by that commit.
-- `--model <m>` → add `-m <m>`. Map `spark` to `gpt-5.3-codex-spark`.
+- `--model <m>` -> add `-m <m>`.
 - If neither `--base` nor `--commit` is given, default to `--uncommitted` (staged + unstaged + untracked).
 
 ## 2. Run exactly one command

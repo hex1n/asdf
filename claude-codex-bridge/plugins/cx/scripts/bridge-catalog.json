@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "profiles": {
+    "claude": {
+      "consult": {
+        "description": "Read-only Claude consultation",
+        "baseArgs": [
+          "--print",
+          "--output-format",
+          "json"
+        ],
+        "modeArgs": [
+          "--strict-mcp-config",
+          "--tools",
+          "Read,Grep,Glob",
+          "--allowedTools",
+          "Read,Grep,Glob"
+        ],
+        "actions": {
+          "direct": [],
+          "work": [],
+          "resume": [
+            "--resume",
+            "{resumeFrom}"
+          ]
+        }
+      },
+      "review": {
+        "description": "Read-only Claude review with git inspection",
+        "baseArgs": [
+          "--print",
+          "--output-format",
+          "json"
+        ],
+        "modeArgs": [
+          "--strict-mcp-config",
+          "--tools",
+          "Read,Grep,Glob,Bash",
+          "--allowedTools",
+          "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)"
+        ],
+        "actions": {
+          "direct": [],
+          "work": [],
+          "resume": [
+            "--resume",
+            "{resumeFrom}"
+          ]
+        }
+      },
+      "work": {
+        "description": "Write-capable Claude work",
+        "baseArgs": [
+          "--print",
+          "--output-format",
+          "json"
+        ],
+        "modeArgs": [
+          "--strict-mcp-config",
+          "--tools",
+          "Read,Edit,Write,Grep,Glob,Bash",
+          "--permission-mode",
+          "acceptEdits",
+          "--allowedTools",
+          "Read,Edit,Write,Grep,Glob,Bash(git status *),Bash(git diff *),Bash(npm test *),Bash(npm run *),Bash(pnpm test *),Bash(pnpm run *),Bash(yarn test *),Bash(yarn run *),Bash(bun test *),Bash(deno test *),Bash(pytest *),Bash(python -m pytest *),Bash(uv run pytest *),Bash(go test *),Bash(cargo test *),Bash(mvn test *),Bash(mvn verify *),Bash(gradle test *),Bash(gradlew test *),Bash(dotnet test *),Bash(make test *),Bash(bundle exec rspec *),Bash(rspec *)"
+        ],
+        "actions": {
+          "work": [],
+          "resume": [
+            "--resume",
+            "{resumeFrom}"
+          ]
+        }
+      }
+    },
+    "cx": {
+      "consult": {
+        "description": "Read-only Codex consultation",
+        "baseArgs": [],
+        "modeArgs": [],
+        "actions": {
+          "direct": [
+            "exec",
+            "--sandbox",
+            "read-only",
+            "--skip-git-repo-check",
+            "--color",
+            "never",
+            "-o",
+            "{resultFile}",
+            "{modelAndEffortArgs}",
+            "-"
+          ]
+        }
+      },
+      "review": {
+        "description": "Codex built-in review",
+        "baseArgs": [],
+        "modeArgs": [],
+        "actions": {
+          "direct": [
+            "exec",
+            "review",
+            "{scope}",
+            "-o",
+            "{resultFile}",
+            "{modelArgs}",
+            "-"
+          ]
+        }
+      },
+      "work": {
+        "description": "Workspace-write Codex work",
+        "baseArgs": [],
+        "modeArgs": [],
+        "actions": {
+          "work": [
+            "exec",
+            "--sandbox",
+            "workspace-write",
+            "--skip-git-repo-check",
+            "--color",
+            "never",
+            "--json",
+            "-o",
+            "{resultFile}",
+            "{modelAndEffortArgs}",
+            "-"
+          ],
+          "resume": [
+            "exec",
+            "resume",
+            "{resumeFrom}",
+            "-c",
+            "sandbox_mode=workspace-write",
+            "-o",
+            "{resultFile}",
+            "{modelAndEffortArgs}",
+            "-"
+          ]
+        }
+      }
+    }
+  },
+  "sessionSources": {
+    "claude": [
+      "consult",
+      "review",
+      "work"
+    ],
+    "cx": [
+      "work"
+    ]
+  },
+  "entrypoints": {
+    "claude": {
+      "consult": {
+        "type": "direct",
+        "profile": "consult",
+        "registerSession": true
+      },
+      "review": {
+        "type": "direct",
+        "profile": "review",
+        "registerSession": true
+      },
+      "work": {
+        "type": "task",
+        "action": "work",
+        "profile": "work"
+      },
+      "resume": {
+        "type": "task",
+        "action": "resume"
+      },
+      "status": {
+        "type": "lookup",
+        "action": "status"
+      },
+      "result": {
+        "type": "lookup",
+        "action": "result"
+      },
+      "cancel": {
+        "type": "lookup",
+        "action": "cancel"
+      }
+    },
+    "cx": {
+      "consult": {
+        "type": "direct",
+        "profile": "consult"
+      },
+      "review": {
+        "type": "direct",
+        "profile": "review"
+      },
+      "work": {
+        "type": "task",
+        "action": "work",
+        "profile": "work"
+      },
+      "resume": {
+        "type": "task",
+        "action": "resume"
+      },
+      "status": {
+        "type": "lookup",
+        "action": "status"
+      },
+      "result": {
+        "type": "lookup",
+        "action": "result"
+      },
+      "cancel": {
+        "type": "lookup",
+        "action": "cancel"
+      }
+    }
+  }
+}

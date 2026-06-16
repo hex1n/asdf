@@ -1,39 +1,64 @@
 # claude-codex-bridge installer (Codex side)
-# Copies codex-prompts/*.md to ~/.codex/prompts/ so they appear as slash commands in Codex.
+# Installs the Codex-side plugin and removes old direct prompt/skill entries.
 $ErrorActionPreference = 'Stop'
 
-$src = Join-Path $PSScriptRoot 'codex-prompts'
-$dst = Join-Path $env:USERPROFILE '.codex\prompts'
+$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE '.codex' }
+$pluginName = 'claude-codex-bridge'
+$marketplaceName = 'claude-codex-bridge'
 
-if (-not (Test-Path $src)) { throw "codex-prompts directory not found next to install.ps1" }
-New-Item -ItemType Directory -Force $dst | Out-Null
+if (-not (Get-Command codex -ErrorAction SilentlyContinue)) { throw "codex CLI not found on PATH" }
 
-Get-ChildItem $src -Filter *.md | ForEach-Object {
-    $target = Join-Path $dst $_.Name
-    if (Test-Path $target) {
-        Copy-Item $target "$target.bak" -Force
-        Write-Host "backup:    $($_.Name) -> $($_.Name).bak"
-    }
-    Copy-Item $_.FullName $target -Force
-    Write-Host "installed: $($_.Name)"
+if (-not (Test-Path (Join-Path $PSScriptRoot '.agents\plugins\marketplace.json'))) {
+    throw "Codex marketplace manifest not found"
 }
 
-$stalePrompts = @('claude-ask.md', 'claude-review.md', 'claude-task.md', 'claude-resume.md', 'claude-fix.md')
-foreach ($staleName in $stalePrompts) {
-    $stalePrompt = Join-Path $dst $staleName
-    if (Test-Path $stalePrompt) {
-        Copy-Item $stalePrompt "$stalePrompt.bak" -Force
-        Remove-Item $stalePrompt -Force
-        Write-Host "removed stale: $staleName -> $staleName.bak"
+if (-not (Test-Path (Join-Path $PSScriptRoot "plugins\$pluginName\.codex-plugin\plugin.json"))) {
+    throw "Codex plugin manifest not found"
+}
+
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Warning "node CLI not found on PATH. Claude-side /cx:work, /cx:resume, /cx:status, /cx:result, and /cx:cancel require Node.js 18.18+."
+}
+
+function Remove-LegacyPath {
+    param(
+        [string] $Path,
+        [string] $Label
+    )
+
+    if (-not (Test-Path $Path)) {
+        return
     }
+
+    $item = Get-Item $Path
+    if ($item.LinkType) {
+        Remove-Item $Path -Force
+        Write-Host "removed legacy ${Label}: $Path"
+    } else {
+        Move-Item $Path "$Path.bak" -Force
+        Write-Host "backup legacy ${Label}: $Path -> $Path.bak"
+    }
+}
+
+@('cc-ask.md', 'cc-review.md', 'cc-task.md', 'cc-resume.md', 'claude-ask.md', 'claude-review.md', 'claude-task.md', 'claude-resume.md', 'claude-fix.md', 'claude-consult.md', 'claude-work.md') | ForEach-Object {
+    Remove-LegacyPath (Join-Path $codexHome "prompts\$_") 'prompt'
+}
+
+@('cc-ask', 'cc-review', 'cc-task', 'cc-resume', 'claude-ask', 'claude-task', 'claude-consult', 'claude-review', 'claude-work', 'claude-resume') | ForEach-Object {
+    Remove-LegacyPath (Join-Path $codexHome "skills\$_") 'skill'
 }
 
 if ($env:ANTHROPIC_API_KEY) {
-    Write-Warning "ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the cc-* prompts."
+    Write-Warning "ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the /claude-* commands."
 }
 
+codex plugin marketplace add "$PSScriptRoot"
+codex plugin add "$pluginName@$marketplaceName"
+
 Write-Host ""
-Write-Host "Codex side installed. Prompts available in Codex as /cc-ask (etc.) after restarting Codex."
+Write-Host "Codex side installed as plugin: $pluginName@$marketplaceName"
+Write-Host "Open a new Codex session before using /claude-consult, /claude-review, /claude-work, /claude-resume, /claude-status, /claude-result, or /claude-cancel."
+Write-Host "Claude-side task commands require Node.js 18.18+ on PATH."
 Write-Host ""
 Write-Host "Claude side: run these inside Claude Code:"
 Write-Host "  /plugin marketplace add `"$PSScriptRoot`""

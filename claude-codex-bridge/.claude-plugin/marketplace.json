@@ -1,6 +1,6 @@
 {
   "name": "claude-codex-bridge",
-  "description": "Local bidirectional bridge commands for delegating review, questions, and task execution between Claude Code and Codex.",
+  "description": "Local bidirectional bridge commands for delegating consult, review, work, and resume workflows between Claude Code and Codex.",
   "owner": {
     "name": "hexin"
   },
@@ -8,7 +8,7 @@
     {
       "name": "cx",
       "source": "./plugins/cx",
-      "description": "Bidirectional Claude<->Codex bridge (thin CLI wrapper, no Node runtime)"
+      "description": "Bidirectional Claude<->Codex bridge with thin consult/review wrappers and a Node companion for trackable jobs"
     }
   ]
 }

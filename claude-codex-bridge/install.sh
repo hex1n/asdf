@@ -2,43 +2,61 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd "$(dirname "$0")" && pwd)
-SRC="$SCRIPT_DIR/codex-prompts"
-DST="${HOME:?HOME is not set}/.codex/prompts"
+CODEX_HOME="${CODEX_HOME:-${HOME:?HOME is not set}/.codex}"
+PLUGIN_NAME="claude-codex-bridge"
+MARKETPLACE_NAME="claude-codex-bridge"
 
-if [ ! -d "$SRC" ]; then
-  echo "codex-prompts directory not found next to install.sh" >&2
+if ! command -v codex >/dev/null 2>&1; then
+  echo "codex CLI not found on PATH" >&2
   exit 1
 fi
 
-mkdir -p "$DST"
+if [ ! -f "$SCRIPT_DIR/.agents/plugins/marketplace.json" ]; then
+  echo "Codex marketplace manifest not found: $SCRIPT_DIR/.agents/plugins/marketplace.json" >&2
+  exit 1
+fi
 
-for prompt in "$SRC"/*.md; do
-  [ -e "$prompt" ] || continue
-  name=$(basename "$prompt")
-  target="$DST/$name"
-  if [ -e "$target" ]; then
-    cp "$target" "$target.bak"
-    echo "backup:    $name -> $name.bak"
+if [ ! -f "$SCRIPT_DIR/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json" ]; then
+  echo "Codex plugin manifest not found: $SCRIPT_DIR/plugins/$PLUGIN_NAME/.codex-plugin/plugin.json" >&2
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "warning: node CLI not found on PATH. Claude-side /cx:work, /cx:resume, /cx:status, /cx:result, and /cx:cancel require Node.js 18.18+." >&2
+fi
+
+cleanup_path() {
+  path=$1
+  label=$2
+  if [ -L "$path" ]; then
+    rm "$path"
+    echo "removed legacy $label: $path"
+  elif [ -e "$path" ]; then
+    backup="$path.bak"
+    mv "$path" "$backup"
+    echo "backup legacy $label: $path -> $backup"
   fi
-  cp "$prompt" "$target"
-  echo "installed: $name"
+}
+
+for prompt_name in cc-ask.md cc-review.md cc-task.md cc-resume.md claude-ask.md claude-review.md claude-task.md claude-resume.md claude-fix.md claude-consult.md claude-work.md; do
+  cleanup_path "$CODEX_HOME/prompts/$prompt_name" "prompt"
 done
 
-for stale_name in claude-ask.md claude-review.md claude-task.md claude-resume.md claude-fix.md; do
-  stale_prompt="$DST/$stale_name"
-  if [ -e "$stale_prompt" ]; then
-    cp "$stale_prompt" "$stale_prompt.bak"
-    rm "$stale_prompt"
-    echo "removed stale: $stale_name -> $stale_name.bak"
-  fi
+for skill_name in cc-ask cc-review cc-task cc-resume claude-ask claude-task claude-consult claude-review claude-work claude-resume; do
+  cleanup_path "$CODEX_HOME/skills/$skill_name" "skill"
 done
 
 if [ "${ANTHROPIC_API_KEY:-}" ]; then
-  echo "warning: ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the cc-* prompts." >&2
+  echo "warning: ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the /claude-* commands." >&2
 fi
 
+codex plugin marketplace add "$SCRIPT_DIR"
+codex plugin add "$PLUGIN_NAME@$MARKETPLACE_NAME"
+
 echo ""
-echo "Codex side installed. Prompts available in Codex as /cc-ask (etc.) after restarting Codex."
+echo "Codex side installed as plugin: $PLUGIN_NAME@$MARKETPLACE_NAME"
+echo "Open a new Codex session before using /claude-consult, /claude-review, /claude-work, /claude-resume, /claude-status, /claude-result, or /claude-cancel."
+echo "Claude-side task commands require Node.js 18.18+ on PATH."
 echo ""
 echo "Claude side: run these inside Claude Code:"
 quoted_dir=$(printf "%s" "$SCRIPT_DIR" | sed "s/'/'\\\\''/g")

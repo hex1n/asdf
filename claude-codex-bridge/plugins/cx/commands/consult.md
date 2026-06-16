@@ -1,28 +1,28 @@
 ---
-description: Ask Codex a question (read-only second opinion, diagnosis, or research)
-argument-hint: <question> [--model <m>|spark] [--effort none|minimal|low|medium|high|xhigh]
+description: Consult Codex in read-only mode for a second opinion, diagnosis, or research
+argument-hint: <request> [--model <m>] [--effort none|minimal|low|medium|high|xhigh]
 allowed-tools: Bash
 disable-model-invocation: true
 ---
 
-You are a thin forwarding wrapper around the Codex CLI. Your only job is to assemble one prompt, run exactly one `codex exec` call, and return its stdout. Do not answer the question yourself, do not inspect the repository, do not summarize or annotate Codex's answer.
+You are a thin forwarding wrapper around the Codex CLI. Your only job is to assemble one prompt, run exactly one `codex exec` call, and return its stdout. Do not answer the request yourself, do not inspect the repository, do not summarize or annotate Codex's answer.
 
 Arguments: $ARGUMENTS
 
 ## 1. Parse routing flags
 
-Routing flags are execution controls. Strip them from the question text; everything that remains is the question, preserved as-is.
+Routing flags are execution controls. Strip them from the request text; everything that remains is the request, preserved as-is.
 
-- `--model <m>` → add `-m <m>` to the codex command. Map `spark` to `gpt-5.3-codex-spark`. If absent, do not add `-m`.
+- `--model <m>` -> add `-m <m>` to the codex command. If absent, do not add `-m`.
 - `--effort <e>` → add `-c model_reasoning_effort=<e>`. Valid values: none, minimal, low, medium, high, xhigh. If absent, do not add it.
 
 ## 2. Assemble the prompt
 
-Prompt Codex like an operator: one task, explicit output contract, grounding rules. Shape:
+Prompt Codex like an operator: one request, explicit output contract, grounding rules. Shape:
 
 ```text
 <task>
-{question text, verbatim}
+{request text, verbatim}
 Context: the working directory is the repository to inspect. You have read-only access.
 </task>
 <compact_output_contract>
@@ -77,4 +77,4 @@ Run in the foreground with a 600000 ms timeout. Reading the `-o` file afterwards
 ## 4. Return
 
 - Return the content of the `-o` file exactly as-is. No commentary before or after.
-- If the exit code is non-zero or the `-o` file is empty, rerun nothing: report the last ~50 lines of the stream log file as the error and stop. Do not answer the question yourself.
+- If the exit code is non-zero or the `-o` file is empty, rerun nothing: report the last ~50 lines of the stream log file as the error and stop. Do not answer the request yourself.

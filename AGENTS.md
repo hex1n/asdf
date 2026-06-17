@@ -21,7 +21,7 @@ When the user asks to improve a skill, treat it as an evidence loop rather than 
 
 Before changing any skill, load and apply `write-a-skill` as the authoring frame for structure, progressive disclosure, bundled resources, and review checklist. If `write-a-skill` is unavailable, record the fallback in the round notes before editing.
 
-1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include the failure modes and negative cases the skill must handle, not just the happy path, so the baseline is not an optimistic softball.
+1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include success criteria, failure modes, and negative or non-trigger examples, not just the happy path, so the baseline is not an optimistic softball.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.
 3. Apply the narrowest edit: catalog/routing text, reference rule, script logic, or focused test.
 4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful.
@@ -30,11 +30,11 @@ Before changing any skill, load and apply `write-a-skill` as the authoring frame
 
 ### Why there is no point score
 
-The decision has three outcomes — accept, continue, or reject — so it carries only about one and a half bits. A 100-point scale invents far more resolution than the decision can hold, and because the author is the grader, that surplus precision becomes a place for optimism bias to hide rather than a measure of quality. The honest design replaces measurement with falsifiable gates plus one directional judgment, so the decision matches the evidence you can actually produce.
+The quality decision has three terminal outcomes — accept, continue, or reject — so it carries only about one and a half bits. `Accept provisional` is not a fourth quality rating; it is an evidence status for an otherwise acceptable edit that still lacks independent falsification. A 100-point scale invents far more resolution than the decision can hold, and because the author is the grader, that surplus precision becomes a place for optimism bias to hide rather than a measure of quality. The honest design replaces measurement with falsifiable gates plus one directional judgment, so the decision matches the evidence you can actually produce.
 
 ### Layer 1 — hard gates (binary; all must pass or the edit is rejected)
 
-- A baseline output exists (or, for a net-new skill, the expected-behavior spec) and a real validation artifact is present.
+- A baseline output exists (or, for a net-new skill, an expected-behavior spec with success criteria, failure modes, and negative or non-trigger examples) and a real validation artifact is present.
 - No unresolved correctness, safety, or privacy regression remains.
 - `SKILL.md` stays task-facing and does not become a maintenance manual.
 - Runtime portability is preserved.
@@ -91,7 +91,13 @@ Relative delta: +x / 0 / -x (trend only)
 Task sample:
 - project:
 - command:
-- output artifact:
+- baseline artifact:
+- candidate artifact:
+- validation artifact / diff:
+
+Expected-behavior spec (net-new only):
+- success criteria:
+- failure modes / negative or non-trigger examples:
 
 Wins:
 - ...

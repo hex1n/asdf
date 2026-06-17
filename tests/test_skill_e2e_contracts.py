@@ -78,12 +78,19 @@ SCENARIOS = (
             "baseline output",
             "real task",
             "two-layer gate",
+            "quality decision",
+            "evidence status",
             "hard gates",
             "improvement magnitude",
             "generalization confidence",
             "adversarial falsification",
             "objective conditions",
             "net-new skill",
+            "failure modes",
+            "negative or non-trigger examples",
+            "baseline artifact",
+            "candidate artifact",
+            "validation artifact / diff",
             "relative delta",
             "regressions",
             "continue / accept / accept provisional / reject",
@@ -485,8 +492,15 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("store temporary comparison outputs outside the skill folder", agents)
         self.assertIn("do not score the edit on an absolute point scale", agents)
         self.assertIn("two-layer gate", agents)
+        self.assertIn("quality decision", agents)
+        self.assertIn("evidence status", agents)
         self.assertIn("hard gates", agents)
         self.assertIn("net-new skill", agents)
+        self.assertIn("failure modes", agents)
+        self.assertIn("negative or non-trigger examples", agents)
+        self.assertIn("baseline artifact", agents)
+        self.assertIn("candidate artifact", agents)
+        self.assertIn("validation artifact / diff", agents)
         self.assertIn("improvement magnitude: none / marginal / clear / large", agents)
         self.assertIn("generalization confidence", agents)
         self.assertIn("never accept generalization on a single sample", agents)

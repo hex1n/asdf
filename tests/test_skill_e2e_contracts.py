@@ -258,7 +258,7 @@ class SkillE2EContractsTest(unittest.TestCase):
 
         self.assertIn("[RISK_ROUTER.md](RISK_ROUTER.md)", java_skill)
         self.assertIn("candidate tournament", java_router)
-        self.assertIn("best-version tournament", resume_skill)
+        self.assertIn("Best-Version Tournament", resume_skill)
         self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md)", resume_skill)
         self.assertIn("Best-Version Tournament Funnel", resume_practices)
         self.assertIn("Adversarial Post-Output Self-Review", resume_practices)

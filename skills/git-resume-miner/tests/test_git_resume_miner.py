@@ -71,6 +71,49 @@ class GitResumeMinerTest(unittest.TestCase):
         self.assertEqual(by_topic["feat_remove"]["current_presence_ratio"], 0)
         self.assertEqual(by_topic["feat_add"]["current_presence_ratio"], 1)
 
+    def test_workstream_filter_keeps_concentrated_multi_token_topics(self) -> None:
+        miner = load_miner()
+
+        cluster = {
+            "topic": "asset_service",
+            "commit_count": 8,
+            "total_file_refs": 10,
+            "parent_counter": {"src/domain/asset": 9, "src/domain/notice": 1},
+        }
+
+        self.assertFalse(
+            miner.is_repo_wide_topic(
+                cluster,
+                broad_count_threshold=7,
+                median_parent_concentration=1.0,
+            )
+        )
+
+    def test_canonical_workstream_topic_merges_implementation_suffixes(self) -> None:
+        miner = load_miner()
+
+        self.assertEqual(miner.canonical_workstream_topic("buyout_process_service"), "buyout_process")
+        self.assertEqual(miner.canonical_workstream_topic("repay_notice_entities"), "repay_notice")
+        self.assertEqual(miner.canonical_workstream_topic("buyout_service"), "buyout_service")
+
+    def test_workstream_filters_scope_and_branch_label_topics(self) -> None:
+        miner = load_miner()
+
+        self.assertTrue(miner.is_branch_label_topic("feature_refactor_mini"))
+        self.assertTrue(miner.is_branch_label_topic("bug_fix"))
+        self.assertFalse(miner.is_branch_label_topic("buyout_process"))
+        self.assertTrue(miner.is_scope_level_topic({"commit_count": 30}, total_commits=100))
+        self.assertFalse(miner.is_scope_level_topic({"commit_count": 16}, total_commits=100))
+        self.assertTrue(miner.is_environment_profile_topic("application_development"))
+        self.assertTrue(miner.is_environment_profile_topic("config_staging"))
+        self.assertFalse(miner.is_environment_profile_topic("loan_application"))
+        self.assertTrue(miner.is_artifact_surface_topic("alter_table"))
+        self.assertTrue(miner.is_artifact_surface_topic("mns_constant"))
+        self.assertTrue(miner.is_artifact_surface_topic("utils_test"))
+        self.assertTrue(miner.is_artifact_surface_topic("generated_handler"))
+        self.assertFalse(miner.is_artifact_surface_topic("buyout_service"))
+        self.assertFalse(miner.is_artifact_surface_topic("tripartite_contract"))
+
     def test_path_filter_inspection_and_diff_sampling(self) -> None:
         miner = load_miner()
         calls: list[list[str]] = []
@@ -211,6 +254,11 @@ class GitResumeMinerTest(unittest.TestCase):
         self.assertNotIn("abc.def.ghi", json.dumps(payload, ensure_ascii=False))
         self.assertNotIn("user:pass", rendered)
         self.assertNotIn("secretBusinessMethod", rendered)
+        self.assertIn("# Git Resume Evidence Index", rendered)
+        self.assertIn("## Workstream Candidates", rendered)
+        self.assertIn("Current-Code Relevance", rendered)
+        self.assertNotIn("Current file presence", rendered)
+        self.assertNotIn("Repo-Native Workstream", rendered)
         self.assertIn("## Matched Authors", rendered)
         self.assertIn("Next check", rendered)
 

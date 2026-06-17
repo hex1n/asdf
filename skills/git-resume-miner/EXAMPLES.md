@@ -23,9 +23,9 @@ python3 scripts/git_resume_miner.py \
 
 Merge commits are excluded by default because they usually add weak resume evidence. Add `--include-merges` only when merge ownership is relevant. Matching history is not capped by default; use `--max-commits N` only when you deliberately want a quick sample before the full pass.
 
-The script is self-contained. It does not read category, taxonomy, or redaction config files; business meaning comes from reading diffs and surrounding code. Repo-native workstream candidates are generated from identifiers and co-changed paths; treat them as prompts for inspection, not final labels.
+The script is self-contained. It does not read category, taxonomy, or redaction config files; business meaning comes from reading diffs and surrounding code. Workstream Candidates are generated from identifiers and co-changed paths; treat them as prompts for inspection, not final labels.
 
-The inspection plan reports `Matched Authors`, `Evidence Warnings`, `Current file presence`, and `Next check` commands. Use them to confirm the author boundary, decide whether to inspect current code, search for renames, or treat the commit as historical evidence before writing a resume bullet.
+The inspection plan reports `Matched Authors`, `Evidence Warnings`, `Current-Code Relevance`, and `Next check` commands. Use them to confirm the author boundary, decide whether to inspect current code, search for renames, or treat the commit as historical evidence before writing a resume bullet.
 
 ## Project Positioning Example
 
@@ -74,12 +74,12 @@ Project Positioning:
 Contribution Map:
 - Order fulfillment workflow and domain rules
   Evidence: a1b2c3d, e4f5g6h, touched service/, domain/, database migration files
-  Confidence: observed for implementation ownership; inferred for business impact
+  Confidence: Observed for implementation ownership; Inferred for business impact
 
 Inspection Plan:
 - a1b2c3d score=8.8 add product order workflow
   Why inspect: change_size=480, file_count=6, directory_breadth=2
-  Current file presence: 5/6 (0.833)
+  Current-Code Relevance: 5/6 currently present (0.833)
   Present now: service/OrderWorkflowService.java, domain/OrderState.java
   Missing now: database/migration/20240101_add_order_audit.sql
   Next check (full diff): git show --find-renames a1b2c3d
@@ -90,7 +90,7 @@ Inspection Plan:
   Files: service/OrderWorkflowService.java, domain/OrderState.java
 - i7j8k9l score=6.5 handle provider callback retry
   Why inspect: change_size=260, file_count=4, directory_breadth=2
-  Current file presence: 4/4 (1.0)
+  Current-Code Relevance: 4/4 currently present (1.0)
   Present now: client/ProviderClient.java, handler/CallbackHandler.java
   Missing now: n/a
   Subject terms: handle=1, provider=1, callback=1, retry=1
@@ -99,11 +99,11 @@ Inspection Plan:
 
 Code Evidence:
 - service/OrderWorkflowService.java: handles state transitions and failure compensation.
-  Commits: a1b2c3d, e4f5g6h. Confidence: observed.
+  Commits: a1b2c3d, e4f5g6h. Confidence: Observed.
 - database/migration/...sql: adds workflow audit table and indexes used by state queries.
-  Commits: q1w2e3r. Confidence: observed.
+  Commits: q1w2e3r. Confidence: Observed.
 
-Repo-Native Workstream Candidates:
+Workstream Candidates:
 - order_workflow: current files present, multiple representative commits. Validate as a likely resume theme.
 - provider_callback: strong diff evidence but shared ownership. Use `expanded` or `improved`, not `owned`, unless the user confirms ownership.
 - doc_generator: real contribution but narrower than transaction consistency. Keep as interview backup unless the target role values internal tooling.
@@ -115,9 +115,9 @@ Diff Samples:
 - a1b2c3d touched workflow state handlers and persistence mapping. Use this only as a preview; read the full diff and current files before writing final claims.
 
 Key Contributions:
-- Productized workflow extension: used state-machine nodes to isolate business-line rules from the shared lifecycle, preserving workflow extensibility. Evidence: a1b2c3d, e4f5g6h. Confidence: observed.
-- Transaction status consistency: used async messaging, idempotency locks, and state checks to reduce duplicate callbacks, concurrent transitions, and ambiguous intermediate states. Evidence: i7j8k9l. Confidence: observed.
-- Downstream settlement data trust: reconciled external settlement records against platform calculations before persistence, protecting fee and sync data consistency. Evidence: m1n2o3p. Confidence: inferred, needs production metric.
+- Productized workflow extension: used state-machine nodes to isolate business-line rules from the shared lifecycle, preserving workflow extensibility. Evidence: a1b2c3d, e4f5g6h. Confidence: Observed.
+- Transaction status consistency: used async messaging, idempotency locks, and state checks to reduce duplicate callbacks, concurrent transitions, and ambiguous intermediate states. Evidence: i7j8k9l. Confidence: Observed.
+- Downstream settlement data trust: reconciled external settlement records against platform calculations before persistence, protecting fee and sync data consistency. Evidence: m1n2o3p. Confidence: Inferred. Metric Question: production impact metric needed.
 
 STAR Story:
 - Situation: A multi-tenant transaction platform needed to add a new business-line workflow without breaking shared lifecycle behavior.
@@ -143,7 +143,7 @@ Candidate Ranking:
 3. Domain workflow extension - keep as bullet. Strong ownership and business workflow depth.
 4. Data trust before downstream sync - keep as bullet. Distinct consistency boundary.
 5. Thread-pool monitoring - interview backup. Useful, but narrower and weaker than the core workflow.
-6. Historical deleted integration - downgrade. Commit evidence exists, but current file presence is low and no current replacement path has been verified.
+6. Historical deleted integration - downgrade. Commit evidence exists, but Current-Code Relevance is low and no current replacement path has been verified.
 
 Pruning Decision:
 - Merge "async retry" and "message idempotency" into one reliability bullet.
@@ -230,17 +230,17 @@ Rewrite:
 ## Review Checklist
 
 - Every resume bullet has at least one evidence anchor.
-- Each primary bullet has current-code evidence, or is explicitly framed as historical/interview material.
+- Each primary bullet has Current-Code Relevance evidence, or is explicitly framed as historical/interview material.
 - Key contribution themes must be problem/domain oriented, not bare technology tags like `state machine orchestration` or `async idempotency`.
-- Resume-ready output prefers four bullets; use five only when the fifth has distinct senior-level value.
+- Resume-Ready output prefers four bullets; use five only when the fifth has distinct senior-level value.
 - Merge or drop bullets that repeat the same contribution theme or result.
 - Each highlight should carry one idea only; split mixed bullets.
 - DTOs, constants, fields, and query methods appear only as evidence, not as final resume selling points.
 - Code-structure inventories appear only in analysis mode unless the user asks for architecture detail.
 - Unsupported business metrics are written as questions, not claims.
-- If a contribution lacks quantified impact, mark it `needs user metric` and ask one focused metric question.
-- Remove `observed`, `inferred`, and `needs user metric` labels from resume-ready bullets.
-- Remove code paths, commit hashes, and candidate rankings from resume-ready output unless explicitly requested.
+- If a contribution lacks quantified impact, mark it `Needs Confirmation` and ask one focused Metric Question.
+- Remove `Observed`, `Inferred`, and `Needs Confirmation` labels from Resume-Ready bullets.
+- Remove code paths, commit hashes, and candidate rankings from Resume-Ready output unless explicitly requested.
 - Apply the 20-second scan test: scope, technical judgment, solved problem, and result value must be visible fast.
 - The strongest bullets appear first and match the target role.
 - Interview stories include enough technical depth for follow-up questions.

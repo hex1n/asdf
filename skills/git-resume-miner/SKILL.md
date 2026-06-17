@@ -60,7 +60,7 @@ Use these Leitwörter exactly; avoid synonyms that blur the gates.
    - `interview`: STAR stories, architecture narrative, trade-offs, and likely follow-ups
 8. Default to `resume-ready` or `compact` when the user asks for "一版", "最佳", "简历版", or a directly usable result. Include only a short evidence note unless the user explicitly asks for full analysis.
 9. For `resume-ready` and `compact`, output only the Resume-Ready project framing, strongest bullets, and Metric Questions. Do not include code paths, contribution maps, candidate rankings, or confidence labels unless the user asks.
-10. Run an adversarial post-output self-review and rewrite once if needed: argue against the strongest bullet and the project framing, then remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
+10. Run a Resume-Ready Defense Check before returning: use the adversarial post-output self-review in [BEST_PRACTICES.md](BEST_PRACTICES.md#resume-ready-defense-check) to argue against the strongest bullet and project framing, require a defensible claim for every final bullet, then remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
 11. Run the final acceptance gate: one project framing, four strong bullets by default, no low-level artifact lists, no invented metrics, no duplicate problem themes, missing metrics separated as questions, and ownership verbs matching evidence strength.
 
 ## Evidence Gates

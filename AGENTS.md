@@ -21,7 +21,7 @@ When the user asks to improve a skill, treat it as an evidence loop rather than 
 
 Before changing any skill, load and apply `write-a-skill` as the authoring frame for structure, progressive disclosure, bundled resources, and review checklist. If `write-a-skill` is unavailable, record the fallback in the round notes before editing.
 
-1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead.
+1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include the failure modes and negative cases the skill must handle, not just the happy path, so the baseline is not an optimistic softball.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.
 3. Apply the narrowest edit: catalog/routing text, reference rule, script logic, or focused test.
 4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful.

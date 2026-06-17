@@ -10,6 +10,18 @@ description: >
 
 Produce Java that is **modern for its JDK**, **consistent with the project**, **architecturally appropriate** (patterns serve real variation points, never decoration), and **risk-prioritized**. Gates run in order: detect version → conform to conventions → route by production risk → pick idioms/patterns → verify/review. Treat the rules as strong defaults with explainable exceptions; correctness, security, compileability, and concurrency safety are the hard lines.
 
+## Operating Language
+
+Use these Leitwörter exactly; avoid synonyms that blur the gates.
+
+- **Target Profile**: detected JDK, Spring Boot version, namespace, web stack, and module boundary.
+- **Project Convention**: observed local style or framework pattern that governs the edit unless it creates a defect.
+- **Risk Signal**: scanner hit, command output, diff, or code read that points to possible risk, not an action by itself.
+- **Failure Path**: concrete compile, security, correctness, concurrency, resource, runtime, or data-integrity failure that justifies action.
+- **Action Candidate**: bounded fix or review finding competing for the next edit or report slot.
+- **Proof Tier**: P0-P4 verification strength from [RISK_ROUTER.md](RISK_ROUTER.md#proof-tiers).
+- **Verification Floor**: the minimum command, source check, or degraded proof needed before reporting completion.
+
 ## Step 1 - Detect the target JDK first (mandatory, once per project)
 
 Never guess the JDK level. Run the detector **once per project per session** and remember its result (effective JDK, Spring Boot version, `jakarta`/`javax`); only re-run when a build file changes — do not re-run before every edit.
@@ -38,7 +50,7 @@ When conventions are absent or inconsistent, prefer the principles below and say
 - **Optional repo profile:** for repeated or non-trivial work in the same repo, or when `docs/agents/java-stack-profile.md` / `docs/agents/java-stack-review-memory.md` exists, read [PROFILE.md](PROFILE.md). Read the repo profile for writing and review; read review memory for review, noisy maintainability cleanup, or explicit memory updates. These files are soft dependencies: use them to sharpen context and reduce review noise, but verify load-bearing facts from build files, code, and commands.
 - **Writing/editing/refactoring:** read [WRITING.md](WRITING.md) before editing. It defines smoke patch vs production fix vs architecture fix, dirty-worktree handling, advisory scanning, and the writing output contract.
 - **Reviewing:** read [REVIEW.md](REVIEW.md) before reporting findings. It defines diff review vs focused review vs repo audit, evidence levels, severity calibration, and the review output format.
-- **Optional advisory scan:** for non-trivial Spring/Java stack work, run `python3 scripts/java_advisory_scan.py --dir . --format markdown`. The scan is a signal, not an oracle; confirm important findings from code and context. It emits proof tiers, exits 0 by default, and only gates when called with `--fail-on`.
+- **Optional advisory scan:** for non-trivial Spring/Java stack work, run `python3 scripts/java_advisory_scan.py --dir . --format markdown`. The scan is a Risk Signal index, not an oracle; confirm important findings from code and context. Markdown output is bounded by default; use `--detail-limit 0` only when the full table is worth the noise. It emits Proof Tiers, exits 0 by default, and only gates when called with `--fail-on`.
 
 ## Step 3 - Write to the version, not below it
 

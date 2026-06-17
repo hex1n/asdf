@@ -161,6 +161,8 @@ class JavaAdvisoryScanTest(unittest.TestCase):
                 "class Demo {\n"
                 "  @Autowired\n"
                 "  private Object dependency;\n"
+                "  @Autowired\n"
+                "  private Object otherDependency;\n"
                 "  void run() { CompletableFuture.runAsync(() -> work()); }\n"
                 "  void work() {}\n"
                 "}\n",
@@ -171,6 +173,89 @@ class JavaAdvisoryScanTest(unittest.TestCase):
 
             self.assertTrue(any("field injection" in rule for rule in rules))
             self.assertTrue(any("common pool" in rule for rule in rules))
+
+    def test_markdown_prioritizes_action_candidates_over_broad_cleanup(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write(
+                root / "src/main/java/example/Demo.java",
+                "package example;\n"
+                "import org.springframework.beans.factory.annotation.Autowired;\n"
+                "import java.util.concurrent.CompletableFuture;\n"
+                "class Demo {\n"
+                "  @Autowired\n"
+                "  private Object dependency;\n"
+                "  @Autowired\n"
+                "  private Object otherDependency;\n"
+                "  void run() { CompletableFuture.runAsync(() -> work()); }\n"
+                "  void work() {}\n"
+                "}\n",
+            )
+
+            result = scan.scan_project(str(root))
+            rendered = scan.render_markdown(result)
+
+            self.assertIn("## Risk Index", rendered)
+            self.assertIn("- Total Risk Signals: 3", rendered)
+            self.assertIn("## Action Candidates", rendered)
+            candidates = rendered.split("## Action Candidates", 1)[1].split("## Detailed Findings", 1)[0]
+            self.assertLess(candidates.find("common pool"), candidates.find("field injection"))
+            self.assertEqual(1, candidates.count("field injection hides required dependencies"))
+            self.assertIn("examples=2", candidates)
+            self.assertIn("Failure Path:", candidates)
+            self.assertIn("Fix:", candidates)
+
+    def test_markdown_detail_findings_are_bounded_by_default(self):
+        findings = []
+        for index in range(scan.DEFAULT_DETAIL_LIMIT + 5):
+            findings.append(
+                {
+                    "severity": "minor",
+                    "category": "logging",
+                    "confidence": "confirmed",
+                    "proof_tier": "P3",
+                    "file": f"src/main/java/example/Demo{index}.java",
+                    "line": 10,
+                    "rule": "console logging bypasses application logging",
+                    "impact": "logs lose structure",
+                    "fix": "use SLF4J parameterized logging",
+                }
+            )
+        result = {"project": {"jdk": 17, "source": "pom.xml", "spring": {}, "note": None}, "findings": findings}
+
+        rendered = scan.render_markdown(result)
+
+        self.assertIn(f"Showing {scan.DEFAULT_DETAIL_LIMIT} of {scan.DEFAULT_DETAIL_LIMIT + 5} findings", rendered)
+        self.assertEqual(scan.DEFAULT_DETAIL_LIMIT, rendered.count("console logging bypasses application logging |"))
+
+    def test_max_findings_preserves_full_summary_and_candidates(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write(
+                root / "src/main/java/example/Demo.java",
+                "package example;\n"
+                "import org.springframework.beans.factory.annotation.Autowired;\n"
+                "import java.util.concurrent.CompletableFuture;\n"
+                "class Demo {\n"
+                "  @Autowired\n"
+                "  private Object dependency;\n"
+                "  @Autowired\n"
+                "  private Object otherDependency;\n"
+                "  void run() { CompletableFuture.runAsync(() -> work()); }\n"
+                "  void work() {}\n"
+                "}\n",
+            )
+
+            result = scan.scan_project(str(root), max_findings=1)
+            rendered = scan.render_markdown(result)
+            candidates = rendered.split("## Action Candidates", 1)[1].split("## Detailed Findings", 1)[0]
+
+            self.assertEqual(1, len(result["findings"]))
+            self.assertIn("- Total Risk Signals: 3", rendered)
+            self.assertIn("Detailed Findings contains 1 of 3 sorted signals", rendered)
+            self.assertIn("common pool", candidates)
+            self.assertIn("field injection hides required dependencies", candidates)
+            self.assertIn("examples=2", candidates)
 
     def test_run_async_with_explicit_executor_is_not_flagged(self):
         with tempfile.TemporaryDirectory() as td:

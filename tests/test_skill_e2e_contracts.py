@@ -72,11 +72,44 @@ SCENARIOS = (
             "explicit user-approved invariant",
             "narrowest applicable level",
             "contract check",
+            "write-a-skill",
+            "progressive disclosure",
+            "review checklist",
+            "baseline output",
+            "real task",
+            "quality rubric",
+            "v3.2",
+            "100-point quality rubric",
+            "outcome delta",
+            "behavioral reliability",
+            "validation & regression safety",
+            "skill design quality",
+            "evidence traceability",
+            "cost & noise control",
+            "accept gates",
+            "score cap",
+            "baseline score",
+            "candidate score",
+            "regressions",
+            "continue / accept / reject",
+            "marginal gain",
         ),
         scoped_markers=(
             "rule harvest gate",
             "explicit user-approved invariant",
             "narrowest applicable level",
+            "write-a-skill",
+            "baseline output",
+            "quality rubric",
+            "v3.2",
+            "100-point quality rubric",
+            "outcome delta",
+            "validation & regression safety",
+            "skill design quality",
+            "baseline score",
+            "candidate score",
+            "score cap",
+            "marginal gain",
         ),
     ),
     SkillScenario(
@@ -311,9 +344,34 @@ class SkillE2EContractsTest(unittest.TestCase):
         agents = read_text("AGENTS.md").lower()
 
         self.assertIn("rule harvest gate", agents)
+        self.assertIn("skill evolution loop", agents)
+        self.assertIn("load and apply `write-a-skill`", agents)
+        self.assertIn("progressive disclosure", agents)
+        self.assertIn("review checklist", agents)
+        self.assertIn("real validation artifact", agents)
+        self.assertIn("store temporary comparison outputs outside the skill folder", agents)
+        self.assertIn("v3.2 100-point quality rubric", agents)
+        self.assertIn("100-point quality rubric", agents)
+        self.assertIn("outcome delta", agents)
+        self.assertIn("behavioral reliability", agents)
+        self.assertIn("validation & regression safety", agents)
+        self.assertIn("skill design quality", agents)
+        self.assertIn("evidence traceability", agents)
+        self.assertIn("cost & noise control", agents)
+        self.assertIn("0% = no evidence or failure", agents)
+        self.assertIn("accept gates", agents)
+        self.assertIn("scores from a single validation sample are capped at 85", agents)
+        self.assertIn("baseline score: xx/100", agents)
+        self.assertIn("candidate score: xx/100", agents)
+        self.assertIn("score cap: none / reason", agents)
+        self.assertIn("decision:", agents)
         for path in RUNTIME_SKILL_FILES:
             with self.subTest(path=path):
                 self.assertNotIn("rule harvest", read_text(path).lower())
+                self.assertNotIn("skill evolution loop", read_text(path).lower())
+                self.assertNotIn("write-a-skill", read_text(path).lower())
+                self.assertNotIn("quality rubric", read_text(path).lower())
+                self.assertNotIn("baseline score", read_text(path).lower())
 
     def test_artifact_naming_rule_stays_aligned_across_skills(self) -> None:
         naming_rule = (

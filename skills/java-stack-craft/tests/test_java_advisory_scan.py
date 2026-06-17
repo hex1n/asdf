@@ -205,6 +205,34 @@ class JavaAdvisoryScanTest(unittest.TestCase):
             self.assertIn("Failure Path:", candidates)
             self.assertIn("Fix:", candidates)
 
+    def test_pervasive_field_injection_is_backlog_not_action_candidate(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            fields = "\n".join(
+                f"  @Autowired\n  private Object dependency{index};" for index in range(scan.BROAD_CLEANUP_BACKLOG_THRESHOLD + 5)
+            )
+            write(
+                root / "src/main/java/example/Demo.java",
+                "package example;\n"
+                "import org.springframework.beans.factory.annotation.Autowired;\n"
+                "import java.util.concurrent.CompletableFuture;\n"
+                "class Demo {\n"
+                f"{fields}\n"
+                "  void run() { CompletableFuture.runAsync(() -> work()); }\n"
+                "  void work() {}\n"
+                "}\n",
+            )
+
+            result = scan.scan_project(str(root), max_findings=1)
+            rendered = scan.render_markdown(result)
+            candidates = rendered.split("## Action Candidates", 1)[1].split("## Backlog Signals", 1)[0]
+            backlog = rendered.split("## Backlog Signals", 1)[1].split("## Detailed Findings", 1)[0]
+
+            self.assertIn("common pool", candidates)
+            self.assertNotIn("field injection hides required dependencies", candidates)
+            self.assertIn("field injection hides required dependencies", backlog)
+            self.assertIn(f"examples={scan.BROAD_CLEANUP_BACKLOG_THRESHOLD + 5}", backlog)
+
     def test_markdown_detail_findings_are_bounded_by_default(self):
         findings = []
         for index in range(scan.DEFAULT_DETAIL_LIMIT + 5):

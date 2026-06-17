@@ -28,6 +28,7 @@ SEVERITY_ORDER = {"blocker": 4, "major": 3, "minor": 2, "nit": 1}
 DEFAULT_MAX_DEPTH = 4
 DEFAULT_DETAIL_LIMIT = 80
 IGNORED_DIRS = {".git", "target", "build", "out", "node_modules", ".gradle"}
+BROAD_CLEANUP_BACKLOG_THRESHOLD = 20
 
 PROOF_SOURCE_INVARIANT = "P2"
 PROOF_SCANNER_SIGNAL = "P3"
@@ -605,6 +606,7 @@ def scan_project(
     findings.sort(key=finding_sort_key)
     summary = summarize_findings(findings)
     candidates = action_candidates(findings)
+    backlog = backlog_signals(findings)
     total_findings = len(findings)
     if max_findings is not None:
         findings = findings[:max_findings]
@@ -614,6 +616,7 @@ def scan_project(
         "findings": findings,
         "summary": summary,
         "action_candidates": candidates,
+        "backlog_signals": backlog,
         "displayed_findings": len(findings),
         "total_findings": total_findings,
     }
@@ -663,15 +666,29 @@ def summarize_findings(findings: List[Dict[str, object]]) -> Dict[str, object]:
 
 
 def action_candidates(findings: List[Dict[str, object]], limit: int = 8) -> List[Dict[str, object]]:
+    candidates = [item for item in grouped_findings(findings) if not is_backlog_signal_group(item)]
+    candidates.sort(key=lambda item: finding_sort_key(item["finding"]))
+    return candidates[:limit]
+
+
+def backlog_signals(findings: List[Dict[str, object]]) -> List[Dict[str, object]]:
+    signals = [item for item in grouped_findings(findings) if is_backlog_signal_group(item)]
+    signals.sort(key=lambda item: (-int(item["count"]), finding_sort_key(item["finding"])))
+    return signals
+
+
+def grouped_findings(findings: List[Dict[str, object]]) -> List[Dict[str, object]]:
     grouped: Dict[tuple[str, str, str], Dict[str, object]] = {}
     for item in findings:
         key = (str(item["severity"]), str(item["category"]), str(item["rule"]))
         if key not in grouped:
             grouped[key] = {"finding": item, "count": 0}
         grouped[key]["count"] = int(grouped[key]["count"]) + 1
-    candidates = list(grouped.values())
-    candidates.sort(key=lambda item: finding_sort_key(item["finding"]))
-    return candidates[:limit]
+    return list(grouped.values())
+
+
+def is_backlog_signal_group(group: Dict[str, object]) -> bool:
+    return int(group["count"]) >= BROAD_CLEANUP_BACKLOG_THRESHOLD and is_broad_cleanup_signal(group["finding"])
 
 
 def render_finding_row(item: Dict[str, object]) -> str:
@@ -692,7 +709,8 @@ def render_markdown(result: Dict[str, object], detail_limit: int = DEFAULT_DETAI
     project = result["project"]
     findings = result["findings"]
     summary = result.get("summary") or summarize_findings(findings)
-    candidates = result.get("action_candidates") or action_candidates(findings)
+    candidates = result["action_candidates"] if "action_candidates" in result else action_candidates(findings)
+    backlog = result["backlog_signals"] if "backlog_signals" in result else backlog_signals(findings)
     spring = project.get("spring") or {}
     lines = ["# Java Stack Advisory Scan", ""]
     lines.append("## Detected")
@@ -725,13 +743,30 @@ def render_markdown(result: Dict[str, object], detail_limit: int = DEFAULT_DETAI
     lines.append("")
     lines.append("## Action Candidates")
     lines.append("")
-    for candidate in candidates:
-        item = candidate["finding"]
-        location = f"{item['file']}:{item['line']}"
-        examples = f" · examples={candidate['count']}" if int(candidate["count"]) > 1 else ""
-        lines.append(
-            f"- {item['severity']} · {item['category']} · {item['confidence']}/{item.get('proof_tier', PROOF_SCANNER_SIGNAL)} · {location} · {item['rule']}{examples}; Failure Path: {item['impact']}; Fix: {item['fix']}"
-        )
+    if candidates:
+        for candidate in candidates:
+            item = candidate["finding"]
+            location = f"{item['file']}:{item['line']}"
+            examples = f" · examples={candidate['count']}" if int(candidate["count"]) > 1 else ""
+            lines.append(
+                f"- {item['severity']} · {item['category']} · {item['confidence']}/{item.get('proof_tier', PROOF_SCANNER_SIGNAL)} · {location} · {item['rule']}{examples}; Failure Path: {item['impact']}; Fix: {item['fix']}"
+            )
+    else:
+        lines.append("No high-priority action candidates. Broad cleanup signals remain in the Risk Index and Detailed Findings.")
+
+    if backlog:
+        lines.append("")
+        lines.append("## Backlog Signals")
+        lines.append("")
+        lines.append("Broad repeated cleanup signals are kept for context, but are not promoted to Action Candidates without a scoped Failure Path.")
+        lines.append("")
+        for signal in backlog:
+            item = signal["finding"]
+            location = f"{item['file']}:{item['line']}"
+            examples = f" · examples={signal['count']}" if int(signal["count"]) > 1 else ""
+            lines.append(
+                f"- {item['severity']} · {item['category']} · {item['confidence']}/{item.get('proof_tier', PROOF_SCANNER_SIGNAL)} · {location} · {item['rule']}{examples}; Inspection note: confirm a scoped Failure Path before editing."
+            )
 
     lines.append("")
     lines.append("## Detailed Findings")

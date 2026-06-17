@@ -77,19 +77,14 @@ SCENARIOS = (
             "review checklist",
             "baseline output",
             "real task",
-            "quality rubric",
-            "v3.2",
-            "100-point quality rubric",
-            "outcome delta",
-            "behavioral reliability",
-            "validation & regression safety",
-            "skill design quality",
-            "evidence traceability",
-            "cost & noise control",
-            "accept gates",
-            "score cap",
-            "baseline score",
-            "candidate score",
+            "two-layer gate",
+            "hard gates",
+            "improvement magnitude",
+            "generalization confidence",
+            "adversarial falsification",
+            "optimism bias",
+            "relative delta",
+            "the author is the grader",
             "regressions",
             "continue / accept / reject",
             "marginal gain",
@@ -99,16 +94,13 @@ SCENARIOS = (
             "explicit user-approved invariant",
             "narrowest applicable level",
             "write-a-skill",
-            "baseline output",
-            "quality rubric",
-            "v3.2",
-            "100-point quality rubric",
-            "outcome delta",
-            "validation & regression safety",
-            "skill design quality",
-            "baseline score",
-            "candidate score",
-            "score cap",
+            "improvement magnitude",
+            "generalization confidence",
+            "adversarial falsification",
+            "optimism bias",
+            "relative delta",
+            "two-layer gate",
+            "the author is the grader",
             "marginal gain",
         ),
     ),
@@ -491,28 +483,24 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("review checklist", agents)
         self.assertIn("real validation artifact", agents)
         self.assertIn("store temporary comparison outputs outside the skill folder", agents)
-        self.assertIn("v3.2 100-point quality rubric", agents)
-        self.assertIn("100-point quality rubric", agents)
-        self.assertIn("outcome delta", agents)
-        self.assertIn("behavioral reliability", agents)
-        self.assertIn("validation & regression safety", agents)
-        self.assertIn("skill design quality", agents)
-        self.assertIn("evidence traceability", agents)
-        self.assertIn("cost & noise control", agents)
-        self.assertIn("0% = no evidence or failure", agents)
-        self.assertIn("accept gates", agents)
-        self.assertIn("scores from a single validation sample are capped at 85", agents)
-        self.assertIn("baseline score: xx/100", agents)
-        self.assertIn("candidate score: xx/100", agents)
-        self.assertIn("score cap: none / reason", agents)
+        self.assertIn("do not score the edit on an absolute point scale", agents)
+        self.assertIn("optimism bias", agents)
+        self.assertIn("the author is the grader", agents)
+        self.assertIn("two-layer gate", agents)
+        self.assertIn("hard gates", agents)
+        self.assertIn("improvement magnitude: none / marginal / clear / large", agents)
+        self.assertIn("generalization confidence", agents)
+        self.assertIn("never accept generalization on a single sample", agents)
+        self.assertIn("adversarial falsification", agents)
+        self.assertIn("relative delta", agents)
         self.assertIn("decision:", agents)
         for path in RUNTIME_SKILL_FILES:
             with self.subTest(path=path):
                 self.assertNotIn("rule harvest", read_text(path).lower())
                 self.assertNotIn("skill evolution loop", read_text(path).lower())
                 self.assertNotIn("write-a-skill", read_text(path).lower())
-                self.assertNotIn("quality rubric", read_text(path).lower())
-                self.assertNotIn("baseline score", read_text(path).lower())
+                self.assertNotIn("improvement magnitude", read_text(path).lower())
+                self.assertNotIn("adversarial falsification", read_text(path).lower())
 
     def test_artifact_naming_rule_stays_aligned_across_skills(self) -> None:
         naming_rule = (

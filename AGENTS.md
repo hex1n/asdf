@@ -81,10 +81,11 @@ Record each evolution round in this compact format, in chat or a temporary artif
 ```md
 ## Round N
 
+Supersedes: none / Round M (reopened because ...)
 Improvement magnitude: none / marginal / clear / large
 Generalization confidence: low / high
 Hard gates: pass / fail (name any failing gate)
-High-stakes escalation: not needed / adversarial falsification result
+High-stakes escalation: not needed / adversarial falsification result / provisional (no independent context)
 Relative delta: +x / 0 / -x (trend only)
 
 Task sample:
@@ -102,5 +103,5 @@ Weakest gate or lowest-confidence claim:
 - ...
 
 Decision:
-- continue / accept / reject
+- continue / accept / accept provisional / reject
 ```

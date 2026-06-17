@@ -86,7 +86,7 @@ SCENARIOS = (
             "net-new skill",
             "relative delta",
             "regressions",
-            "continue / accept / reject",
+            "continue / accept / accept provisional / reject",
             "marginal gain",
         ),
         scoped_markers=(

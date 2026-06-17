@@ -21,7 +21,7 @@ When the user asks to improve a skill, treat it as an evidence loop rather than 
 
 Before changing any skill, load and apply `write-a-skill` as the authoring frame for structure, progressive disclosure, bundled resources, and review checklist. If `write-a-skill` is unavailable, record the fallback in the round notes before editing.
 
-1. Capture a baseline output from the existing skill on a real task or fixture.
+1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.
 3. Apply the narrowest edit: catalog/routing text, reference rule, script logic, or focused test.
 4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful.
@@ -34,7 +34,7 @@ The decision has three outcomes — accept, continue, or reject — so it carrie
 
 ### Layer 1 — hard gates (binary; all must pass or the edit is rejected)
 
-- A baseline output exists and a real validation artifact is present.
+- A baseline output exists (or, for a net-new skill, the expected-behavior spec) and a real validation artifact is present.
 - No unresolved correctness, safety, or privacy regression remains.
 - `SKILL.md` stays task-facing and does not become a maintenance manual.
 - Runtime portability is preserved.
@@ -58,11 +58,18 @@ Then apply the decision rule:
 - Marginal improvement: accept only when it fixes a real reported failure or removes real cost or noise; otherwise reject as not worth the maintenance.
 - No improvement, or any regression: reject.
 
-State the magnitude as a falsifiable claim tied to the output diff, so a reviewer can challenge it with "show the output that makes it clear" rather than argue about a number.
+State the magnitude as a falsifiable claim tied to the output diff, so a reviewer can challenge it with "show the output that makes it clear" rather than argue about a number. Accept does not close the loop: if a later real task shows an accepted edit made things worse, reopen it as a new round and reject or revise.
 
 ### High-stakes escalation (adversarial falsification)
 
-When the edit touches a load-bearing rule, has broad blast radius, or sits on a marginal accept/reject line, do not add scoring resolution — add an independent falsification pass. In a fresh context, try to show the edit is not better or introduces a regression. Because the author is the grader, this adversarial falsification is the only structural check on self-bias; accept only when the attempt to break the claim fails.
+Because the author is the grader, every magnitude, confidence, and trigger judgment above is self-assessed, so the trigger for the one structural check on that bias must be mechanical rather than another judgment call. Run an independent falsification pass whenever any of these objective conditions hold — do not add scoring resolution instead:
+
+- The edit changes routing, description, or `name` text that decides when the skill loads.
+- The edit touches two or more skills, or a shared rule in this file.
+- The edit changes a hard gate or the decision rule itself.
+- The accept decision rests on a single sample, or on calling an improvement `clear` rather than `marginal`.
+
+In the pass, work in a fresh context and try to show the edit is not better or introduces a regression; accept only when that attempt fails. If the runtime cannot supply an independent context, record that in the round notes and mark the accept provisional until a second reviewer or a later session runs the pass — never treat the author's own re-read as the independent check.
 
 ### Optional trend log
 

@@ -1,10 +1,10 @@
 # Java Stack Craft - Risk Router
 
-Use this file to decide what deserves action before applying Java/Spring style rules. The goal is to prevent scanner hits and generic best practices from outranking real production risk.
+Use this file to decide what deserves action before applying Java/Spring style rules. The goal is to prevent Risk Signals and generic best practices from outranking real production risk.
 
 ## Core rule
 
-A rule match is not a reason to edit or report by itself. First name the failure path: what can compile wrong, leak, be attacked, corrupt data, exhaust resources, fail at runtime, or make a focused change untestable.
+A rule match is a Risk Signal, not a reason to edit or report by itself. First name the Failure Path: what can compile wrong, leak, be attacked, corrupt data, exhaust resources, fail at runtime, or make a focused change untestable. Promote it to an Action Candidate only when the Failure Path, Proof Tier, blast radius, and Verification Floor are concrete enough to act on.
 
 ## Priority ladder
 
@@ -24,10 +24,10 @@ Use the highest applicable tier with concrete evidence:
 
 Pick a change only after answering:
 
-- What is the highest-risk concrete failure path in scope?
+- What is the highest-risk concrete Failure Path in scope?
 - Is the evidence from code, a failing command, a scanner signal, or inference?
 - Can the change be bounded to one module/class/flow?
-- What proof can run in this environment?
+- What Verification Floor can run in this environment?
 
 If the strongest signal is broad field injection or style drift, do not make it the main production fix unless the user asked for that cleanup. Prefer a smaller correctness, security, concurrency, or build-compatible fix with a clear failure path.
 
@@ -40,6 +40,8 @@ When there is more than one plausible target, write a compact candidate decision
 For 3+ plausible targets or high-impact choices, run a lightweight candidate tournament: compare candidates pairwise by the table criteria, drop weaker or duplicate candidates, then challenge the winner with the strongest reason it could be wrong. Keep it only if it still wins on risk, proof, blast radius, and verification.
 
 Choose the candidate that has the best mix of high risk, bounded blast radius, and available proof. Even when only two candidates made the table, challenge the chosen one with the strongest reason it could be wrong before editing; the tournament is the expanded form of this check. Reject candidates that are only broad cleanup, require external side effects, cannot be verified in the current environment, or would turn a legacy-wide pattern into an incidental rewrite.
+
+## Proof Tiers
 
 Proof tiers:
 

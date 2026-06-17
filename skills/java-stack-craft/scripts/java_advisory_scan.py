@@ -26,10 +26,20 @@ except Exception:  # pragma: no cover - script can still scan without detector
 
 SEVERITY_ORDER = {"blocker": 4, "major": 3, "minor": 2, "nit": 1}
 DEFAULT_MAX_DEPTH = 4
+DEFAULT_DETAIL_LIMIT = 80
 IGNORED_DIRS = {".git", "target", "build", "out", "node_modules", ".gradle"}
 
 PROOF_SOURCE_INVARIANT = "P2"
 PROOF_SCANNER_SIGNAL = "P3"
+PROOF_ORDER = {"P0": 5, "P1": 4, "P2": 3, "P3": 2, "P4": 1}
+CATEGORY_ORDER = {
+    "security": 7,
+    "jdk": 6,
+    "correctness": 5,
+    "concurrency": 5,
+    "spring": 4,
+    "logging": 1,
+}
 
 
 @dataclass(frozen=True)
@@ -592,15 +602,97 @@ def scan_project(
     findings.extend(scan_java_files(root, project, include_tests=include_tests))
     if categories:
         findings = [item for item in findings if str(item["category"]) in categories]
-    findings.sort(key=lambda item: (-SEVERITY_ORDER.get(str(item["severity"]), 0), str(item["file"]), int(item["line"])))
+    findings.sort(key=finding_sort_key)
+    summary = summarize_findings(findings)
+    candidates = action_candidates(findings)
+    total_findings = len(findings)
     if max_findings is not None:
         findings = findings[:max_findings]
-    return {"root": str(root), "project": project, "findings": findings}
+    return {
+        "root": str(root),
+        "project": project,
+        "findings": findings,
+        "summary": summary,
+        "action_candidates": candidates,
+        "displayed_findings": len(findings),
+        "total_findings": total_findings,
+    }
 
 
-def render_markdown(result: Dict[str, object]) -> str:
+def is_broad_cleanup_signal(item: Dict[str, object]) -> bool:
+    rule = str(item.get("rule", ""))
+    category = str(item.get("category", ""))
+    return "field injection" in rule or category == "logging"
+
+
+def finding_priority(item: Dict[str, object]) -> int:
+    priority = SEVERITY_ORDER.get(str(item.get("severity")), 0) * 100
+    priority += CATEGORY_ORDER.get(str(item.get("category")), 0) * 10
+    priority += PROOF_ORDER.get(str(item.get("proof_tier")), 0)
+    if is_broad_cleanup_signal(item):
+        priority -= 80
+    return priority
+
+
+def finding_sort_key(item: Dict[str, object]) -> tuple[object, ...]:
+    return (-finding_priority(item), str(item["file"]), int(item["line"]), str(item["rule"]))
+
+
+def summarize_findings(findings: List[Dict[str, object]]) -> Dict[str, object]:
+    by_group: Dict[tuple[str, str, str, str], int] = {}
+    for item in findings:
+        key = (
+            str(item["severity"]),
+            str(item["category"]),
+            str(item["confidence"]),
+            str(item.get("proof_tier", PROOF_SCANNER_SIGNAL)),
+        )
+        by_group[key] = by_group.get(key, 0) + 1
+    groups = [
+        {
+            "severity": severity,
+            "category": category,
+            "confidence": confidence,
+            "proof_tier": proof_tier,
+            "count": count,
+        }
+        for (severity, category, confidence, proof_tier), count in by_group.items()
+    ]
+    groups.sort(key=lambda item: (-SEVERITY_ORDER.get(item["severity"], 0), -CATEGORY_ORDER.get(item["category"], 0), item["category"], item["confidence"], item["proof_tier"]))
+    return {"total": len(findings), "groups": groups}
+
+
+def action_candidates(findings: List[Dict[str, object]], limit: int = 8) -> List[Dict[str, object]]:
+    grouped: Dict[tuple[str, str, str], Dict[str, object]] = {}
+    for item in findings:
+        key = (str(item["severity"]), str(item["category"]), str(item["rule"]))
+        if key not in grouped:
+            grouped[key] = {"finding": item, "count": 0}
+        grouped[key]["count"] = int(grouped[key]["count"]) + 1
+    candidates = list(grouped.values())
+    candidates.sort(key=lambda item: finding_sort_key(item["finding"]))
+    return candidates[:limit]
+
+
+def render_finding_row(item: Dict[str, object]) -> str:
+    location = f"{item['file']}:{item['line']}"
+    return "| {severity} | {category} | {confidence} | {proof} | {location} | {rule} | {impact} | {fix} |".format(
+        severity=item["severity"],
+        category=item["category"],
+        confidence=item["confidence"],
+        proof=item.get("proof_tier", PROOF_SCANNER_SIGNAL),
+        location=location,
+        rule=str(item["rule"]).replace("|", "/"),
+        impact=str(item["impact"]).replace("|", "/"),
+        fix=str(item["fix"]).replace("|", "/"),
+    )
+
+
+def render_markdown(result: Dict[str, object], detail_limit: int = DEFAULT_DETAIL_LIMIT) -> str:
     project = result["project"]
     findings = result["findings"]
+    summary = result.get("summary") or summarize_findings(findings)
+    candidates = result.get("action_candidates") or action_candidates(findings)
     spring = project.get("spring") or {}
     lines = ["# Java Stack Advisory Scan", ""]
     lines.append("## Detected")
@@ -614,28 +706,51 @@ def render_markdown(result: Dict[str, object]) -> str:
     if project.get("note"):
         lines.append(f"- Note: {project.get('note')}")
     lines.append("")
-    lines.append("## Findings")
+    lines.append("## Risk Index")
     lines.append("")
     if not findings:
         lines.append("No advisory findings.")
         return "\n".join(lines)
 
+    lines.append(f"- Total Risk Signals: {summary['total']}")
+    lines.append("- Scanner output is an inspection index, not a refactor plan; confirm Failure Paths from code before acting.")
+    lines.append("")
+    lines.append("| Severity | Category | Confidence | Proof | Count |")
+    lines.append("|---|---|---|---|---|")
+    for item in summary["groups"]:
+        lines.append(
+            f"| {item['severity']} | {item['category']} | {item['confidence']} | {item['proof_tier']} | {item['count']} |"
+        )
+
+    lines.append("")
+    lines.append("## Action Candidates")
+    lines.append("")
+    for candidate in candidates:
+        item = candidate["finding"]
+        location = f"{item['file']}:{item['line']}"
+        examples = f" · examples={candidate['count']}" if int(candidate["count"]) > 1 else ""
+        lines.append(
+            f"- {item['severity']} · {item['category']} · {item['confidence']}/{item.get('proof_tier', PROOF_SCANNER_SIGNAL)} · {location} · {item['rule']}{examples}; Failure Path: {item['impact']}; Fix: {item['fix']}"
+        )
+
+    lines.append("")
+    lines.append("## Detailed Findings")
+    lines.append("")
+    detail_findings = findings if detail_limit == 0 else findings[:detail_limit]
+    total_findings = int(result.get("total_findings", len(findings)))
+    displayed_findings = int(result.get("displayed_findings", len(findings)))
+    if displayed_findings < total_findings:
+        lines.append(
+            f"Detailed Findings contains {displayed_findings} of {total_findings} sorted signals because `--max-findings` limited scan output."
+        )
+        lines.append("")
+    if detail_limit and len(findings) > detail_limit:
+        lines.append(f"Showing {detail_limit} of {len(findings)} findings. Use `--detail-limit 0` for the full Markdown table or `--category` to focus.")
+        lines.append("")
     lines.append("| Severity | Category | Confidence | Proof | Location | Rule | Impact | Fix |")
     lines.append("|---|---|---|---|---|---|---|---|")
-    for item in findings:
-        location = f"{item['file']}:{item['line']}"
-        lines.append(
-            "| {severity} | {category} | {confidence} | {proof} | {location} | {rule} | {impact} | {fix} |".format(
-                severity=item["severity"],
-                category=item["category"],
-                confidence=item["confidence"],
-                proof=item.get("proof_tier", PROOF_SCANNER_SIGNAL),
-                location=location,
-                rule=str(item["rule"]).replace("|", "/"),
-                impact=str(item["impact"]).replace("|", "/"),
-                fix=str(item["fix"]).replace("|", "/"),
-            )
-        )
+    for item in detail_findings:
+        lines.append(render_finding_row(item))
     return "\n".join(lines)
 
 
@@ -654,6 +769,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--include-tests", action="store_true", help="Also scan src/test Java and test resources")
     parser.add_argument("--category", help="Comma-separated categories to keep, e.g. security,concurrency,jdk")
     parser.add_argument("--max-findings", type=int, help="Maximum findings to print after sorting")
+    parser.add_argument("--detail-limit", type=int, default=DEFAULT_DETAIL_LIMIT, help="Maximum Markdown detail rows to render; use 0 for all")
     parser.add_argument("--max-depth", type=int, default=DEFAULT_MAX_DEPTH, help="Max module-scan depth for build files")
     args = parser.parse_args(argv)
 
@@ -670,7 +786,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        print(render_markdown(result))
+        print(render_markdown(result, detail_limit=max(0, args.detail_limit)))
 
     return 1 if should_fail(result["findings"], args.fail_on) else 0
 

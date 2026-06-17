@@ -8,7 +8,7 @@
 - Contribution labels should be problem/domain themes, not bare technology tags. Put technologies in the sentence as evidence of how the problem was solved.
 - One bullet should carry one technical idea. Split bullets that mix state machines, queues, data models, and provider integrations without a single throughline.
 - Metrics are strongest when known. When metrics are unavailable, use concrete scope: critical path, external systems integrated, consistency boundaries, failure modes handled, reusable pattern, or workflows owned.
-- Mark missing quantified impact explicitly as `needs user metric`; do not hide the gap behind vague value claims.
+- Mark missing quantified impact explicitly as `Needs Confirmation`; ask a focused Metric Question instead of hiding the gap behind vague value claims.
 - Apply a 20-second scan test: scope, technical judgment, solved problem, and result value should be visible without close reading.
 - Keep implementation artifacts as evidence, not final selling points: DTOs, constants, fields, mapper methods, query APIs, config keys, and migration fragments.
 - Prefer four bullets for resume-ready project experience. Use five only when the fifth adds a distinct senior-level problem, decision, and result.
@@ -18,7 +18,7 @@
 - Project description should establish the business system, critical workflows, ownership boundary, and platform value.
 - Avoid packing internal mechanisms such as state machines, queues, locks, or idempotency into the project description unless the mechanism is the product itself.
 - Put technical mechanisms in contribution bullets, where they can be tied to a concrete problem and result.
-- In resume-ready output, avoid implementation-layer inventories. Code layers and artifacts are evidence surfaces, not project value.
+- In Resume-Ready output, avoid implementation-layer inventories. Code layers and artifacts are evidence surfaces, not project value.
 
 ## Project Positioning Evidence Priority
 
@@ -27,17 +27,17 @@
 - Treat repo metadata and dominant path terms as discovery clues, not project titles. They may describe one subsystem, historical demand, or module family rather than the whole project.
 - Separate system framing from workstream labels. A frequent module can become a contribution theme only after current code and representative diffs prove the workflow it supports.
 - If project positioning remains uncertain, use a neutral domain framing such as "backend support for <observed workflow group>" or describe the workflows directly instead of asserting a product name.
-- When the user corrects a project label, remove the old label from resume-ready output and rerun the final wording through the acceptance checklist.
+- When the user corrects a project label, remove the old label from Resume-Ready output and rerun the final wording through the acceptance checklist.
 
 ## Implementation Surface Compression
 
-Before returning resume-ready output, compress implementation surfaces into business or system workflows. When a phrase is mainly a list of code layers, modules, generated artifacts, data shapes, task classes, or integration wrappers, translate it into the user-facing workflow, operational failure mode, consistency boundary, or platform behavior it supports.
+Before returning Resume-Ready output, compress implementation surfaces into business or system workflows. When a phrase is mainly a list of code layers, modules, generated artifacts, data shapes, task classes, or integration wrappers, translate it into the user-facing workflow, operational failure mode, consistency boundary, or platform behavior it supports.
 
 Use implementation names only in `analysis` mode as evidence anchors. In `resume-ready` and `compact` modes, describe the workflow, failure mode, technical decision, and result value. If a sentence reads like a code-structure inventory, rewrite it into the business process or system reliability problem those surfaces support.
 
 ## Output Modes
 
-- `analysis`: show evidence, confidence, weak spots, and `needs user metric` labels. Use this while mining the repo.
+- `analysis`: show evidence, confidence, weak spots, and `Needs Confirmation` labels. Use this while mining the repo.
 - `resume-ready`: remove evidence labels, keep only polished project description and bullets, and move metric gaps into follow-up questions.
 - `interview`: keep STAR stories, architecture narrative, trade-offs, and likely interviewer follow-ups.
 - `compact`: produce one project description and four strongest bullets for direct resume insertion.
@@ -58,7 +58,7 @@ Then prune aggressively:
 - When 3+ candidates remain, compare them pairwise by evidence, ownership, senior complexity, distinctness, and result value; drop the weaker candidate or merge overlapping themes before polishing.
 - Merge overlapping candidates into the stronger problem theme.
 - Downgrade deleted or absent historical code to interview backup unless the user asks for history.
-- Use current-file presence as a triage signal, not a verdict: missing paths can mean deletion, rename, extraction, or generated output. Verify the reason before turning the work into a final claim.
+- Use Current-Code Relevance as a triage signal, not a verdict: missing paths can mean deletion, rename, extraction, or generated output. Verify the reason before turning the work into a final claim.
 - Keep broad early work as project context when a later workstream has stronger evidence and resume value.
 - Prefer four strong bullets over six complete but diluted bullets.
 
@@ -99,17 +99,17 @@ Use this checklist before returning `resume-ready` or `compact` output:
 
 ## Evidence Sampling Script
 
-- Treat script output as an index, not the final analysis. The inspection plan prioritizes commits to read; it does not prove behavior or ownership by itself.
+- Treat script output as the Evidence Index, not the final analysis. The inspection plan prioritizes commits to read; it does not prove behavior or ownership by itself.
 - Prefer a full-history pass for final analysis. Use `--max-commits` only as a stated sampling constraint, then remove it before drawing project-level conclusions.
 - Read `Matched Authors` before interpreting the rest of the output. Multiple names/emails can mean renamed accounts, personal/company email drift, bot commits, or an over-broad regex. Resolve that identity boundary before using ownership verbs.
-- Read `Evidence Warnings` as gates, not decoration. A zero-commit result means scope might be wrong; low current-file presence means the work may be deleted, renamed, generated, or replaced; strict privacy means you still need a local full-diff read.
+- Read `Evidence Warnings` as gates, not decoration. A zero-commit result means scope might be wrong; low Current-Code Relevance means the work may be deleted, renamed, generated, or replaced; strict privacy means you still need a local full-diff read.
 - Use `--path` to focus on the subsystem the user owned before drawing project conclusions.
 - Use `--top-by-size` to discover large changes, but do not rank resume value by line count.
-- Use repo-native workstream candidates to discover likely themes from code identifiers and co-changed paths. Validate every candidate against current code and representative diffs before turning it into a claim.
+- Use Workstream Candidates to discover likely themes from code identifiers and co-changed paths. Validate every candidate against current code and representative diffs before turning it into a claim.
 - Use `--with-diffs` for local preview only. Final claims still require reading representative full diffs and current surrounding code.
 - Use `--privacy strict` when output may be stored, shared, or pasted into chat; it keeps metadata and omits diff excerpts. In strict mode, manually run the `Next check` commands locally before final writing.
 - Use inspection-plan `Next check` commands as a minimum, not a complete investigation: `git show` proves the diff, `git log --follow` checks rename/history, and `git show HEAD:<path>` gives the current file snapshot.
-- Use inspection-plan `Current file presence` to decide whether to inspect current code first, search for renamed paths, or downgrade the commit to historical/interview evidence.
+- Use inspection-plan `Current-Code Relevance` to decide whether to inspect current code first, search for renamed paths, or downgrade the commit to historical/interview evidence.
 - Treat `current_relevance_factor` as a ranking aid only. It reduces the rank of absent historical paths so active evidence surfaces first; it does not prove product value or ownership.
 - Do not build an exhaustive taxonomy in Python or config. Business domains, workstreams, and ownership boundaries must come from reading diffs and code.
 - Do not depend on external config for labels, categories, or redaction. The script should remain self-contained; add human judgment in the analysis, not config files.
@@ -131,7 +131,7 @@ Avoid labels like `State machine orchestration`, `Async idempotency`, or `DTO mo
 
 ## Density And De-Duplication
 
-- Before finalizing resume-ready output, group bullets by solved problem and result value.
+- Before finalizing Resume-Ready output, group bullets by solved problem and result value.
 - Merge bullets that both mainly say "extended the product/workflow" or "made the integration reusable".
 - Drop summary bullets that restate cross-system collaboration unless they have unique evidence, ownership, or metrics.
 - Keep each final bullet to one core idea and one sentence when possible.
@@ -158,9 +158,9 @@ If a bullet passes fewer than four checks, rewrite it or move it to evidence not
 
 ## Label Handling
 
-- Keep `observed`, `inferred`, and `needs user metric` in analysis outputs.
-- Remove those labels from resume-ready bullets.
-- If a metric is unavailable, use evidence-backed scope in the bullet and ask one focused follow-up question.
+- Keep `Observed`, `Inferred`, and `Needs Confirmation` in analysis outputs.
+- Remove those labels from Resume-Ready bullets.
+- If a metric is unavailable, use evidence-backed scope in the bullet and ask one focused Metric Question.
 
 ## Skill Example Privacy
 

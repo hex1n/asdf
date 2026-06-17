@@ -51,6 +51,43 @@ LOW_SIGNAL_SUBJECT_RE = re.compile(
     r"^(init|initial|format|reformat|vendor|generated|代码迁移|代码调整|删除不需要的代码)$",
     re.IGNORECASE,
 )
+GENERIC_TOPIC_SUFFIXES = {
+    "dto",
+    "dtos",
+    "entities",
+    "entity",
+    "handler",
+    "helper",
+    "helpers",
+    "impl",
+    "manager",
+    "process",
+    "service",
+    "util",
+    "utils",
+}
+BRANCH_LABEL_TOPIC_PREFIXES = {"bug", "bugfix", "feature", "fix", "hotfix", "merge", "release"}
+CONFIG_TOPIC_PREFIXES = {"application", "bootstrap", "config", "configuration", "settings"}
+ARTIFACT_TOPIC_SUFFIXES = {"constant", "constants", "test", "tests"}
+GENERIC_ARTIFACT_PREFIXES = {"abstract", "base", "common", "default", "generated"}
+SCHEMA_ACTION_TOKENS = {"add", "alter", "create", "drop", "update"}
+SCHEMA_OBJECT_TOKENS = {"column", "constraint", "index", "table"}
+ENVIRONMENT_PROFILE_TOKENS = {
+    "dev",
+    "development",
+    "local",
+    "preprod",
+    "prepublish",
+    "prod",
+    "production",
+    "qa",
+    "sandbox",
+    "sit",
+    "stage",
+    "staging",
+    "test",
+    "uat",
+}
 
 
 def configure_utf8_stdio() -> None:
@@ -176,6 +213,13 @@ def topic_candidates_for_commit(commit: dict[str, Any], limit: int = 8) -> list[
     return [topic for topic, _count in counter.most_common(limit * 2)]
 
 
+def canonical_workstream_topic(topic: str) -> str:
+    parts = topic.split("_")
+    while len(parts) > 2 and parts[-1] in GENERIC_TOPIC_SUFFIXES:
+        parts = parts[:-1]
+    return "_".join(parts)
+
+
 def current_path_candidates(git_path: str) -> list[str]:
     path = (git_path or "").strip()
     if not path:
@@ -291,10 +335,38 @@ def is_repo_wide_topic(
     broad_count_threshold: int,
     median_parent_concentration: float,
 ) -> bool:
+    diffuse_parent_threshold = min(median_parent_concentration, 0.45)
     return (
         cluster["commit_count"] >= broad_count_threshold
-        and parent_concentration(cluster) <= median_parent_concentration
+        and parent_concentration(cluster) <= diffuse_parent_threshold
     )
+
+
+def is_branch_label_topic(topic: str) -> bool:
+    parts = topic.split("_")
+    return bool(parts and parts[0] in BRANCH_LABEL_TOPIC_PREFIXES)
+
+
+def is_scope_level_topic(cluster: dict[str, Any], total_commits: int) -> bool:
+    if total_commits < 20:
+        return False
+    return cluster["commit_count"] / total_commits >= 0.25
+
+
+def is_environment_profile_topic(topic: str) -> bool:
+    parts = topic.split("_")
+    return bool(parts and parts[0] in CONFIG_TOPIC_PREFIXES and any(part in ENVIRONMENT_PROFILE_TOKENS for part in parts[1:]))
+
+
+def is_artifact_surface_topic(topic: str) -> bool:
+    parts = topic.split("_")
+    if not parts:
+        return False
+    if parts[-1] in ARTIFACT_TOPIC_SUFFIXES:
+        return True
+    if parts[0] in GENERIC_ARTIFACT_PREFIXES and parts[-1] in GENERIC_TOPIC_SUFFIXES:
+        return True
+    return bool(SCHEMA_ACTION_TOKENS.intersection(parts) and SCHEMA_OBJECT_TOKENS.intersection(parts))
 
 
 def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit: int = 15) -> list[dict[str, Any]]:
@@ -302,15 +374,22 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
     token_doc_counts = build_token_document_counts(commits)
     high_doc_threshold = max(percentile(list(token_doc_counts.values()), 0.85), round(len(commits) ** 0.5), 2)
     for commit in commits:
-        topics = topic_candidates_for_commit(commit)
+        topics = []
+        seen_topics: set[str] = set()
+        for raw_topic in topic_candidates_for_commit(commit):
+            topic = canonical_workstream_topic(raw_topic)
+            if topic not in seen_topics:
+                topics.append((topic, raw_topic))
+                seen_topics.add(topic)
         if not topics:
             continue
         commit_score, _reasons = score_commit(commit)
-        for topic in topics:
+        for topic, raw_topic in topics:
             cluster = clusters.setdefault(
                 topic,
                 {
                     "topic": topic,
+                    "aliases": collections.Counter(),
                     "commit_count": 0,
                     "insertions": 0,
                     "deletions": 0,
@@ -322,6 +401,7 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                     "representative_commits": [],
                 },
             )
+            cluster["aliases"][raw_topic] += 1
             cluster["commit_count"] += 1
             cluster["insertions"] += commit["insertions"]
             cluster["deletions"] += commit["deletions"]
@@ -352,6 +432,14 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
     concentration_values = [round(parent_concentration(cluster) * 1000) for cluster in clusters.values()]
     median_parent_concentration = percentile(concentration_values, 0.50) / 1000 if concentration_values else 0
     for cluster in clusters.values():
+        if is_branch_label_topic(cluster["topic"]):
+            continue
+        if is_environment_profile_topic(cluster["topic"]):
+            continue
+        if is_artifact_surface_topic(cluster["topic"]):
+            continue
+        if is_scope_level_topic(cluster, len(commits)):
+            continue
         if is_single_token_noise_topic(cluster["topic"], token_doc_counts, high_doc_threshold):
             continue
         if is_repo_wide_topic(cluster, broad_count_threshold, median_parent_concentration):
@@ -388,6 +476,11 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                 "representative_paths": [
                     path for path, _count in cluster["path_counter"].most_common(8)
                 ],
+                "topic_aliases": [
+                    alias
+                    for alias, _count in cluster["aliases"].most_common(6)
+                    if alias != cluster["topic"]
+                ][:5],
                 "representative_commits": representatives,
             }
         )
@@ -682,7 +775,7 @@ def build_evidence_warnings(
         if item["current_file_total"] > 0 and item["current_presence_ratio"] < 0.5
     ]
     if low_presence:
-        warnings.append("Some inspection candidates have low current-file presence; check for rename, deletion, generated output, or replacement before using them as primary resume evidence.")
+        warnings.append("Some inspection candidates have low Current-Code Relevance; check for rename, deletion, generated output, or replacement before using them as primary Resume-Ready evidence.")
     if args.privacy == "strict" and args.with_diffs:
         warnings.append("--privacy strict omitted diff excerpts; inspect full diffs locally before writing final claims.")
     return warnings
@@ -690,7 +783,7 @@ def build_evidence_warnings(
 
 def render_markdown(payload: dict[str, Any]) -> str:
     lines = [
-        "# Git Resume Evidence",
+        "# Git Resume Evidence Index",
         "",
         "## Inputs",
         f"- Repo: `{payload['repo']}`",
@@ -732,14 +825,14 @@ def render_markdown(payload: dict[str, Any]) -> str:
         lines.append("- n/a")
 
     if payload["workstream_candidates"]:
-        lines.extend(["", "## Repo-Native Workstream Candidates"])
+        lines.extend(["", "## Workstream Candidates"])
         for candidate in payload["workstream_candidates"]:
+            aliases = f" aliases={', '.join(candidate['topic_aliases'])}" if candidate.get("topic_aliases") else ""
             lines.extend(
                 [
-                    f"- `{candidate['topic']}` score={candidate['score']} commits={candidate['commit_count']} latest={candidate['latest_date']}",
+                    f"- `{candidate['topic']}` score={candidate['score']} commits={candidate['commit_count']} latest={candidate['latest_date']}{aliases}",
                     f"  - Change size: +{candidate['insertions']} -{candidate['deletions']}",
-                    f"  - Current file presence: {candidate['current_file_hits']}/{candidate['total_file_refs']} ({candidate['current_presence_ratio']})",
-                    f"  - Current relevance factor: {candidate['current_relevance_factor']}",
+                    f"  - Current-Code Relevance: {candidate['current_file_hits']}/{candidate['total_file_refs']} currently present ({candidate['current_presence_ratio']}); factor={candidate['current_relevance_factor']}",
                     f"  - Representative paths: {', '.join(candidate['representative_paths'][:5]) or 'n/a'}",
                 ]
             )
@@ -753,7 +846,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
             [
                 f"- `{item['short_hash']}` {item['date']} score={item['score']} {item['subject']}",
                 f"  - Why inspect: {', '.join(item['reasons'])}",
-                f"  - Current file presence: {item['current_file_hits']}/{item['current_file_total']} ({item['current_presence_ratio']})",
+                f"  - Current-Code Relevance: {item['current_file_hits']}/{item['current_file_total']} currently present ({item['current_presence_ratio']})",
                 f"  - Present now: {', '.join(item['current_files_present'][:5]) or 'n/a'}",
                 f"  - Missing now: {', '.join(item['current_files_missing'][:5]) or 'n/a'}",
                 f"  - Subject terms: {format_terms(item['subject_terms'])}",

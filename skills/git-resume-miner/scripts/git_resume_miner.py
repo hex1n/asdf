@@ -51,25 +51,137 @@ LOW_SIGNAL_SUBJECT_RE = re.compile(
     r"^(init|initial|format|reformat|vendor|generated|代码迁移|代码调整|删除不需要的代码)$",
     re.IGNORECASE,
 )
+CONVENTIONAL_COMMIT_RE = re.compile(r"^([A-Za-z]+)(?:\([^)]+\))?!?:\s*(.+)$")
+CONVENTIONAL_COMMIT_TYPES = {
+    "build",
+    "chore",
+    "ci",
+    "docs",
+    "feat",
+    "fix",
+    "perf",
+    "refactor",
+    "revert",
+    "style",
+    "test",
+}
+CHANGE_ACTION_TOPIC_PREFIXES = {
+    "add",
+    "added",
+    "adjust",
+    "adjusted",
+    "create",
+    "created",
+    "delete",
+    "deleted",
+    "document",
+    "documented",
+    "enable",
+    "enabled",
+    "expose",
+    "exposed",
+    "fix",
+    "fixed",
+    "harden",
+    "hardened",
+    "handle",
+    "handled",
+    "implement",
+    "implemented",
+    "improve",
+    "improved",
+    "introduce",
+    "introduced",
+    "keep",
+    "kept",
+    "migrate",
+    "migrated",
+    "optimize",
+    "optimized",
+    "persist",
+    "persisted",
+    "prepare",
+    "prepared",
+    "refactor",
+    "refactored",
+    "remove",
+    "removed",
+    "rename",
+    "renamed",
+    "serve",
+    "served",
+    "strengthen",
+    "strengthened",
+    "support",
+    "supported",
+    "tighten",
+    "tightened",
+    "update",
+    "updated",
+}
+TOPIC_LEADING_STOPWORDS = {"only"}
 GENERIC_TOPIC_SUFFIXES = {
     "dto",
     "dtos",
     "entities",
     "entity",
+    "fallback",
     "handler",
+    "hasher",
     "helper",
     "helpers",
     "impl",
     "manager",
+    "miner",
     "process",
+    "reader",
     "service",
+    "set",
     "util",
     "utils",
 }
 BRANCH_LABEL_TOPIC_PREFIXES = {"bug", "bugfix", "feature", "fix", "hotfix", "merge", "release"}
 CONFIG_TOPIC_PREFIXES = {"application", "bootstrap", "config", "configuration", "settings"}
 ARTIFACT_TOPIC_SUFFIXES = {"constant", "constants", "test", "tests"}
+ARTIFACT_TOPIC_PREFIXES = {"spec", "specs", "test", "tests"}
+VALIDATION_ARTIFACT_TOPIC_PHRASES = {"real_project"}
+VALIDATION_ARTIFACT_TOPIC_TOKENS = {
+    "acceptance",
+    "baseline",
+    "current",
+    "desc",
+    "diag",
+    "diagnostic",
+    "eval",
+    "fixture",
+    "fixtures",
+    "permissive",
+}
 GENERIC_ARTIFACT_PREFIXES = {"abstract", "base", "common", "default", "generated"}
+LOW_VALUE_SINGLE_TOKEN_TOPICS = {
+    "app",
+    "config",
+    "demo",
+    "example",
+    "examples",
+    "fixture",
+    "fixtures",
+    "install",
+    "log",
+    "logs",
+    "marketplace",
+    "mock",
+    "mockup",
+    "plugin",
+    "plugins",
+    "profile",
+    "profiles",
+    "setup",
+    "task",
+    "tasks",
+    "temp",
+    "tmp",
+}
 SCHEMA_ACTION_TOKENS = {"add", "alter", "create", "drop", "update"}
 SCHEMA_OBJECT_TOKENS = {"column", "constraint", "index", "table"}
 ENVIRONMENT_PROFILE_TOKENS = {
@@ -184,8 +296,7 @@ def path_terms(files: list[dict[str, Any]]) -> list[tuple[str, int]]:
     return top_terms(pieces)
 
 
-def topic_phrases_from_text(text: str) -> list[str]:
-    tokens = tokenize(text)
+def topic_phrases_from_tokens(tokens: list[str]) -> list[str]:
     if not tokens:
         return []
 
@@ -199,6 +310,22 @@ def topic_phrases_from_text(text: str) -> list[str]:
     return phrases
 
 
+def topic_phrases_from_text(text: str) -> list[str]:
+    return topic_phrases_from_tokens(tokenize(text))
+
+
+def topic_phrases_from_subject(subject: str) -> list[str]:
+    text = subject.strip()
+    match = CONVENTIONAL_COMMIT_RE.match(text)
+    if match and match.group(1).lower() in CONVENTIONAL_COMMIT_TYPES:
+        text = match.group(2)
+
+    tokens = tokenize(text)
+    while len(tokens) > 1 and tokens[0] in CHANGE_ACTION_TOPIC_PREFIXES.union(TOPIC_LEADING_STOPWORDS):
+        tokens = tokens[1:]
+    return topic_phrases_from_tokens(tokens)
+
+
 def topic_candidates_for_commit(commit: dict[str, Any], limit: int = 8) -> list[str]:
     counter: collections.Counter[str] = collections.Counter()
 
@@ -206,7 +333,8 @@ def topic_candidates_for_commit(commit: dict[str, Any], limit: int = 8) -> list[
         for phrase in topic_phrases_from_text(text):
             counter[phrase] += weight
 
-    add_phrases(commit["subject"], 4)
+    for phrase in topic_phrases_from_subject(commit["subject"]):
+        counter[phrase] += 4
     for file_info in commit["files"]:
         path = pathlib.PurePosixPath(file_info["path"].replace("\\", "/"))
         add_phrases(path.stem, 3)
@@ -322,6 +450,45 @@ def is_single_token_noise_topic(
     return doc_counts.get(topic, 0) >= high_doc_threshold
 
 
+def is_low_evidence_single_token_surface_topic(cluster: dict[str, Any]) -> bool:
+    topic = cluster["topic"]
+    if "_" in topic:
+        return False
+    if topic in {"log", "logs"}:
+        return True
+    if topic not in LOW_VALUE_SINGLE_TOKEN_TOPICS:
+        return False
+    return cluster["commit_count"] <= 2 and cluster["total_file_refs"] >= 5
+
+
+def is_redundant_single_token_topic(cluster: dict[str, Any], clusters: dict[str, dict[str, Any]]) -> bool:
+    topic = cluster["topic"]
+    if "_" in topic or cluster["commit_count"] > 2:
+        return False
+    commit_hashes = cluster.get("commit_hashes") or set()
+    if not commit_hashes:
+        return False
+    for peer in clusters.values():
+        if peer is cluster or "_" not in peer["topic"]:
+            continue
+        peer_hashes = peer.get("commit_hashes") or set()
+        if commit_hashes.issubset(peer_hashes):
+            return True
+    return False
+
+
+def is_redundant_prefix_expansion_topic(cluster: dict[str, Any], clusters: dict[str, dict[str, Any]]) -> bool:
+    parts = cluster["topic"].split("_")
+    if len(parts) < 3 or cluster["commit_count"] > 2:
+        return False
+    commit_hashes = cluster.get("commit_hashes") or set()
+    for prefix_len in range(2, len(parts)):
+        peer = clusters.get("_".join(parts[:prefix_len]))
+        if peer and commit_hashes and commit_hashes.issubset(peer.get("commit_hashes") or set()):
+            return True
+    return False
+
+
 def parent_concentration(cluster: dict[str, Any]) -> float:
     parent_counter = cluster.get("parent_counter") or {}
     total_refs = cluster.get("total_file_refs") or 0
@@ -334,7 +501,12 @@ def is_repo_wide_topic(
     cluster: dict[str, Any],
     broad_count_threshold: int,
     median_parent_concentration: float,
+    total_commits: int = 0,
 ) -> bool:
+    total_refs = cluster.get("total_file_refs") or 0
+    current_ratio = (cluster.get("current_file_hits") or 0) / total_refs if total_refs else 0
+    if 0 < total_commits < 50 and "_" in cluster["topic"] and current_ratio >= 0.5:
+        return False
     diffuse_parent_threshold = min(median_parent_concentration, 0.45)
     return (
         cluster["commit_count"] >= broad_count_threshold
@@ -362,11 +534,23 @@ def is_artifact_surface_topic(topic: str) -> bool:
     parts = topic.split("_")
     if not parts:
         return False
+    if topic in VALIDATION_ARTIFACT_TOPIC_PHRASES:
+        return True
+    if VALIDATION_ARTIFACT_TOPIC_TOKENS.intersection(parts):
+        return True
+    if parts[0] in ARTIFACT_TOPIC_PREFIXES:
+        return True
     if parts[-1] in ARTIFACT_TOPIC_SUFFIXES:
         return True
     if parts[0] in GENERIC_ARTIFACT_PREFIXES and parts[-1] in GENERIC_TOPIC_SUFFIXES:
         return True
     return bool(SCHEMA_ACTION_TOKENS.intersection(parts) and SCHEMA_OBJECT_TOKENS.intersection(parts))
+
+
+def cluster_evidence_quality_factor(cluster: dict[str, Any]) -> float:
+    if cluster["commit_count"] <= 2 and cluster.get("bulk_commit_count") == cluster["commit_count"]:
+        return 0.35
+    return 1.0
 
 
 def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit: int = 15) -> list[dict[str, Any]]:
@@ -398,6 +582,8 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                     "total_file_refs": 0,
                     "path_counter": collections.Counter(),
                     "parent_counter": collections.Counter(),
+                    "commit_hashes": set(),
+                    "bulk_commit_count": 0,
                     "representative_commits": [],
                 },
             )
@@ -406,6 +592,9 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
             cluster["insertions"] += commit["insertions"]
             cluster["deletions"] += commit["deletions"]
             cluster["latest_date"] = max(cluster["latest_date"], commit["date"])
+            cluster["commit_hashes"].add(commit["hash"])
+            if LOW_SIGNAL_SUBJECT_RE.match(commit["subject"].strip()) or len(commit["files"]) >= 100:
+                cluster["bulk_commit_count"] += 1
             for file_info in commit["files"]:
                 path = file_info["path"]
                 parent = str(pathlib.PurePosixPath(path.replace("\\", "/")).parent)
@@ -442,7 +631,13 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
             continue
         if is_single_token_noise_topic(cluster["topic"], token_doc_counts, high_doc_threshold):
             continue
-        if is_repo_wide_topic(cluster, broad_count_threshold, median_parent_concentration):
+        if is_low_evidence_single_token_surface_topic(cluster):
+            continue
+        if is_redundant_single_token_topic(cluster, clusters):
+            continue
+        if is_redundant_prefix_expansion_topic(cluster, clusters):
+            continue
+        if is_repo_wide_topic(cluster, broad_count_threshold, median_parent_concentration, len(commits)):
             continue
         total_refs = cluster["total_file_refs"]
         current_ratio = round(cluster["current_file_hits"] / total_refs, 3) if total_refs else 0
@@ -454,7 +649,8 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
             + concentration * 5
         )
         current_relevance_factor = 0.4 + current_ratio * 0.6
-        cluster_score = base_score * current_relevance_factor
+        evidence_quality_factor = cluster_evidence_quality_factor(cluster)
+        cluster_score = base_score * current_relevance_factor * evidence_quality_factor
         representatives = sorted(
             cluster["representative_commits"],
             key=lambda item: (item["score"], item["change_size"], item["date"]),
@@ -472,6 +668,7 @@ def build_workstream_candidates(repo: str, commits: list[dict[str, Any]], limit:
                 "total_file_refs": total_refs,
                 "current_presence_ratio": current_ratio,
                 "current_relevance_factor": round(current_relevance_factor, 3),
+                "evidence_quality_factor": round(evidence_quality_factor, 3),
                 "path_concentration": concentration,
                 "representative_paths": [
                     path for path, _count in cluster["path_counter"].most_common(8)
@@ -828,14 +1025,17 @@ def render_markdown(payload: dict[str, Any]) -> str:
         lines.extend(["", "## Workstream Candidates"])
         for candidate in payload["workstream_candidates"]:
             aliases = f" aliases={', '.join(candidate['topic_aliases'])}" if candidate.get("topic_aliases") else ""
+            evidence_factor = candidate.get("evidence_quality_factor", 1)
             lines.extend(
                 [
                     f"- `{candidate['topic']}` score={candidate['score']} commits={candidate['commit_count']} latest={candidate['latest_date']}{aliases}",
                     f"  - Change size: +{candidate['insertions']} -{candidate['deletions']}",
                     f"  - Current-Code Relevance: {candidate['current_file_hits']}/{candidate['total_file_refs']} currently present ({candidate['current_presence_ratio']}); factor={candidate['current_relevance_factor']}",
-                    f"  - Representative paths: {', '.join(candidate['representative_paths'][:5]) or 'n/a'}",
                 ]
             )
+            if evidence_factor != 1:
+                lines.append(f"  - Evidence quality factor: {evidence_factor}")
+            lines.append(f"  - Representative paths: {', '.join(candidate['representative_paths'][:5]) or 'n/a'}")
 
     lines.extend(["", "## Inspection Plan"])
     for item in payload["inspection_plan"]:

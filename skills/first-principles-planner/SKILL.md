@@ -1,17 +1,18 @@
 ---
 name: first-principles-planner
 description: >
-  Creates first-principles plans that reframe proposed solutions into root
-  problems, compare mechanisms, and produce concrete Markdown plans. Use when
-  the user asks for 第一性原理, 第一性原理计划, 最佳方案, 最佳实现, 最好的方案,
-  还有更好, 有没有更好, 给出方案, 先不coding, 不coding,
-  先写方案, 先不写代码, 先不要写代码, 不要直接改代码, 架构演进, 优化方案,
-  取舍, adopt/replace/upgrade decisions, should we X or Y, tradeoff analysis,
-  or a plan beyond the first viable solution. Do not use for pure what-is-true
-  research (use deep-research), bug diagnosis, implementation,
-  plan/document/code review, 计划评审, 方案评审, 审查计划, 审查方案, durable
-  ADR/CONTEXT capture, or skill-writing audits unless explicitly asked to
-  re-plan from first principles.
+  Creates first-principles recommendations and plans by reframing the root
+  problem, separating constraints from assumptions, comparing mechanisms, and
+  returning the current-best path with failure conditions and next verification
+  steps. Use when the user asks for a best/better plan, architecture or design
+  direction, implementation strategy, tradeoff/adopt/replace/upgrade decision,
+  or explicitly avoids coding while choosing a path; examples include 第一性原理,
+  最佳方案, 最佳实现, 给出方案, 先写方案, 先不写代码, 先不要写代码,
+  先不coding, 不coding, 不要直接改代码, 还有更好, 是否应该, 最佳了吗, 取舍,
+  架构演进, and 优化方案. Do not use for pure fact-finding research, live bug
+  diagnosis, implementation, code/plan review, 计划评审, 方案评审, 审查计划,
+  审查方案, durable ADR/CONTEXT capture, or skill-writing audits unless the user
+  explicitly asks to re-plan from first principles.
 ---
 
 # First-Principles Planner
@@ -34,7 +35,7 @@ If running as a subagent, use the full planner only for delegated planning, arch
 ## Hard Gates
 
 - If the stated solution is not tied to an outcome, rewrite the problem statement before comparing options.
-- If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default.
+- If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default; do not stop at clarification when a safe default exists — state the default, give the current-best path under that default, and name the fact that would flip the recommendation.
 - If the plan has no independently verifiable next step, shrink it to a vertical slice or a decision.
 - **Artifact Gate:** use a chat-first plan by default. Do not create durable artifacts unless explicitly asked, a target path is provided, or the result is a reusable handoff into named next work; then use [REFERENCE.md](REFERENCE.md#artifact-location).
 - Saved plans use `docs/plans/` by default; saved decision/tradeoff memos use `docs/decisions/` by default. Chat-only plans still name where an artifact would go if requested.
@@ -45,8 +46,8 @@ Use the user's language for chat and saved artifacts. For Standard or deeper wor
 
 | Mode | Use when | Shape |
 |---|---|---|
-| Decision | "还有更好?", "是否应该?", "最佳了吗?" | 10-20 lines: recommendation, why, when wrong, next step; include a compressed **Bestness Check** for non-trivial recommendations |
-| Plan | "最佳方案", "最佳实现", "给出方案", "先不 coding", architecture/design proposal | Chat-first plan by default; save only through the Artifact Gate; put the Bestness Check near the top for non-trivial recommendations |
+| Decision | The user asks whether to choose, keep, replace, or improve a path, or challenges the current best: "还有更好?", "是否应该?", "最佳了吗?" | 10-20 lines: recommendation, why, when wrong, next step; include a compressed **Bestness Check** for non-trivial recommendations |
+| Plan | The user asks for a best/better plan, implementation strategy, architecture or design direction, or explicitly avoids coding while choosing a path: "最佳方案", "最佳实现", "给出方案", "先不写代码" | Chat-first plan by default; save only through the Artifact Gate; put the Bestness Check near the top for non-trivial recommendations |
 
 ## Depth
 
@@ -72,13 +73,14 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 
 ## Route Examples
 
+- `是否应该替换 X?` / `还有更好的吗?` / `最佳了吗?` -> Decision.
+- `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan.
 - `深度分析为什么失败` -> Research-first; plan only if the user asks for a fix path.
-- `先不写代码，给最佳方案` -> Plan.
 - `审查这个方案有没有问题` -> use a review skill; re-plan only if asked.
 
 ## Acceptance Gate
 
-Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it.
+Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation.
 
 ## Anti-Patterns
 

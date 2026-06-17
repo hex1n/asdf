@@ -35,6 +35,7 @@ Use these Leitwörter exactly; avoid synonyms that blur the gates.
 - **Needs Confirmation**: blocked by missing author identity, deleted code, ambiguous scope, or absent business context.
 - **Best-Version Tournament**: pairwise pruning that keeps the strongest non-overlapping Workstreams.
 - **Resume-Ready**: final user-facing project framing and bullets with no internal evidence labels or low-level artifact lists.
+- **Interview-Ready**: interview stories with concise evidence anchors, trade-off defense, likely follow-ups, and ownership boundaries.
 - **Metric Question**: missing high-value business or scale metric, asked separately instead of invented.
 
 ## Workflow
@@ -57,7 +58,7 @@ Use these Leitwörter exactly; avoid synonyms that blur the gates.
    - `analysis`: evidence ledger, contribution map, ranking, confidence labels, and weak spots
    - `resume-ready`: Resume-Ready project description plus 3-5 bullets, preferring 4
    - `compact`: one project description plus four strongest bullets
-   - `interview`: STAR stories, architecture narrative, trade-offs, and likely follow-ups
+   - `interview`: Interview-Ready STAR stories, architecture narrative, trade-off defense, evidence anchors, ownership boundaries, and likely follow-ups
 8. Default to `resume-ready` or `compact` when the user asks for "一版", "最佳", "简历版", or a directly usable result. Include only a short evidence note unless the user explicitly asks for full analysis.
 9. For `resume-ready` and `compact`, output only the Resume-Ready project framing, strongest bullets, and Metric Questions. Do not include code paths, contribution maps, candidate rankings, or confidence labels unless the user asks.
 10. Run a Resume-Ready Defense Check before returning: use the adversarial post-output self-review in [BEST_PRACTICES.md](BEST_PRACTICES.md#resume-ready-defense-check) to argue against the strongest bullet and project framing, require a defensible claim for every final bullet, then remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
@@ -80,7 +81,7 @@ Use these Leitwörter exactly; avoid synonyms that blur the gates.
 - In `analysis`: contribution map, candidate ranking, code evidence, confidence labels, and metric gaps.
 - In `resume-ready`/`compact`: Resume-Ready project description and strongest bullets only; remove confidence labels, file names, and low-level artifact lists.
 - Current-Code Relevance: note deleted, renamed, or absent evidence in analysis mode; omit or demote it in Resume-Ready output unless the user asks for historical work.
-- Interview stories and talking points when requested.
+- In `interview`: Interview-Ready stories and talking points with concise evidence anchors; do not print exhaustive candidate rankings unless requested.
 - Follow-up questions only as Metric Questions.
 
 ## Quality Bar
@@ -89,12 +90,10 @@ Use these Leitwörter exactly; avoid synonyms that blur the gates.
 - Prefer ownership, architecture, consistency, reliability, integration, and reuse signals over bare technology labels.
 - Keep DTOs, constants, table fields, query methods, and config keys as evidence, not final selling points.
 - Do not turn implementation-surface inventories into Resume-Ready value. If a sentence mainly lists code layers, modules, artifacts, or surfaces, rewrite it as workflow scope, failure mode, technical decision, and result value.
-- Use short commit hashes and file references as evidence anchors in analysis mode only.
+- Use short commit hashes and file references as evidence anchors in `analysis` and `interview` only.
 - Do not treat script categories, commit count, or lines changed as proof of value.
 - Do not add project-specific configuration to encode business meaning; read diffs and code instead.
 - Do not let one dominant module, repo description, package/POM label, or path term name the whole project unless authoritative docs and current workflows support it.
 - Treat built-in redaction as best effort for common secret patterns. Manually redact customer names, internal hostnames, and sensitive data before quoting or sharing.
 - Keep bundled examples fictional or anonymized.
-
-## References
-See [BEST_PRACTICES.md](BEST_PRACTICES.md) for resume pruning rules and [EXAMPLES.md](EXAMPLES.md) for output shapes.
+## References: [BEST_PRACTICES.md](BEST_PRACTICES.md) for pruning rules and [EXAMPLES.md](EXAMPLES.md) for output shapes.

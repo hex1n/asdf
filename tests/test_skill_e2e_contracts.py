@@ -82,9 +82,9 @@ SCENARIOS = (
             "improvement magnitude",
             "generalization confidence",
             "adversarial falsification",
-            "optimism bias",
+            "objective conditions",
+            "net-new skill",
             "relative delta",
-            "the author is the grader",
             "regressions",
             "continue / accept / reject",
             "marginal gain",
@@ -97,10 +97,10 @@ SCENARIOS = (
             "improvement magnitude",
             "generalization confidence",
             "adversarial falsification",
-            "optimism bias",
+            "objective conditions",
+            "net-new skill",
             "relative delta",
             "two-layer gate",
-            "the author is the grader",
             "marginal gain",
         ),
     ),
@@ -484,14 +484,14 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("real validation artifact", agents)
         self.assertIn("store temporary comparison outputs outside the skill folder", agents)
         self.assertIn("do not score the edit on an absolute point scale", agents)
-        self.assertIn("optimism bias", agents)
-        self.assertIn("the author is the grader", agents)
         self.assertIn("two-layer gate", agents)
         self.assertIn("hard gates", agents)
+        self.assertIn("net-new skill", agents)
         self.assertIn("improvement magnitude: none / marginal / clear / large", agents)
         self.assertIn("generalization confidence", agents)
         self.assertIn("never accept generalization on a single sample", agents)
         self.assertIn("adversarial falsification", agents)
+        self.assertIn("objective conditions", agents)
         self.assertIn("relative delta", agents)
         self.assertIn("decision:", agents)
         for path in RUNTIME_SKILL_FILES:

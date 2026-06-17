@@ -129,7 +129,10 @@ class GitResumeMinerTest(unittest.TestCase):
         self.assertEqual(miner.canonical_workstream_topic("document_structure_hasher"), "document_structure")
         self.assertEqual(miner.canonical_workstream_topic("dto_bytecode_fallback"), "dto_bytecode")
         self.assertEqual(miner.canonical_workstream_topic("java_annotation_reader"), "java_annotation")
+        self.assertEqual(miner.canonical_workstream_topic("claim_cron_controller"), "claim_cron")
+        self.assertEqual(miner.canonical_workstream_topic("claim_cron_controllers"), "claim_cron")
         self.assertEqual(miner.canonical_workstream_topic("buyout_service"), "buyout_service")
+        self.assertEqual(miner.canonical_workstream_topic("user_controller"), "user_controller")
 
     def test_subject_topics_strip_commit_grammar_and_change_verbs(self) -> None:
         miner = load_miner()
@@ -171,6 +174,7 @@ class GitResumeMinerTest(unittest.TestCase):
         self.assertTrue(miner.is_artifact_surface_topic("desc_current"))
         self.assertTrue(miner.is_artifact_surface_topic("diag_permissive"))
         self.assertTrue(miner.is_artifact_surface_topic("generated_handler"))
+        self.assertTrue(miner.is_artifact_surface_topic("generated_controller"))
         self.assertFalse(miner.is_artifact_surface_topic("buyout_service"))
         self.assertFalse(miner.is_artifact_surface_topic("mock_provider"))
         self.assertFalse(miner.is_artifact_surface_topic("tripartite_contract"))

@@ -18,6 +18,12 @@ def write(path, text):
     path.write_text(text, encoding="utf-8")
 
 
+def profile_card_gate_lines():
+    profile = Path(__file__).resolve().parents[1] / "PROFILE.md"
+    section = profile.read_text(encoding="utf-8").split("Card promotion gate:", 1)[1].split("```md", 1)[0]
+    return [line.strip() for line in section.splitlines() if line.strip().startswith("- ")]
+
+
 class JavaStackContextTest(unittest.TestCase):
     def test_facilities_detect_common_project_seams(self):
         with tempfile.TemporaryDirectory() as td:
@@ -159,6 +165,9 @@ class JavaStackContextTest(unittest.TestCase):
             self.assertIn(java_stack.GENERATED_END, first)
             self.assertIn("## Project Knowledge Cards", first)
             self.assertIn("would change a future coding, review, or verification choice", first)
+            self.assertIn("Card promotion gate:", first)
+            self.assertIn("Decision is an imperative action", first)
+            self.assertIn("A fact failing any gate stays in the chat/report", first)
             self.assertIn("- Decision:", first)
             self.assertIn("- Use when:", first)
             self.assertIn("- Do not use when:", first)
@@ -178,6 +187,20 @@ class JavaStackContextTest(unittest.TestCase):
             self.assertEqual(1, second.count(java_stack.GENERATED_START))
             self.assertEqual(1, second.count(java_stack.GENERATED_END))
             self.assertIn("- Human keeps this note.", second)
+
+    def test_generated_profile_template_matches_profile_card_gate(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write(root / "pom.xml", "<project><properties><java.version>17</java.version></properties></project>")
+
+            with contextlib.redirect_stdout(io.StringIO()):
+                rc = java_stack.main(["context", "--dir", str(root)])
+
+            profile = (root / "docs/agents/java-stack-profile.md").read_text(encoding="utf-8")
+            self.assertEqual(0, rc)
+            for line in profile_card_gate_lines():
+                with self.subTest(line=line):
+                    self.assertIn(line, profile)
 
     def test_profile_refresh_repairs_malformed_generated_markers(self):
         with tempfile.TemporaryDirectory() as td:

@@ -39,7 +39,7 @@ Treat the context as evidence, not an oracle. Confirm load-bearing facts from co
 
 1. Name whether the work is writing, review, or accepted-plan landing.
 2. Capture the Target Profile once per project session; re-run only if build files, working tree, target module, or touched seam changed.
-3. Read `docs/agents/java-stack-profile.md`; treat the generated block as a freshness-checked snapshot and Project Knowledge Cards as soft repo memory.
+3. Read `docs/agents/java-stack-profile.md`; treat the generated block as a freshness-checked snapshot and Project Knowledge Cards as soft repo memory. Name the card that changed a choice, or say `no-card`.
 4. Read same-module or touched-flow code for any Project Facility that the context flags as relevant.
 5. Use [RISK_ROUTER.md](RISK_ROUTER.md) to choose the Action Candidate when more than one risk is plausible.
 6. Load [SPRING_BOOT.md](SPRING_BOOT.md) before Spring writing or review; the context tells you which Boot namespace and web-stack facts to trust.

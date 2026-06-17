@@ -1,21 +1,21 @@
 ---
 name: git-resume-miner
-description: Analyzes a specified Git author's commits, diffs, and surrounding code to produce evidence-backed backend project contributions, Resume-Ready bullets, interview stories, and Best-Version Tournament pruning. Use when the user wants to mine Git history for resume content, analyze repository contributions, prepare interview narratives, or turn code evidence into a concise Resume-Ready project experience.
+description: Mine a specified Git author's commit history into evidence-backed resume or interview material. Use when the user wants to analyze Git contributions, turn commits/diffs/current code into senior or backend resume bullets, prepare interview narratives, compare contribution workstreams, or produce a Resume-Ready/Interview-Ready project experience.
 ---
 
 # Git Resume Miner
 
 ## Quick Start
 
-When the user provides a repository and Git author, collect evidence first:
+When the user provides a repository and Git author, start with an **Evidence Index**:
 
 ```bash
 python3 scripts/git_resume_miner.py --repo . --author "name-or-email" --since 2024-01-01 --until 2024-12-31 --format markdown
 ```
 
-On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and does not read project-specific configuration. It scans the full matching history by default; add `--max-commits N` only for an explicitly bounded exploratory pass. Add `--path service --path api` to narrow scope, `--with-diffs` for built-in redacted diff excerpts, and `--privacy strict` when diff content should not be printed. The script emits UTF-8 output and includes matched-author summaries, evidence warnings, Workstream Candidates, Current-Code Relevance checks, and next inspection commands.
+On Windows, use `python` or `py` if `python3` is unavailable. The script is self-contained and scans full matching history by default. Use `--max-commits N` only for an explicitly bounded exploratory pass, `--path service --path api` to narrow scope, `--with-diffs` for local redacted diff previews, and `--privacy strict` when diff content should not be printed. Keep merge commits excluded unless merge ownership matters.
 
-Use script output only as an Evidence Index. Resume-Ready claims must come from representative diffs, current code context, data models, integration points, workflow behavior, and tests. If no author is provided, ask for the Git author name or email.
+If no author is provided, ask for the Git author name or email. Completion criterion: `Matched Authors`, `Evidence Warnings`, scope, and privacy mode are understood before making any ownership claim.
 
 ## Inputs
 
@@ -34,66 +34,30 @@ Use these Leitwörter exactly; avoid synonyms that blur the gates.
 - **Inferred**: plausible from commit/path evidence but not directly proven.
 - **Needs Confirmation**: blocked by missing author identity, deleted code, ambiguous scope, or absent business context.
 - **Best-Version Tournament**: pairwise pruning that keeps the strongest non-overlapping Workstreams.
+- **Defense Card**: private check for each final bullet: winning Workstream, evidence basis, ownership verb, overstatement risk, and Metric Question.
 - **Resume-Ready**: final user-facing project framing and bullets with no internal evidence labels or low-level artifact lists.
 - **Interview-Ready**: interview stories with concise evidence anchors, trade-off defense, likely follow-ups, and ownership boundaries.
 - **Metric Question**: missing high-value business or scale metric, asked separately instead of invented.
 
-## Workflow
+## Run Contract
 
-1. Extract the Evidence Index: commits, dates, matched author identities, subjects, changed files, insertions/deletions, top paths, repo-derived terms, Current-Code Relevance, inspection plan, evidence warnings, and optional diff excerpts. Exclude merges unless ownership matters.
-2. Establish project positioning and Ownership Boundary before feature narrative. Apply evidence priority: user-provided or corrected framing > authoritative product/architecture docs > current workflow code and tests > repo names, package names, README/POM descriptions, dominant modules, and high-frequency script candidates. Treat weak metadata as clues only; if sources conflict, use neutral framing and state uncertainty instead of asserting a project title.
-3. Cluster candidate Workstreams from repo-native evidence: co-changed paths, code identifiers, representative diffs, current code, data models, integration boundaries, operational hooks, tests, and domain workflow. Use script candidates as hints, not labels.
-4. Build a contribution ledger with confidence labels: Observed, Inferred, and Needs Confirmation. Treat vague commit subjects as weak evidence until code confirms them, and mark low Current-Code Relevance as historical evidence until current code, release notes, or user context proves it still matters.
-5. Calibrate Ownership Boundary before writing bullets:
-   - use `designed`, `owned`, or `delivered` only when commits, current code, and diffs support direct ownership of the core design or implementation
-   - use `expanded`, `refactored`, `improved`, or `drove` when the work is substantial but the subsystem is clearly multi-author
-   - use `participated in` or `contributed to` when evidence shows meaningful work but not end-to-end ownership
-6. Run the Best-Version Tournament before writing final bullets:
-   - rank Workstreams by Current-Code Relevance, Ownership Boundary, senior complexity, distinct failure mode, and business/platform value
-   - when 3+ candidates remain, compare them pairwise and eliminate weaker, overlapping, or less defensible themes
-   - downgrade historical code that is deleted or absent from the current branch unless the user asks for archaeology
-   - merge candidates that solve the same problem; keep weaker real themes as interview backup
-   - choose the strongest four resume bullets by value, not chronology, commit count, or changed lines
-7. Select output mode:
-   - `analysis`: evidence ledger, contribution map, ranking, confidence labels, and weak spots
-   - `resume-ready`: Resume-Ready project description plus 3-5 bullets, preferring 4
-   - `compact`: one project description plus four strongest bullets
-   - `interview`: Interview-Ready STAR stories, architecture narrative, trade-off defense, evidence anchors, ownership boundaries, and likely follow-ups
-8. Default to `resume-ready` or `compact` when the user asks for "一版", "最佳", "简历版", or a directly usable result. Include only a short evidence note unless the user explicitly asks for full analysis.
-9. For `resume-ready` and `compact`, output only the Resume-Ready project framing, strongest bullets, and Metric Questions. Do not include code paths, contribution maps, candidate rankings, or confidence labels unless the user asks.
-10. Run a Resume-Ready Defense Check before returning: use the adversarial post-output self-review in [BEST_PRACTICES.md](BEST_PRACTICES.md#resume-ready-defense-check) to argue against the strongest bullet and project framing, require a defensible claim for every final bullet, then remove overstated ownership, duplicate themes, weak support-tool bullets, low-level artifact lists, implementation-layer inventories, unproven metrics, and wording that turns a multi-author subsystem into a single-owner claim.
-11. Run the final acceptance gate: one project framing, four strong bullets by default, no low-level artifact lists, no invented metrics, no duplicate problem themes, missing metrics separated as questions, and ownership verbs matching evidence strength.
+1. Extract the Evidence Index: commits, matched identities, changed files, top paths, Workstream Candidates, Current-Code Relevance, inspection plan, evidence warnings, and optional diff excerpts. Completion criterion: the author boundary and scope are explicit.
+2. Establish project positioning and Ownership Boundary before writing feature narrative. Evidence priority is user-provided framing, then authoritative docs, current workflow code/tests, then weak metadata such as repo names, package labels, dominant paths, and script candidates.
+3. Form Workstreams from repo-native evidence: co-changed paths, code identifiers, representative diffs, current code, data models, integration boundaries, operational hooks, tests, and domain workflow. Script candidates are hints, not labels.
+4. Inspect before promotion. For each kept Workstream, read at least one representative full diff and one current surrounding code path unless the output is explicitly historical. Use the script's `Next check` commands as the minimum follow-up.
+5. Build the contribution ledger with `Observed`, `Inferred`, and `Needs Confirmation`. Promote Inferred only after code, tests, docs, or user facts show the workflow, boundary, failure mode, or data model behind the commit subject.
+6. Calibrate Ownership Boundary before bullets. Use ownership verbs only as strongly as representative diffs, current code, and multi-author context allow.
+7. Run the Best-Version Tournament before final output: compare Workstreams pairwise by evidence strength, ownership, senior complexity, distinctness, and result value; merge overlaps; downgrade low Current-Code Relevance unless archaeology was requested; keep the strongest four resume bullets by value.
+8. Select output mode. Use `analysis` for evidence ledgers, `resume-ready` for polished project description plus bullets, `compact` for a directly insertable short version, and `interview` for Interview-Ready stories with evidence anchors, trade-off defense, ownership boundaries, and likely follow-ups.
+9. Default to `resume-ready` or `compact` when the user asks for "一版", "最佳", "简历版", or a directly usable result. For resume-ready/compact, do not include code paths, contribution maps, candidate rankings, or confidence labels unless explicitly requested.
+10. Run the relevant defense branch before returning: Resume-Ready Defense Check for `resume-ready`/`compact`, Interview-Ready Defense Pack for `interview`, and evidence gate review for `analysis`. Completion criterion: every final bullet has a defensible claim, no invented metric, and an ownership verb that survives interview challenge.
+11. Return only the selected mode plus Metric Questions. Completion criterion: one project framing, four strong bullets by default for resume output, no duplicate problem themes, and missing metrics separated as questions.
 
-## Evidence Gates
+## Reference Pointers
 
-- Use the full-history Evidence Index to choose what to inspect; do not write final bullets from the script summary alone.
-- Confirm `Matched Authors` first. If zero commits or multiple identities appear, resolve the author/date/path scope before writing ownership claims.
-- For each kept Workstream, inspect at least one representative full diff and one current surrounding code path unless the output is explicitly historical.
-- Use the script's `Next check` commands as the minimum follow-up: inspect the full diff, path history, and current file before promoting a theme.
-- Treat `Current-Code Relevance` as a triage signal: high presence strengthens current relevance; low presence requires checking whether the work was deleted, renamed, generated, or replaced before using it as resume value.
-- Promote Inferred to Observed only after code or tests show the workflow, boundary, failure mode, or data model behind the commit subject.
-- If the user asks for archaeology or interview preparation, keep deleted but meaningful work as an interview backup instead of a primary resume bullet.
-
-## Output Contract
-
-- Inputs and constraints used.
-- Project positioning and evidence-backed Ownership Boundary.
-- In `analysis`: contribution map, candidate ranking, code evidence, confidence labels, and metric gaps.
-- In `resume-ready`/`compact`: Resume-Ready project description and strongest bullets only; remove confidence labels, file names, and low-level artifact lists.
-- Current-Code Relevance: note deleted, renamed, or absent evidence in analysis mode; omit or demote it in Resume-Ready output unless the user asks for historical work.
-- In `interview`: Interview-Ready stories and talking points with concise evidence anchors; do not print exhaustive candidate rankings unless requested.
-- Follow-up questions only as Metric Questions.
-
-## Quality Bar
-
-- Do not invent product impact, revenue, latency, scale, user count, or production outcomes.
-- Prefer ownership, architecture, consistency, reliability, integration, and reuse signals over bare technology labels.
-- Keep DTOs, constants, table fields, query methods, and config keys as evidence, not final selling points.
-- Do not turn implementation-surface inventories into Resume-Ready value. If a sentence mainly lists code layers, modules, artifacts, or surfaces, rewrite it as workflow scope, failure mode, technical decision, and result value.
-- Use short commit hashes and file references as evidence anchors in `analysis` and `interview` only.
-- Do not treat script categories, commit count, or lines changed as proof of value.
-- Do not add project-specific configuration to encode business meaning; read diffs and code instead.
-- Do not let one dominant module, repo description, package/POM label, or path term name the whole project unless authoritative docs and current workflows support it.
-- Treat built-in redaction as best effort for common secret patterns. Manually redact customer names, internal hostnames, and sensitive data before quoting or sharing.
-- Keep bundled examples fictional or anonymized.
-## References: [BEST_PRACTICES.md](BEST_PRACTICES.md) for pruning rules and [EXAMPLES.md](EXAMPLES.md) for output shapes.
+- Open [BEST_PRACTICES.md](BEST_PRACTICES.md#evidence-sampling-script) for Evidence Index limits, redaction, path filtering, and Current-Code Relevance.
+- Open [BEST_PRACTICES.md](BEST_PRACTICES.md#best-version-tournament-funnel) before pruning three or more Workstreams.
+- Open [BEST_PRACTICES.md](BEST_PRACTICES.md#ownership-verb-calibration) before choosing `owned`, `designed`, `delivered`, `drove`, `expanded`, `contributed to`, or similar verbs.
+- Open [BEST_PRACTICES.md](BEST_PRACTICES.md#resume-ready-defense-check) before returning `resume-ready` or `compact`; build private Defense Cards and remove weak or overstated bullets.
+- Open [BEST_PRACTICES.md](BEST_PRACTICES.md#interview-ready-defense-pack) before returning `interview`; keep concise evidence anchors and overstatement risks.
+- Open [EXAMPLES.md](EXAMPLES.md) only when output shape, pruning examples, or fictionalized resume-ready phrasing would help.

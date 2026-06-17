@@ -72,9 +72,12 @@ SCENARIOS = (
             "explicit user-approved invariant",
             "narrowest applicable level",
             "contract check",
-            "write-a-skill",
+            "writing-great-skills",
             "progressive disclosure",
-            "review checklist",
+            "information hierarchy",
+            "context pointers",
+            "leading words",
+            "pruning",
             "baseline output",
             "real task",
             "two-layer gate",
@@ -100,7 +103,7 @@ SCENARIOS = (
             "rule harvest gate",
             "explicit user-approved invariant",
             "narrowest applicable level",
-            "write-a-skill",
+            "writing-great-skills",
             "improvement magnitude",
             "generalization confidence",
             "adversarial falsification",
@@ -298,6 +301,39 @@ SCENARIOS = (
         ),
     ),
     SkillScenario(
+        name="deep_research_mixed_investigation",
+        prompt_without_skill="Determine whether this repository's configured dependency supports a documented behavior.",
+        skill_files=[
+            "skills/deep-research/SKILL.md",
+            "skills/deep-research/REFERENCE.md",
+        ],
+        target_files=(
+            "skills/deep-research/SKILL.md",
+            "skills/deep-research/REFERENCE.md",
+        ),
+        required_markers=(
+            "mixed investigation",
+            "mixed applicability check",
+            "local applicability gate",
+            "local fact",
+            "external source",
+            "published artifact",
+            "applicability result",
+            "applies",
+            "does not apply",
+            "unknown/blocked",
+            "conflict",
+            "do not use external docs to override local code",
+            "do not use local behavior to assert general external product behavior",
+        ),
+        scoped_markers=(
+            "mixed applicability check",
+            "local fact",
+            "applicability result",
+            "unknown/blocked",
+        ),
+    ),
+    SkillScenario(
         name="first_principles_option_choice",
         prompt_without_skill="Choose between several possible implementation plans.",
         skill_files=[
@@ -392,9 +428,22 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("[RISK_ROUTER.md](RISK_ROUTER.md)", java_skill)
         self.assertIn("candidate tournament", java_router)
         self.assertIn("Best-Version Tournament", resume_skill)
-        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md)", resume_skill)
+        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#best-version-tournament-funnel)", resume_skill)
         self.assertIn("Best-Version Tournament Funnel", resume_practices)
         self.assertIn("Adversarial Post-Output Self-Review", resume_practices)
+
+    def test_git_resume_entrypoint_stays_runtime_skeleton(self) -> None:
+        resume_skill = read_text("skills/git-resume-miner/SKILL.md")
+
+        self.assertIn("## Run Contract", resume_skill)
+        self.assertIn("## Reference Pointers", resume_skill)
+        self.assertIn("Completion criterion", resume_skill)
+        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#evidence-sampling-script)", resume_skill)
+        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#resume-ready-defense-check)", resume_skill)
+        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#interview-ready-defense-pack)", resume_skill)
+        self.assertIn("Defense Card", resume_skill)
+        self.assertNotIn("## Output Contract", resume_skill)
+        self.assertNotIn("## Quality Bar", resume_skill)
 
     def test_deep_research_saved_header_uses_core_conclusion_not_header_tldr(self) -> None:
         skill = read_text("skills/deep-research/SKILL.md").lower()
@@ -452,6 +501,30 @@ class SkillE2EContractsTest(unittest.TestCase):
             "staleness risk",
             "do not use external docs to override local code",
             "do not use local behavior to assert general external product behavior",
+        ):
+            self.assertIn(marker, section)
+
+    def test_deep_research_mixed_applicability_check_is_explicit(self) -> None:
+        skill = read_text("skills/deep-research/SKILL.md").lower()
+        reference = read_text("skills/deep-research/REFERENCE.md")
+        section = reference.split("### Mixed Applicability Check", 1)[1].split(
+            "## Current-State Research", 1
+        )[0].lower()
+
+        self.assertIn("[reference.md](reference.md#mixed-applicability-check)", skill)
+        self.assertIn("surface the local applicability result", skill)
+        for marker in (
+            "local fact",
+            "external source",
+            "published artifact",
+            "applicability result",
+            "applies",
+            "does not apply",
+            "unknown/blocked",
+            "conflict",
+            "next check",
+            "a source that says \"feature exists\" is not enough",
+            "a local observation is not enough to make a general product claim",
         ):
             self.assertIn(marker, section)
 
@@ -517,9 +590,12 @@ class SkillE2EContractsTest(unittest.TestCase):
 
         self.assertIn("rule harvest gate", agents)
         self.assertIn("skill evolution loop", agents)
-        self.assertIn("load and apply `write-a-skill`", agents)
+        self.assertIn("load and apply `writing-great-skills`", agents)
+        self.assertIn("information hierarchy", agents)
+        self.assertIn("context pointers", agents)
+        self.assertIn("leading words", agents)
+        self.assertIn("pruning", agents)
         self.assertIn("progressive disclosure", agents)
-        self.assertIn("review checklist", agents)
         self.assertIn("real validation artifact", agents)
         self.assertIn("store temporary comparison outputs outside the skill folder", agents)
         self.assertIn("do not score the edit on an absolute point scale", agents)
@@ -544,7 +620,7 @@ class SkillE2EContractsTest(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertNotIn("rule harvest", read_text(path).lower())
                 self.assertNotIn("skill evolution loop", read_text(path).lower())
-                self.assertNotIn("write-a-skill", read_text(path).lower())
+                self.assertNotIn("writing-great-skills", read_text(path).lower())
                 self.assertNotIn("improvement magnitude", read_text(path).lower())
                 self.assertNotIn("adversarial falsification", read_text(path).lower())
 
@@ -638,6 +714,27 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("## Artifact Location", reference)
         self.assertIn("## Plan File Output", reference)
 
+    def test_planner_both_output_modes_front_load_current_best_path(self) -> None:
+        skill = read_text("skills/first-principles-planner/SKILL.md")
+        reference = read_text("skills/first-principles-planner/REFERENCE.md")
+        output_mode = skill.split("## Output Mode", 1)[1].split("## Depth", 1)[0]
+        lower_output_mode = output_mode.lower()
+        plan_synthesis = reference.split("## Plan Synthesis", 1)[1].split("## Evidence Conventions", 1)[0].lower()
+        decision_row = next(line for line in output_mode.splitlines() if line.startswith("| Decision |"))
+        plan_row = next(line for line in output_mode.splitlines() if line.startswith("| Plan |"))
+
+        self.assertIn("front-load the recommendation", lower_output_mode)
+        self.assertIn("current-best path", lower_output_mode)
+        self.assertIn("compressed bestness check", lower_output_mode)
+        self.assertIn("next verification step before archaeology", lower_output_mode)
+        self.assertIn("next step", decision_row)
+        self.assertIn("compressed **Bestness Check**", decision_row)
+        self.assertIn("Bestness Check near the top", plan_row)
+        self.assertIn("non-trivial recommendations", decision_row)
+        self.assertIn("non-trivial recommendations", plan_row)
+        self.assertIn("lead with actionable content in the first 20 lines", plan_synthesis)
+        self.assertIn("put analysis last", plan_synthesis)
+
     def test_java_gates_stay_single_sourced(self) -> None:
         skill = read_text("skills/java-stack-craft/SKILL.md")
         examples = read_text("skills/java-stack-craft/EXAMPLES.md")
@@ -717,6 +814,16 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("Project Knowledge Cards", context)
         self.assertIn("Project Knowledge Cards", profile)
         self.assertIn("future-choice test", profile)
+        self.assertIn("Card promotion gate", profile)
+        self.assertIn("Decision is an imperative action", profile)
+        self.assertIn("Use when / Do not use when define the branch boundary", profile)
+        self.assertIn("A fact failing any gate stays in the chat/report", profile)
+        self.assertIn("Relevant Project Knowledge Cards considered", writing)
+        self.assertIn("which choice each changed", writing)
+        self.assertIn("Knowledge Card closure", writing)
+        self.assertIn("used `<card>` unchanged", writing)
+        self.assertIn("marked `<card>` stale", writing)
+        self.assertIn("card title", review)
         self.assertIn("Decision:", profile)
         self.assertIn("Use when:", profile)
         self.assertIn("Do not use when:", profile)

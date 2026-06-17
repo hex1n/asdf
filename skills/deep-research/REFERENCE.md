@@ -19,6 +19,24 @@ Rules:
 - For External Investigation, include source URLs or identifiers, retrieval date when relevant, and the channel/version used.
 - Source independence means different authority or artifact type, not two pages that mirror the same upstream text.
 
+### Mixed Applicability Check
+
+Use this when local code/config/runtime evidence and external documentation both matter. Complete it before a general external claim becomes a local conclusion.
+
+| Field | Completion criterion |
+|---|---|
+| Local fact | The local version, dependency, config, runtime path, feature flag, or observed behavior that decides applicability is verified in this session. |
+| External source | The official source, source repository, published artifact, spec, or release note is identified with version/date/channel or marked unknown. |
+| Applicability result | State `applies`, `does not apply`, or `unknown/blocked`; do not leave the result implied. |
+| Conflict | Name any mismatch between local evidence and external source, or state `none found`. |
+| Next check | Name the smallest local or external check that would change the result; use `none` only when the result is settled inside the decision boundary. |
+
+Rules:
+
+- A source that says "feature exists" is not enough; the local fact must show the repo is on a version/config/runtime path where it applies.
+- A local observation is not enough to make a general product claim; keep it repo-specific unless the external source supports the general behavior.
+- If local and external evidence conflict, the settled answer should use the local behavior for this repo and mark the external claim's applicability as unresolved or version-bound.
+
 ## Current-State Research
 
 Use current-state evidence when current reality is central to the question: actual behavior, runtime environment data, external-call results, persisted state, logs, UI/runtime state, relevant lookup keys, freshness windows, queued work, or "why does this current result look wrong?"

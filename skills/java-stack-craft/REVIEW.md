@@ -28,7 +28,7 @@ Useful evidence:
 
 Scanner output is advisory. Confirm important findings with code before ranking them high.
 
-Project Knowledge Cards and review memory are advisory. They may lower repeated maintainability noise or point to local facilities, but they must not suppress new evidence for security, correctness, data integrity, concurrency, resource, or build/runtime failures. If profile facts conflict with build files, detector output, or code, trust live evidence and mark the profile stale.
+Project Knowledge Cards and review memory are advisory. Use a card only when its Use when / Do not use when boundary matches the review scope. Cards may lower repeated maintainability noise or point to local facilities, but they must not suppress new evidence for security, correctness, data integrity, concurrency, resource, or build/runtime failures. If profile facts conflict with build files, detector output, or code, trust live evidence and mark the profile stale.
 
 If a build cannot reach compilation because private repositories, blocked HTTP mirrors, credentials, or missing internal artifacts fail dependency resolution, record the failing stage as a baseline and use source evidence for review. Do not mark compile-related findings `confirmed` unless the command actually reached source compilation.
 
@@ -94,4 +94,4 @@ Major · concurrency · likely/P2 · src/main/java/.../StreamingService.java:49 
 
 For broad reviews, keep the top findings and mention what was not exhaustively reviewed.
 
-When profile or review memory changed ranking, mention that briefly after findings.
+When a Project Knowledge Card changed ranking, mention the card title and whether it was used unchanged, updated, marked stale, or skipped because it failed the promotion gate.

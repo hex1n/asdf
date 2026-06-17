@@ -42,7 +42,7 @@ If running as a subagent, use the full planner only for delegated planning, arch
 
 ## Output Mode
 
-Use the user's language for chat and saved artifacts. For Standard or deeper work, state `Mode`, `Depth`, and input sources actually read in this session. For Light decisions, keep the first line compact. Do not add external sources just to make a plan look researched.
+Use the user's language for chat and saved artifacts. For Standard or deeper work, state `Mode`, `Depth`, and input sources actually read in this session, then front-load the recommendation: current-best path, compressed Bestness Check, and next verification step before archaeology. For Light decisions, keep the first line compact. Do not add external sources just to make a plan look researched.
 
 | Mode | Use when | Shape |
 |---|---|---|

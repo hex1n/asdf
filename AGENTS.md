@@ -19,12 +19,12 @@ Keep `SKILL.md` files concise and task-facing. Put maintenance guidance here ins
 
 When the user asks to improve a skill, treat it as an evidence loop rather than a wording edit:
 
-Before changing any skill, load and apply `write-a-skill` as the authoring frame for structure, progressive disclosure, bundled resources, and review checklist. If `write-a-skill` is unavailable, record the fallback in the round notes before editing.
+Before changing any skill, load and apply `writing-great-skills` as the authoring frame for predictability, information hierarchy, context pointers, leading words, progressive disclosure, and pruning. If `writing-great-skills` is unavailable, record the fallback in the round notes before editing.
 
 1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include success criteria, failure modes, and negative or non-trigger examples, not just the happy path, so the baseline is not an optimistic softball.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.
 3. Apply the narrowest edit: catalog/routing text, reference rule, script logic, or focused test.
-4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful.
+4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful. For branch or scenario claims, choose samples that exercise the branch-specific gates and the protected failure mode; a simple smoke sample can be recorded, but it cannot raise generalization confidence to high.
 5. Decide with the two-layer gate below; do not score the edit on an absolute point scale.
 6. Iterate on the weakest failing gate or the lowest-confidence claim until the marginal gain is low or a hard gate fails.
 

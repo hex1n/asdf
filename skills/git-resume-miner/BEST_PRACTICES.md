@@ -85,6 +85,20 @@ After writing a resume-ready version, review it once before returning:
 - Are all metrics observed or user-provided? If not, move them into focused metric questions.
 - Would the candidate be comfortable defending every verb under interview questioning?
 
+## Resume-Ready Defense Check
+
+Before returning `resume-ready` or `compact`, quietly build a Defense Card for each final bullet. Do not print these cards unless the user asks for analysis; use them to rewrite, merge, or demote weak bullets.
+
+Each Defense Card must answer:
+
+- Workstream defended: which kept Workstream won, and which weaker/overlapping candidate did it beat?
+- Evidence basis: which representative diff, current code, test, doc, or user-provided fact makes this a defensible claim?
+- Ownership verb: why the chosen verb is justified by the Ownership Boundary.
+- Overstatement risk: what would be exaggerated under interview challenge?
+- Metric gap: what focused Metric Question remains if quantified impact is missing?
+
+If any bullet cannot produce a defensible Defense Card, do not ship it as Resume-Ready. Rewrite the bullet around the proven problem/decision/result, merge it into a stronger bullet, or move it to interview backup.
+
 ## Final Acceptance Checklist
 
 Use this checklist before returning `resume-ready` or `compact` output:

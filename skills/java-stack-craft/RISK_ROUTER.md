@@ -53,6 +53,21 @@ Proof tiers:
 | P3 | Scanner-only signal | Discovery signal only |
 | P4 | Inference from conventions or incomplete context | `needs-check` only |
 
+## Verification Closure
+
+Use this closure when verification is degraded, compile/test does not reach project source, a scanner finding matters to the result, or the output makes a compile/runtime/security/concurrency claim.
+
+| Claim | Evidence | Proof tier | Verification floor | Not proven | Next check |
+|---|---|---|---|---|---|
+| specific result or finding | command/code/scanner path | P0-P4 | command or source invariant reached | compile/runtime/user-impact gap | smallest command or review that would close the gap |
+
+Boundaries:
+
+- If Maven/Gradle stops at dependency resolution, private repositories, credentials, or blocked HTTP mirrors, call it an environment baseline; do not claim compile passed or failed on project source.
+- P3 scanner-only evidence cannot be `confirmed`. Promote only after direct code/control-flow proof, or report it as `likely/P3` / `needs-check/P3`.
+- A source-level invariant under blocked dependencies is degraded verification: name the invariant checked and the runtime or compile behavior still not proven.
+- The Next check must be executable in a real project context, such as the exact Maven/Gradle command after repository access is fixed or a focused test/harness for the touched flow.
+
 ## Review ranking
 
 For each candidate finding, require:

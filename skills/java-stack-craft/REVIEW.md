@@ -74,6 +74,8 @@ When verification strength matters, attach the proof tier from [RISK_ROUTER.md](
 
 Lead with blockers. If there are none, say so plainly.
 
+When compile/test/source proof is degraded or material to ranking, append the Verification Closure from [RISK_ROUTER.md](RISK_ROUTER.md#verification-closure).
+
 Preferred format:
 
 ```text

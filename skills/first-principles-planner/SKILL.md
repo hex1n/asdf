@@ -36,8 +36,8 @@ If running as a subagent, use the full planner only for delegated planning, arch
 - If the stated solution is not tied to an outcome, rewrite the problem statement before comparing options.
 - If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default.
 - If the plan has no independently verifiable next step, shrink it to a vertical slice or a decision.
-- For Plan mode, write a Markdown artifact by default unless the user asks for chat-only output; place it per the artifact-location ladder in [REFERENCE.md](REFERENCE.md#artifact-location) (`docs/plans/` by default).
-- For Decision mode, do not create durable artifacts unless explicitly asked; an explicitly saved decision/tradeoff memo follows the same ladder (`docs/decisions/` by default).
+- **Artifact Gate:** use a chat-first plan by default. Do not create durable artifacts unless explicitly asked, a target path is provided, or the result is a reusable handoff into named next work; then use [REFERENCE.md](REFERENCE.md#artifact-location).
+- Saved plans use `docs/plans/` by default; saved decision/tradeoff memos use `docs/decisions/` by default. Chat-only plans still name where an artifact would go if requested.
 
 ## Output Mode
 
@@ -46,7 +46,7 @@ Use the user's language for chat and saved artifacts. For Standard or deeper wor
 | Mode | Use when | Shape |
 |---|---|---|
 | Decision | "还有更好?", "是否应该?", "最佳了吗?" | 10-20 lines: recommendation, why, when wrong, next step; include a compressed **Bestness Check** for non-trivial recommendations |
-| Plan | "最佳方案", "最佳实现", "给出方案", "先不 coding", architecture/design proposal | Write Markdown artifact; chat gives summary, path, risks; put the Bestness Check near the top for non-trivial recommendations |
+| Plan | "最佳方案", "最佳实现", "给出方案", "先不 coding", architecture/design proposal | Chat-first plan by default; save only through the Artifact Gate; put the Bestness Check near the top for non-trivial recommendations |
 
 ## Depth
 

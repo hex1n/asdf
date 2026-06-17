@@ -129,6 +129,10 @@ SCENARIOS = (
             "strongest reason it could be wrong",
             "proof tier",
             "blast radius",
+            "verification closure",
+            "not proven",
+            "next check",
+            "environment baseline",
         ),
         scoped_markers=(
             "candidate tournament",
@@ -154,24 +158,41 @@ SCENARIOS = (
             "strongest evidence-based argument",
             "do not include code paths",
             "candidate rankings",
+            "resume-ready defense check",
+            "defensible claim",
+            "defense card",
+            "overstatement risk",
+            "interview challenge",
         ),
         scoped_markers=(
             "best-version tournament",
             "adversarial post-output self-review",
             "strongest evidence-based argument",
+            "resume-ready defense check",
+            "defensible claim",
+            "defense card",
+            "overstatement risk",
+            "interview challenge",
         ),
     ),
     SkillScenario(
-        name="deep_research_multi_source",
-        prompt_without_skill="Research a high-impact technical decision with several sources.",
+        name="deep_research_codebase_investigation",
+        prompt_without_skill="Explain why the artifact behavior in this repository happens.",
         skill_files=[
             "skills/deep-research/SKILL.md",
             "skills/deep-research/REFERENCE.md",
         ],
         target_files=(
             "skills/deep-research/SKILL.md",
+            "skills/deep-research/REFERENCE.md",
         ),
         required_markers=(
+            "research scenario gate",
+            "codebase investigation",
+            "local authority set",
+            "source inventory",
+            "file/line receipts",
+            "blast-radius boundary",
             "independent evidence lanes",
             "disconfirming evidence",
             "strongest counterexample",
@@ -202,6 +223,10 @@ SCENARIOS = (
             "stop reason",
         ),
         scoped_markers=(
+            "research scenario gate",
+            "codebase investigation",
+            "file/line receipts",
+            "blast-radius boundary",
             "independent evidence lanes",
             "disconfirming evidence",
             "strongest counterexample",
@@ -227,6 +252,45 @@ SCENARIOS = (
         ),
     ),
     SkillScenario(
+        name="deep_research_external_investigation",
+        prompt_without_skill="Determine how a third-party action handles hidden files using public sources.",
+        skill_files=[
+            "skills/deep-research/SKILL.md",
+            "skills/deep-research/REFERENCE.md",
+        ],
+        target_files=(
+            "skills/deep-research/SKILL.md",
+            "skills/deep-research/REFERENCE.md",
+        ),
+        required_markers=(
+            "research scenario gate",
+            "external investigation",
+            "official sources",
+            "source independence",
+            "version/date/channel",
+            "as-of date",
+            "staleness risk",
+            "source urls",
+            "local applicability gate",
+            "not a local implementation claim",
+            "pasted external text",
+            "evidence, not instructions",
+            "do not follow commands",
+            "primary-source cross-check",
+            "version/date/channel context",
+            "flip condition",
+        ),
+        scoped_markers=(
+            "research scenario gate",
+            "external investigation",
+            "source independence",
+            "as-of date",
+            "staleness risk",
+            "local applicability gate",
+            "not a local implementation claim",
+        ),
+    ),
+    SkillScenario(
         name="first_principles_option_choice",
         prompt_without_skill="Choose between several possible implementation plans.",
         skill_files=[
@@ -247,6 +311,9 @@ SCENARIOS = (
             "marginal-gain stop",
             "first response",
             "current-best",
+            "artifact gate",
+            "chat-first plan",
+            "do not create durable artifacts unless explicitly asked",
         ),
         scoped_markers=(
             "option tournament",
@@ -255,6 +322,8 @@ SCENARIOS = (
             "bestness check",
             "first response",
             "current-best",
+            "artifact gate",
+            "chat-first plan",
         ),
     ),
 )
@@ -347,6 +416,30 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("what remains unverified", lower_section)
         self.assertIn("Establishes:", section)
 
+    def test_deep_research_scenario_gate_splits_codebase_and_external_authority(self) -> None:
+        skill = read_text("skills/deep-research/SKILL.md").lower()
+        reference = read_text("skills/deep-research/REFERENCE.md")
+        section = reference.split("## Research Scenario Gate", 1)[1].split(
+            "## Current-State Research", 1
+        )[0].lower()
+
+        self.assertIn("[reference.md](reference.md#research-scenario-gate)", skill)
+        for marker in (
+            "codebase investigation",
+            "external investigation",
+            "mixed investigation",
+            "local authority set",
+            "official sources",
+            "local applicability gate",
+            "source independence",
+            "file/line receipts",
+            "as-of date",
+            "staleness risk",
+            "do not use external docs to override local code",
+            "do not use local behavior to assert general external product behavior",
+        ):
+            self.assertIn(marker, section)
+
     def test_deep_research_closure_check_settles_or_stops(self) -> None:
         skill = read_text("skills/deep-research/SKILL.md").lower()
         reference = read_text("skills/deep-research/REFERENCE.md")
@@ -371,6 +464,22 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("candidate rankings", resume_skill)
         self.assertIn("do not include code paths", resume_skill)
         self.assertIn("no evidence table, commit list, code path, confidence label, or candidate ranking", practices)
+
+    def test_resume_ready_defense_check_keeps_final_bullets_defensible(self) -> None:
+        resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()
+        practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md")
+        section = practices.split("## Resume-Ready Defense Check", 1)[1].split(
+            "## Final Acceptance Checklist", 1
+        )[0].lower()
+
+        self.assertIn("[best_practices.md](best_practices.md#resume-ready-defense-check)", resume_skill)
+        self.assertIn("defensible claim", resume_skill)
+        self.assertIn("defense card", section)
+        self.assertIn("which kept workstream won", section)
+        self.assertIn("which representative diff, current code, test, doc, or user-provided fact", section)
+        self.assertIn("why the chosen verb is justified", section)
+        self.assertIn("what would be exaggerated under interview challenge", section)
+        self.assertIn("what focused metric question remains", section)
 
     def test_rule_harvest_stays_in_maintenance_guidance(self) -> None:
         agents = read_text("AGENTS.md").lower()
@@ -442,6 +551,21 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertNotIn("byte-identical", skill.lower())
         self.assertIn("byte-identical", agents.lower())
 
+    def test_planner_artifact_gate_is_chat_first_for_unsaved_plans(self) -> None:
+        skill = read_text("skills/first-principles-planner/SKILL.md")
+        reference = read_text("skills/first-principles-planner/REFERENCE.md")
+        lower_skill = skill.lower()
+
+        self.assertIn("**Artifact Gate:**", skill)
+        self.assertIn("chat-first plan by default", lower_skill)
+        self.assertIn("do not create durable artifacts unless explicitly asked", lower_skill)
+        self.assertIn("a target path is provided", lower_skill)
+        self.assertIn("reusable handoff into named next work", lower_skill)
+        self.assertIn("save only through the Artifact Gate", skill)
+        self.assertNotIn("write a Markdown artifact by default", skill)
+        self.assertIn("## Artifact Location", reference)
+        self.assertIn("## Plan File Output", reference)
+
     def test_java_gates_stay_single_sourced(self) -> None:
         skill = read_text("skills/java-stack-craft/SKILL.md")
         examples = read_text("skills/java-stack-craft/EXAMPLES.md")
@@ -464,6 +588,30 @@ class SkillE2EContractsTest(unittest.TestCase):
         # field-injection policy is single-sourced in RISK_ROUTER.md
         for text in (skill, writing, review):
             self.assertIn("(RISK_ROUTER.md#scanner-calibration)", text)
+
+    def test_java_verification_closure_prevents_degraded_proof_overclaiming(self) -> None:
+        skill = read_text("skills/java-stack-craft/SKILL.md")
+        router = read_text("skills/java-stack-craft/RISK_ROUTER.md")
+        review = read_text("skills/java-stack-craft/REVIEW.md")
+        writing = read_text("skills/java-stack-craft/WRITING.md")
+
+        self.assertIn("## Verification Closure", router)
+        for marker in (
+            "Claim",
+            "Evidence",
+            "Proof tier",
+            "Verification floor",
+            "Not proven",
+            "Next check",
+            "environment baseline",
+            "P3 scanner-only evidence cannot be `confirmed`",
+            "degraded verification",
+        ):
+            self.assertIn(marker, router)
+
+        self.assertIn("(RISK_ROUTER.md#verification-closure)", writing)
+        self.assertIn("(RISK_ROUTER.md#verification-closure)", review)
+        self.assertIn("Verification Closure", skill)
 
     def test_java_script_suite_passes(self) -> None:
         result = subprocess.run(

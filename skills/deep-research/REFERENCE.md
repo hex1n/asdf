@@ -2,6 +2,23 @@
 
 Use this file only when the main skill points here. Keep the investigation focused on the user's decision boundary.
 
+## Research Scenario Gate
+
+Pick one scenario before building the source inventory:
+
+| Scenario | Primary authority | Minimum lanes | Orientation | Closure |
+|---|---|---|---|---|
+| Codebase Investigation | local authority set, source code, tests/commands/logs, project docs | code path plus one corroborating lane when the claim is non-trivial | source inventory or component/flow map with file/line receipts | settled local behavior, blast-radius boundary, what local evidence does not prove |
+| External Investigation | official sources: docs, specs, release notes, source repositories, or vendor statements | one primary official source; add source independence for important or surprising claims | version/date/channel table with as-of date and staleness risk | answer scope, stale-risk or flip condition, source authority, not a local implementation claim |
+| Mixed Investigation | local version/config/runtime facts first, then external evidence that matches them | local applicability gate plus the relevant codebase/external lanes | gate table: local fact -> external source -> applicability result | what applies locally, what remains external-only, next check if local config changes |
+
+Rules:
+
+- Do not use external docs to override local code without checking local version, config, and runtime path.
+- Do not use local behavior to assert general external product behavior; mark it as repo-specific unless an official source supports the general claim.
+- For External Investigation, include source URLs or identifiers, retrieval date when relevant, and the channel/version used.
+- Source independence means different authority or artifact type, not two pages that mirror the same upstream text.
+
 ## Current-State Research
 
 Use current-state evidence when current reality is central to the question: actual behavior, runtime environment data, external-call results, persisted state, logs, UI/runtime state, relevant lookup keys, freshness windows, queued work, or "why does this current result look wrong?"

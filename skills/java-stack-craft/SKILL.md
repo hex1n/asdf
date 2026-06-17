@@ -96,5 +96,5 @@ Check every change against [REFERENCE.md](REFERENCE.md#review-checklist) (and [S
 ## Output contracts
 
 - **Language:** use the user's language for chat, findings, and saved reports; keep code identifiers, commands, and file paths as-is.
-- **Writing:** follow [WRITING.md](WRITING.md#step-w5-report-the-result). Scale the report to the change; do not recite irrelevant checklist items.
-- **Review:** follow [REVIEW.md](REVIEW.md#step-r5-output-findings). Report findings, not a rewrite, unless the user asks for patches.
+- **Writing:** follow [WRITING.md](WRITING.md#step-w5-report-the-result), including Verification Closure when proof is degraded or non-obvious. Scale the report to the change; do not recite irrelevant checklist items.
+- **Review:** follow [REVIEW.md](REVIEW.md#step-r5-output-findings), including Verification Closure for compile/test/source-evidence claims. Report findings, not a rewrite, unless the user asks for patches.

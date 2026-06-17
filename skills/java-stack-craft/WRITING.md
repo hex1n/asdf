@@ -76,6 +76,7 @@ For a small change, report only the relevant items:
 - Conventions matched and any deliberate divergence.
 - Any abstraction introduced and its variation point, or state that none was introduced.
 - Verification command and result.
+- Verification Closure from [RISK_ROUTER.md](RISK_ROUTER.md#verification-closure) when proof is degraded, scanner-backed, or non-obvious.
 - Remaining risk or why a broader test was skipped.
 
 For non-trivial fixes or handoffs to another agent, add a compact durable handoff:

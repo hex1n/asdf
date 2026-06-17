@@ -162,6 +162,10 @@ SCENARIOS = (
             "defense card",
             "overstatement risk",
             "interview challenge",
+            "interview-ready",
+            "evidence anchors",
+            "trade-off defense",
+            "ownership boundaries",
         ),
         scoped_markers=(
             "best-version tournament",
@@ -172,6 +176,10 @@ SCENARIOS = (
             "defense card",
             "overstatement risk",
             "interview challenge",
+            "interview-ready",
+            "evidence anchors",
+            "trade-off defense",
+            "ownership boundaries",
         ),
     ),
     SkillScenario(
@@ -310,6 +318,10 @@ SCENARIOS = (
             "marginal-gain stop",
             "first response",
             "current-best",
+            "do not stop at clarification",
+            "current-best path under that default",
+            "flip the recommendation",
+            "what would change the recommendation",
             "artifact gate",
             "chat-first plan",
             "do not create durable artifacts unless explicitly asked",
@@ -321,6 +333,10 @@ SCENARIOS = (
             "bestness check",
             "first response",
             "current-best",
+            "do not stop at clarification",
+            "current-best path under that default",
+            "flip the recommendation",
+            "what would change the recommendation",
             "artifact gate",
             "chat-first plan",
         ),
@@ -480,6 +496,22 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("what would be exaggerated under interview challenge", section)
         self.assertIn("what focused metric question remains", section)
 
+    def test_interview_mode_keeps_defensible_evidence_without_full_analysis_dump(self) -> None:
+        resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()
+        practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md")
+        section = practices.split("## Interview-Ready Defense Pack", 1)[1].split(
+            "## Final Acceptance Checklist", 1
+        )[0].lower()
+
+        self.assertIn("interview-ready", resume_skill)
+        self.assertIn("evidence anchors", resume_skill)
+        self.assertIn("trade-off defense", resume_skill)
+        self.assertIn("ownership boundaries", resume_skill)
+        self.assertIn("one concise evidence anchor per major claim", section)
+        self.assertIn("what exactly did you own", section)
+        self.assertIn("likely interviewer follow-ups and direct answers", section)
+        self.assertIn("do not print the full contribution ledger or candidate ranking", section)
+
     def test_rule_harvest_stays_in_maintenance_guidance(self) -> None:
         agents = read_text("AGENTS.md").lower()
 
@@ -533,7 +565,32 @@ class SkillE2EContractsTest(unittest.TestCase):
         skill = read_text("skills/first-principles-planner/SKILL.md")
         reference = read_text("skills/first-principles-planner/REFERENCE.md")
         agents = read_text("AGENTS.md")
+        description = frontmatter_description(skill).lower()
 
+        self.assertIn("first-principles recommendations and plans", description)
+        self.assertIn("current-best path", description)
+        self.assertIn("failure conditions", description)
+        self.assertIn("next verification steps", description)
+        self.assertIn("avoids coding while choosing a path", description)
+        for marker in (
+            "先写方案",
+            "先不写代码",
+            "先不要写代码",
+            "先不coding",
+            "不coding",
+            "不要直接改代码",
+        ):
+            self.assertIn(marker, description)
+        self.assertIn("code/plan review", description)
+        for marker in ("计划评审", "方案评审", "审查计划", "审查方案"):
+            self.assertIn(marker, description)
+        self.assertNotIn("concrete markdown plans", description)
+        self.assertIn("choose, keep, replace, or improve a path", skill)
+        self.assertIn("challenges the current best", skill)
+        self.assertIn("architecture or design direction", skill)
+        self.assertIn("explicitly avoids coding while choosing a path", skill)
+        self.assertIn("`是否应该替换 X?`", skill)
+        self.assertIn("`给一个架构演进方案`", skill)
         self.assertIn("do not create durable artifacts unless explicitly asked", skill.lower())
         self.assertIn("belongs to a review skill", skill)
         self.assertIn("use the user's language for chat and saved artifacts", skill.lower())
@@ -541,11 +598,24 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("[REFERENCE.md](REFERENCE.md#inversion-test)", skill)
         self.assertIn("[REFERENCE.md](REFERENCE.md#bestness-check)", skill)
         self.assertIn("current-best path", skill)
+        self.assertIn("do not stop at clarification", skill)
+        self.assertIn("current-best path under that default", skill)
+        self.assertIn("flip the recommendation", skill)
+        self.assertIn("what would change the recommendation", skill)
         self.assertIn("first answer", skill)
         self.assertIn("first response", reference)
         self.assertIn("even when the user only asks for a plan", " ".join(reference.split()))
         self.assertIn("Defeat condition", reference)
         self.assertIn("Marginal-gain stop", reference)
+        prompt_markers = {
+            "不要直接改代码，先写方案": ("不要直接改代码", "先写方案"),
+            "先不coding，给最佳实现": ("先不coding", "最佳实现"),
+        }
+        for positive_prompt, markers in prompt_markers.items():
+            for marker in markers:
+                self.assertIn(marker, description, f"planner description lost trigger coverage for {positive_prompt}")
+        self.assertIn("plan review", skill.lower())
+        self.assertIn("belongs to a review skill", skill)
         # the location ladder is single-sourced in REFERENCE.md
         self.assertIn("OS temp directory", reference)
         self.assertNotIn("designated output directory", skill)

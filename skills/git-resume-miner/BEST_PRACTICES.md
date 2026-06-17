@@ -33,13 +33,13 @@
 
 Before returning Resume-Ready output, compress implementation surfaces into business or system workflows. When a phrase is mainly a list of code layers, modules, generated artifacts, data shapes, task classes, or integration wrappers, translate it into the user-facing workflow, operational failure mode, consistency boundary, or platform behavior it supports.
 
-Use implementation names only in `analysis` mode as evidence anchors. In `resume-ready` and `compact` modes, describe the workflow, failure mode, technical decision, and result value. If a sentence reads like a code-structure inventory, rewrite it into the business process or system reliability problem those surfaces support.
+Use implementation names only in `analysis` and `interview` as evidence anchors. In `resume-ready` and `compact`, describe the workflow, failure mode, technical decision, and result value. If a sentence reads like a code-structure inventory, rewrite it into the business process or system reliability problem those surfaces support.
 
 ## Output Modes
 
 - `analysis`: show evidence, confidence, weak spots, and `Needs Confirmation` labels. Use this while mining the repo.
 - `resume-ready`: remove evidence labels, keep only polished project description and bullets, and move metric gaps into follow-up questions.
-- `interview`: keep STAR stories, architecture narrative, trade-offs, and likely interviewer follow-ups.
+- `interview`: produce Interview-Ready stories: keep concise evidence anchors, ownership boundaries, trade-off defense, and likely interviewer follow-ups. This is not Resume-Ready polish; do not strip the anchors needed to defend a claim under questioning.
 - `compact`: produce one project description and four strongest bullets for direct resume insertion.
 - If the user asks for "一版", "最佳", "简历版", or a directly usable result, default to `resume-ready`/`compact`, not a full evidence dump.
 
@@ -98,6 +98,16 @@ Each Defense Card must answer:
 - Metric gap: what focused Metric Question remains if quantified impact is missing?
 
 If any bullet cannot produce a defensible Defense Card, do not ship it as Resume-Ready. Rewrite the bullet around the proven problem/decision/result, merge it into a stronger bullet, or move it to interview backup.
+
+## Interview-Ready Defense Pack
+
+Use this when the user asks for interview preparation, STAR stories, talking points, or a defensible ownership narrative.
+
+- Keep one concise evidence anchor per major claim: representative commit or diff, current code path, test, architecture doc, or user-provided fact.
+- Preserve the Ownership Boundary and the strongest overstatement risk so the candidate can answer "what exactly did you own?"
+- Explain the key trade-off, failure mode, integration boundary, or data consistency problem behind each story.
+- Include likely interviewer follow-ups and direct answers; each answer should point back to the evidence anchor instead of relying on a polished claim.
+- Do not print the full contribution ledger or candidate ranking unless the user asks for analysis; use the Best-Version Tournament privately to choose the strongest stories.
 
 ## Final Acceptance Checklist
 

@@ -16,18 +16,19 @@ Do not turn every review into a repo audit. For repo audits, default to the top 
 
 ## Step R2: Gather evidence
 
-Use the main skill gates first: detect JDK once, read Spring rules for Spring projects, inspect conventions, and read [RISK_ROUTER.md](RISK_ROUTER.md). For repeated, broad, or noisy reviews, also read [PROFILE.md](PROFILE.md) plus any existing `docs/agents/java-stack-profile.md` and `docs/agents/java-stack-review-memory.md`. Then gather only evidence that can change priority.
+Use the main skill gates first: read [WORK_CONTEXT.md](WORK_CONTEXT.md), reuse or refresh the Java Work Context according to its lifecycle rule, read Spring rules for Spring projects, inspect conventions, and read [RISK_ROUTER.md](RISK_ROUTER.md). Read [PROFILE.md](PROFILE.md); the context command creates or updates `docs/agents/java-stack-profile.md` by default. For repeated, broad, or noisy reviews, also read `docs/agents/java-stack-review-memory.md` when present. Then gather only evidence that can change priority.
 
 Useful evidence:
 
 - `mvn -q -DskipTests compile` or Gradle compile for namespace/JDK issues.
 - Targeted tests or full tests when the review is about verification health.
-- `scripts/java_advisory_scan.py` for high-frequency defect signals with proof tiers. Add `--include-tests` only when test source/config quality is in scope. Use `--category`, `--max-findings`, or `--max-depth` when a focused review needs less noise or deeper build-file discovery.
+- `<java-stack-craft>/scripts/java_stack.py context --dir <project-root>` for Target Profile, Project Facilities, bounded risk candidates, and verification floor.
+- `<java-stack-craft>/scripts/java_stack.py scan --dir <project-root>` for focused high-frequency defect signals with proof tiers. Add `--include-tests` only when test source/config quality is in scope. Use `--category`, `--max-findings`, or `--max-depth` when a focused review needs less noise or deeper build-file discovery.
 - Direct code reads for concurrency, lifecycle, security, and boundary issues.
 
 Scanner output is advisory. Confirm important findings with code before ranking them high.
 
-The repo profile and review memory are also advisory. They may lower repeated maintainability noise, but they must not suppress new evidence for security, correctness, data integrity, concurrency, resource, or build/runtime failures. If profile facts conflict with build files, detector output, or code, trust live evidence and mark the profile stale.
+Project Knowledge Cards and review memory are advisory. They may lower repeated maintainability noise or point to local facilities, but they must not suppress new evidence for security, correctness, data integrity, concurrency, resource, or build/runtime failures. If profile facts conflict with build files, detector output, or code, trust live evidence and mark the profile stale.
 
 If a build cannot reach compilation because private repositories, blocked HTTP mirrors, credentials, or missing internal artifacts fail dependency resolution, record the failing stage as a baseline and use source evidence for review. Do not mark compile-related findings `confirmed` unless the command actually reached source compilation.
 
@@ -53,6 +54,8 @@ For each candidate finding, apply the [RISK_ROUTER.md](RISK_ROUTER.md) evidence 
 - Impact: reachable failure, exploit, data issue, resource issue, or concrete maintenance cost.
 - Confidence: `confirmed`, `likely`, or `needs-check`.
 - Fix: one practical next step, not a broad rewrite.
+
+Flag newly invented helpers that bypass seam-relevant same-module Project Facilities only when they create a concrete failure path or maintenance cost; otherwise treat them as convention notes, not top findings.
 
 For broad reviews or noisy scans, use the candidate triage table from [RISK_ROUTER.md](RISK_ROUTER.md) to decide keep/drop before writing final findings. If a candidate cannot pass this ladder, drop it from top findings or downgrade it to a pattern note.
 

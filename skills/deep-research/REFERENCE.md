@@ -79,6 +79,20 @@ Stop if the investigation keeps expanding faster than it converges. Report the s
 
 Use the user's language for headings and table labels. Use tables for comparisons and reconciliation, diagrams for flows, narrative for causal chains, and bullets for edge cases/checklists.
 
+### Research Closure Check
+
+Use this before Standard/Deep final answers to convert evidence into a bounded conclusion. Keep it compact in chat; expand it only for saved findings or high-risk decisions.
+
+| Field | Question it must answer |
+|---|---|
+| Settled answer | What is now answered under the stated decision boundary? |
+| Confidence basis | Which independent evidence lanes support it, and which lane conflicts remain? |
+| Strongest unresolved counterexample | What rival explanation, edge case, or missing source could still matter? |
+| Flip condition | What specific evidence would change or downgrade the conclusion? |
+| Stop reason | Why should the investigation stop now, or what one next check is still worth running? |
+
+If the stop reason is weak, run one more distinguishing check or lower confidence. If the flip condition is broad or unknowable, narrow the decision boundary instead of pretending the question is settled.
+
 ### Saved Artifact Headers
 
 Standard/Deep saved findings open with a header whose fields are question, depth, core conclusion, artifact type, verification status, and open-question count, labeled in the user's language. English labels: `Question`, `Depth`, `Core conclusion`, `Artifact type`, `Verification status`, `Open questions`. For Chinese Standard/Deep saved findings:

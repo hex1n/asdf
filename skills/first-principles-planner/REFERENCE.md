@@ -7,6 +7,7 @@ short process in `SKILL.md` is not enough.
 
 - Problem Archaeology: root trace, problem statement, assumption audit
 - Solution Reconstruction: option categories, inversion test, recommendation chain
+- Bestness Check: fit criteria, closest alternative, stop point
 - Plan Synthesis: priority table, effort/risk/value, action-first structure
 - Evidence Conventions: verified vs unverified claims
 - Artifact Location: default path rules for saved Markdown plans
@@ -106,6 +107,29 @@ Recommend the approach that best satisfies:
 
 If the root differs from the user's framing, reframe explicitly. If the root
 confirms their instinct, validate it with evidence.
+
+### Bestness Check
+
+Use this for any non-trivial planner recommendation: the default deliverable is
+the current-best option under stated constraints, even when the user only asks
+for a plan. Best/better wording and repeated "还有更好" challenges make the gate
+stricter, not newly active. The goal is to prevent a sequence of slightly better
+answers by making the stopping rule explicit in the first response.
+
+Answer these five checks compactly:
+
+| Check | Question |
+|---|---|
+| Fit criteria | What 3-5 constraints decide "best" for this problem? |
+| Winner | Which mechanism wins against those criteria, and why? |
+| Closest alternative | What is the strongest competing mechanism? |
+| Defeat condition | What new fact would make the closest alternative better? |
+| Marginal-gain stop | What further improvement would be too small, too costly, or not decision-relevant? |
+
+If the answer changed since the previous recommendation, name the new criterion
+or evidence that changed it. If it did not change, say "current best under these
+constraints" and give the next verification step instead of inventing a new
+variant.
 
 ### Dissenting Path
 

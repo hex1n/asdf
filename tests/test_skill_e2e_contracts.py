@@ -196,6 +196,10 @@ SCENARIOS = (
             "smallest orientation form",
             "decision-shaped",
             "what remains unverified",
+            "research closure check",
+            "settled answer",
+            "flip condition",
+            "stop reason",
         ),
         scoped_markers=(
             "independent evidence lanes",
@@ -216,6 +220,10 @@ SCENARIOS = (
             "non-duplicative scan value",
             "save consistency check",
             "header counts match corresponding body sections",
+            "research closure check",
+            "settled answer",
+            "flip condition",
+            "stop reason",
         ),
     ),
     SkillScenario(
@@ -234,11 +242,19 @@ SCENARIOS = (
             "true constraints",
             "strongest failure mode",
             "reconstruct options",
+            "bestness check",
+            "closest alternative",
+            "marginal-gain stop",
+            "first response",
+            "current-best",
         ),
         scoped_markers=(
             "option tournament",
             "compare options pairwise",
             "strongest failure mode",
+            "bestness check",
+            "first response",
+            "current-best",
         ),
     ),
 )
@@ -331,6 +347,22 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("what remains unverified", lower_section)
         self.assertIn("Establishes:", section)
 
+    def test_deep_research_closure_check_settles_or_stops(self) -> None:
+        skill = read_text("skills/deep-research/SKILL.md").lower()
+        reference = read_text("skills/deep-research/REFERENCE.md")
+        section = reference.split("### Research Closure Check", 1)[1].split(
+            "### Saved Artifact Headers", 1
+        )[0].lower()
+
+        self.assertIn("[reference.md](reference.md#research-closure-check)", skill)
+        self.assertIn("settled answer", skill)
+        self.assertIn("strongest unresolved counterexample", skill)
+        self.assertIn("flip condition", skill)
+        self.assertIn("stop reason", skill)
+        self.assertIn("which independent evidence lanes support it", section)
+        self.assertIn("what specific evidence would change", section)
+        self.assertIn("why should the investigation stop now", section)
+
     def test_tournament_does_not_leak_resume_candidate_rankings_to_final_output(self) -> None:
         resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()
         practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md").lower()
@@ -396,6 +428,13 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("use the user's language for chat and saved artifacts", skill.lower())
         self.assertIn("[REFERENCE.md](REFERENCE.md#artifact-location)", skill)
         self.assertIn("[REFERENCE.md](REFERENCE.md#inversion-test)", skill)
+        self.assertIn("[REFERENCE.md](REFERENCE.md#bestness-check)", skill)
+        self.assertIn("current-best path", skill)
+        self.assertIn("first answer", skill)
+        self.assertIn("first response", reference)
+        self.assertIn("even when the user only asks for a plan", " ".join(reference.split()))
+        self.assertIn("Defeat condition", reference)
+        self.assertIn("Marginal-gain stop", reference)
         # the location ladder is single-sourced in REFERENCE.md
         self.assertIn("OS temp directory", reference)
         self.assertNotIn("designated output directory", skill)

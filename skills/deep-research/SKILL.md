@@ -77,7 +77,7 @@ Pick the smallest shape that answers the decision boundary:
 
 For Standard/Deep, include only the relevant pieces: answer/core conclusion, optional body TL;DR, refined orientation with remaining `?`, key evidence, weakest point, what this does not decide (boundaries/non-goals), open questions that could change the conclusion, verification status, and artifact status. When a conclusion rests on external or versioned sources, surface version/date/channel context by default, or mark it unknown.
 
-Before delivering a Standard/Deep conclusion, attack it once: name the strongest counterexample or rival explanation you have not ruled out; if it could flip the decision, check it or downgrade confidence. Before saving, run a save consistency check: header counts match corresponding body sections, the core-conclusion field answers the main question in one sentence, and body `## TL;DR` appears only when it adds non-duplicative scan value per [REFERENCE.md](REFERENCE.md#saved-artifact-headers).
+Before delivering a Standard/Deep conclusion, run a research closure check ([REFERENCE.md](REFERENCE.md#research-closure-check)): state the settled answer, strongest unresolved counterexample or rival explanation, flip condition, and stop reason; if the counterexample could flip the decision, check it or downgrade confidence. Before saving, run a save consistency check: header counts match corresponding body sections, the core-conclusion field answers the main question in one sentence, and body `## TL;DR` appears only when it adds non-duplicative scan value per [REFERENCE.md](REFERENCE.md#saved-artifact-headers).
 
 ## 5. Save
 Quick answers stay in chat unless the user asks for a file.

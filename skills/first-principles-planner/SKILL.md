@@ -18,7 +18,7 @@ description: >
 
 ## Core Move
 
-Plan from the root problem, not from the user's first proposed solution. Before recommending anything, separate true constraints, conventions, and unverified assumptions.
+Plan from the root problem, not from the user's first proposed solution. A planner recommendation should be the current-best path under stated constraints, not the first viable path. Before recommending anything, separate true constraints, conventions, and unverified assumptions.
 
 ## Routing Gate
 
@@ -45,8 +45,8 @@ Use the user's language for chat and saved artifacts. For Standard or deeper wor
 
 | Mode | Use when | Shape |
 |---|---|---|
-| Decision | "还有更好?", "是否应该?", "最佳了吗?" | 10-20 lines: recommendation, why, when wrong, next step |
-| Plan | "给出方案", "先不 coding", architecture/design proposal | Write Markdown artifact; chat gives summary, path, risks |
+| Decision | "还有更好?", "是否应该?", "最佳了吗?" | 10-20 lines: recommendation, why, when wrong, next step; include a compressed **Bestness Check** for non-trivial recommendations |
+| Plan | "最佳方案", "最佳实现", "给出方案", "先不 coding", architecture/design proposal | Write Markdown artifact; chat gives summary, path, risks; put the Bestness Check near the top for non-trivial recommendations |
 
 ## Depth
 
@@ -56,6 +56,7 @@ Use the user's language for chat and saved artifacts. For Standard or deeper wor
 | Multiple viable approaches | Standard |
 | User states a solution, not the problem | Standard+ (Standard with a mandatory root reframe) |
 | Recurring/stuck/conventional problem | Deep |
+| Any current-best recommendation with non-obvious tradeoffs | Deep |
 
 ## Process
 
@@ -64,7 +65,8 @@ Use the user's language for chat and saved artifacts. For Standard or deeper wor
 3. **Constraint split**: classify load-bearing factors as true constraints, conventions, or unverified assumptions.
 4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)).
 5. **Recommend**: pick the approach that solves the root under true constraints after the inversion test (skip it only for Light depth or obvious low-risk decisions); if rejecting the user's approach, include what would justify it.
-6. **Synthesize**: make Plan outputs specific enough to predict what changes, in what order, and why.
+6. **Bestness Check**: for non-trivial recommendations, including the first response, state the fit criteria, winner, closest alternative, what would beat it, and the marginal-gain stop point. Details: [REFERENCE.md](REFERENCE.md#bestness-check).
+7. **Synthesize**: make Plan outputs specific enough to predict what changes, in what order, and why.
 
 For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE.md) before writing the final answer.
 
@@ -76,7 +78,7 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 
 ## Acceptance Gate
 
-Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step.
+Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it.
 
 ## Anti-Patterns
 

@@ -54,7 +54,7 @@ Read the real task output against the baseline and place the edit on two axes:
 Then apply the decision rule:
 
 - Clear or large improvement with high confidence: accept.
-- Clear improvement with low confidence: run a second diverse sample before accepting; never accept generalization on a single sample.
+- Clear or large improvement with low confidence: continue — run a second diverse sample before accepting; never accept generalization on a single sample.
 - Marginal improvement: accept only when it fixes a real reported failure or removes real cost or noise; otherwise reject as not worth the maintenance.
 - No improvement, or any regression: reject.
 
@@ -65,9 +65,10 @@ State the magnitude as a falsifiable claim tied to the output diff, so a reviewe
 Because the author is the grader, every magnitude, confidence, and trigger judgment above is self-assessed, so the trigger for the one structural check on that bias must be mechanical rather than another judgment call. Run an independent falsification pass whenever any of these objective conditions hold — do not add scoring resolution instead:
 
 - The edit changes routing, description, or `name` text that decides when the skill loads.
+- The edit changes a skill's runtime behavior in a way a passing sample could mask — script logic, or removing or loosening a rule.
 - The edit touches two or more skills, or a shared rule in this file.
 - The edit changes a hard gate or the decision rule itself.
-- The accept decision rests on a single sample, or on calling an improvement `clear` rather than `marginal`.
+- The accept decision rests on a single sample.
 
 In the pass, work in a fresh context and try to show the edit is not better or introduces a regression; accept only when that attempt fails. If the runtime cannot supply an independent context, record that in the round notes and mark the accept provisional until a second reviewer or a later session runs the pass — never treat the author's own re-read as the independent check.
 

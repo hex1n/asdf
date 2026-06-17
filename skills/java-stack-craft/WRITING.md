@@ -23,7 +23,7 @@ For repeated or non-trivial repo work, read [WORK_CONTEXT.md](WORK_CONTEXT.md), 
 Before editing, identify:
 
 - The Java Work Context summary: Target Profile, relevant Project Facilities, Risk Candidates, and Verification Floor.
-- Whether a repo profile was used, absent, or stale.
+- Relevant Project Knowledge Cards considered, which choice each changed, or `no-card` when none applied.
 - Whether the worktree is dirty and whether edits are in the original project or a temporary copy.
 - The intended files or module boundary.
 - Seam-relevant Project Facilities searched in touched-flow and same-module sibling code; examples include logging/alarm, transaction boundaries, pagination/query, mapping, JSON/date/id utilities.
@@ -54,7 +54,7 @@ Use `--category security,concurrency,jdk` or `--max-findings 20` when a broad sc
 
 When scan output is mostly broad maintainability signal, deliberately look for a stronger scoped risk before editing: a reachable security issue, correctness bug, concurrency/resource issue, or build/runtime compatibility failure. If none is in scope, keep the patch small and report that it is cleanup rather than a production fix.
 
-If the work reveals a stable repo fact that changed the coding or verification choice, follow [PROFILE.md](PROFILE.md): add or update a Project Knowledge Card outside the generated block, redacting secrets and keeping generated detector output script-owned. Do not add descriptive project summaries that would not change a future choice.
+If the work reveals a stable repo fact that changed the coding or verification choice, follow [PROFILE.md](PROFILE.md): add or update a Project Knowledge Card outside the generated block, redacting secrets and keeping generated detector output script-owned. Do not add descriptive project summaries that would not change a future choice. If a candidate fact fails the card promotion gate, keep it in the result only.
 
 ## Step W4: Write with flexible defaults
 
@@ -74,7 +74,7 @@ For a small change, report only the relevant items:
 - Files changed.
 - Risk tier and concrete failure path improved.
 - Candidate chosen/rejected summary when selection was non-obvious.
-- Profile status when it affected decisions; mention review memory only for noisy maintainability cleanup or explicit memory updates.
+- Knowledge Card closure: updated `<card>`, used `<card>` unchanged, marked `<card>` stale, or `no-card` with a one-line reason.
 - Project Facilities reused, or why creating/adapting a helper was the better fit.
 - Conventions matched and any deliberate divergence.
 - Any abstraction introduced and its variation point, or state that none was introduced.

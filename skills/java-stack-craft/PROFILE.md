@@ -29,6 +29,14 @@ These paths are inside the target repo being worked on, not inside this skill. T
 
 This is the useful part of the profile. Add a card only when it passes the future-choice test: "Would this change the next coding, review, or verification choice?" If not, leave it out.
 
+Card promotion gate:
+
+- Decision is an imperative action, not a project description.
+- Use when / Do not use when define the branch boundary.
+- Evidence points to file:line, command output, or a named code-read source.
+- Last verified is a date, commit, or current-task marker.
+- A fact failing any gate stays in the chat/report, not the profile.
+
 ```md
 ### <seam or convention>
 - Decision: <what to do next time>

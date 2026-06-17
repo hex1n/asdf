@@ -121,6 +121,8 @@ CHANGE_ACTION_TOPIC_PREFIXES = {
 }
 TOPIC_LEADING_STOPWORDS = {"only"}
 GENERIC_TOPIC_SUFFIXES = {
+    "controller",
+    "controllers",
     "dto",
     "dtos",
     "entities",

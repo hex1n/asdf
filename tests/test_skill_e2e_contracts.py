@@ -661,6 +661,107 @@ class SkillE2EContractsTest(unittest.TestCase):
         for text in (skill, writing, review):
             self.assertIn("(RISK_ROUTER.md#scanner-calibration)", text)
 
+    def test_java_description_routes_plan_implementation_to_java_skill(self) -> None:
+        description = frontmatter_description(read_text("skills/java-stack-craft/SKILL.md"))
+
+        self.assertIn("landing an accepted plan into Java stack code", description)
+        self.assertIn("按计划落地 Java 改动", description)
+        self.assertIn("根据计划实现 Java/Spring 改动", description)
+        self.assertIn("根据方案实现 Java/Spring 改动", description)
+        self.assertNotIn("落地方案", description)
+        self.assertIn("pure planning", description)
+        self.assertIn("architecture/design discussion", description)
+        self.assertIn("feasibility research", description)
+        self.assertIn("non-Java implementation", description)
+        self.assertIn("unless the task includes writing or reviewing Java stack code", description)
+
+    def test_java_bundled_scripts_are_not_resolved_from_target_repo(self) -> None:
+        skill = read_text("skills/java-stack-craft/SKILL.md")
+        writing = read_text("skills/java-stack-craft/WRITING.md")
+        review = read_text("skills/java-stack-craft/REVIEW.md")
+        context = read_text("skills/java-stack-craft/WORK_CONTEXT.md")
+
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py context --dir <project-root>", skill)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py context --dir <project-root>", context)
+        self.assertIn("docs/agents/java-stack-profile.md", skill)
+        self.assertIn("docs/agents/java-stack-profile.md", context)
+        self.assertIn("writes the repo profile by default", skill)
+        self.assertIn("generated block", context)
+        self.assertIn("hand-written notes outside that block are preserved", context)
+        self.assertIn("--no-write-profile", context)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py profile --dir <project-root>", context)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py facilities --dir <project-root>", context)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py scan --dir <project-root>", context)
+        self.assertIn("Resolve `<java-stack-craft>` to this skill directory", skill)
+        self.assertIn("target project (`.` only if current dir is target)", skill)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py scan --dir <project-root>", skill)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py scan --dir <project-root>", writing)
+        self.assertIn("not the target repo", writing)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py context --dir <project-root>", review)
+        self.assertIn("<java-stack-craft>/scripts/java_stack.py scan --dir <project-root>", review)
+        self.assertNotIn("python3 scripts/detect_java_profile.py --dir .", skill)
+        self.assertNotIn("python3 scripts/java_advisory_scan.py --dir .", skill)
+        self.assertNotIn("python3 scripts/java_advisory_scan.py --dir .", writing)
+
+    def test_java_work_context_is_first_class(self) -> None:
+        skill = read_text("skills/java-stack-craft/SKILL.md")
+        writing = read_text("skills/java-stack-craft/WRITING.md")
+        review = read_text("skills/java-stack-craft/REVIEW.md")
+        context = read_text("skills/java-stack-craft/WORK_CONTEXT.md")
+        profile = read_text("skills/java-stack-craft/PROFILE.md")
+
+        self.assertIn("build Java Work Context", skill)
+        self.assertIn("**Java Work Context**", skill)
+        self.assertIn("reuse the current Java Work Context", skill)
+        self.assertIn("project-local long-term profile plus a refreshable generated snapshot", context)
+        self.assertIn("Project Knowledge Cards", context)
+        self.assertIn("Project Knowledge Cards", profile)
+        self.assertIn("future-choice test", profile)
+        self.assertIn("Decision:", profile)
+        self.assertIn("Use when:", profile)
+        self.assertIn("Do not use when:", profile)
+        self.assertIn("Evidence:", profile)
+        self.assertIn("Useless facts merely summarize the repo", profile)
+        self.assertNotIn("## Detected Target", profile)
+        self.assertNotIn("## Project Shape", profile)
+        self.assertIn("common seam catalog and generic type detector are search seeds", context)
+        for marker in (
+            "Target Profile",
+            "Project Facilities",
+            "Risk Candidates",
+            "Verification Floor",
+        ):
+            self.assertIn(marker, context)
+            self.assertIn(marker, writing)
+        self.assertIn("[WORK_CONTEXT.md](WORK_CONTEXT.md)", skill)
+        self.assertIn("[WORK_CONTEXT.md](WORK_CONTEXT.md)", writing)
+        self.assertIn("[WORK_CONTEXT.md](WORK_CONTEXT.md)", review)
+        self.assertIn("Target Profile, Project Facilities, bounded risk candidates, and verification floor", review)
+
+    def test_java_project_facilities_are_discovered_before_inventing_helpers(self) -> None:
+        skill = read_text("skills/java-stack-craft/SKILL.md")
+        writing = read_text("skills/java-stack-craft/WRITING.md")
+        review = read_text("skills/java-stack-craft/REVIEW.md")
+
+        self.assertIn("**Project Facility**", skill)
+        self.assertIn("relevant to the seam being changed", skill)
+        self.assertIn("prefer relevant **Project Facilities** before inventing a parallel path", skill)
+        self.assertIn("Common examples include logging/alarm", skill)
+        self.assertIn("transaction boundaries", skill)
+        self.assertIn("pagination/query helpers", skill)
+        self.assertIn("JSON/date/id utilities", skill)
+        self.assertIn("touched-flow and same-module sibling code", skill)
+        self.assertIn("Seam-relevant Project Facilities searched", writing)
+        self.assertIn("Prefer seam-relevant Project Facilities before inventing new helpers", writing)
+        self.assertIn("common examples include logging/alarm", writing)
+        self.assertIn("Create or adapt a helper when no fitting facility exists", writing)
+        self.assertIn("the local one has a defect", writing)
+        self.assertIn("real variation point", writing)
+        self.assertIn("wrong bounded context", writing)
+        self.assertIn("Project Facilities reused, or why creating/adapting a helper was the better fit", writing)
+        self.assertIn("bypass seam-relevant same-module Project Facilities", review)
+        self.assertIn("concrete failure path or maintenance cost", review)
+
     def test_java_verification_closure_prevents_degraded_proof_overclaiming(self) -> None:
         skill = read_text("skills/java-stack-craft/SKILL.md")
         router = read_text("skills/java-stack-craft/RISK_ROUTER.md")

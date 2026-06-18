@@ -11,38 +11,18 @@ Let `ARGUMENTS` be the text after `/claude-consult` or after a natural-language 
 
 ## Steps
 
-1. Parse routing flags. Strip `--model <model>` from the question text and pass it to Claude as `--model <model>`. Everything else is the question, preserved exactly.
+1. Parse routing flags. Strip `--model <model>` from the question text and pass it to the bridge companion as `--model <model>`. Everything else is the question, preserved exactly.
 
-2. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, unset it for the child process only. Never pass `--bare` and never use `--continue`; both break subscription billing or session isolation.
+2. Write the question to a temp file, preserving it exactly. Always pass it as a prompt file; do not inline the question as a command-line argument.
 
-3. Write the question to a temp file, preserving it exactly. Always pipe stdin into Claude; do not inline the question as a command-line argument.
-
-4. Run from the repository root in the foreground, allowing up to 10 minutes.
-
-PowerShell:
-
-```powershell
-Get-Content <tmpfile> -Raw | claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" <optional model arg>
-```
-
-POSIX shell:
+3. Resolve `../../scripts/bridge-companion.mjs` relative to this `SKILL.md`, then run from the repository root in the foreground, allowing up to 10 minutes:
 
 ```sh
-env -u ANTHROPIC_API_KEY claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob" --allowedTools "Read,Grep,Glob" <optional model arg> < "$tmpfile"
+node "<resolved companion path>" claude direct --mode consult --prompt-file "<temporary question file>" <optional model arg>
 ```
 
-Replace `<optional model arg>` before running; never include placeholder text literally.
+Replace `<optional model arg>` before running; never include placeholder text literally. The companion owns billing guardrails, Claude CLI resolution, JSON parsing, result rendering, and session tracking.
 
-5. Parse the single JSON object from stdout. Fields needed: `result`, `session_id`, `total_cost_usd`, `is_error`.
+4. Report the command output exactly as-is.
 
-6. Persist session metadata through the bridge companion, not by writing registry JSON yourself. Resolve `../../scripts/bridge-companion.mjs` relative to this `SKILL.md`, then run from the repository root:
-
-```sh
-node "<resolved companion path>" claude register-session --session "<session_id>" --source consult
-```
-
-7. Report to the user:
-   - the full `result` text, unmodified
-   - then one final line: `cost: $<total_cost_usd> | session: <session_id>`
-
-8. If the command fails or `is_error` is true, show the raw error output and stop. Do not retry. Do not fall back to answering yourself.
+5. If the command exits non-zero, show the raw output and stop. Do not retry. Do not fall back to answering yourself.

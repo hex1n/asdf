@@ -73,8 +73,18 @@ async function sideMain(side, argv) {
   const action = argv.shift();
   if (!action) {
     throw new UsageError(
-      `usage: bridge-companion.mjs ${side} <work|resume|status|result|cancel|register-session> ...`,
+      `usage: bridge-companion.mjs ${side} <direct|review|work|resume|status|result|cancel|register-session> ...`,
     );
+  }
+
+  if (action === "direct") {
+    await runDirect(side, argv);
+    return;
+  }
+
+  if (action === "review") {
+    await runReview(side, argv);
+    return;
   }
 
   if (action === "work" || action === "resume") {
@@ -103,6 +113,99 @@ async function sideMain(side, argv) {
   }
 
   throw new UsageError(`unsupported ${side} action: ${action}`);
+}
+
+async function runDirect(side, argv) {
+  const args = await parseDirectArgs(argv, { side });
+  if (!args.mode) {
+    throw new UsageError(`${sideLabel(side)} direct requires --mode ${profileList(side)}`);
+  }
+  const profile = profileConfig(side, args.mode);
+  if (!Array.isArray(profile.actions?.direct)) {
+    throw new UsageError(`${sideLabel(side)} profile ${args.mode} does not support direct action`);
+  }
+  if (!args.request.trim()) {
+    throw new UsageError("missing direct prompt");
+  }
+
+  const stateRoot = stateRootPath();
+  const cwd = path.resolve(process.cwd());
+  const repoHash = hashCwd(cwd);
+  await ensureStateRoot(stateRoot);
+
+  const job = await createJob({
+    stateRoot,
+    cwd,
+    repoHash,
+    side,
+    action: "direct",
+    request: args.request,
+    model: args.model,
+    effort: args.effort,
+    background: false,
+    resumeFrom: null,
+    mode: args.mode,
+    scope: args.scope,
+    bundleMetrics: null,
+  });
+
+  const finished = await runWorkerForJob(stateRoot, job);
+  await printDirectResult(finished);
+}
+
+async function runReview(side, argv) {
+  const args = await parseReviewArgs(argv, { side });
+  const profile = profileConfig(side, "review");
+  if (!Array.isArray(profile.actions?.direct)) {
+    throw new UsageError(`${sideLabel(side)} profile review does not support direct action`);
+  }
+
+  const cwd = path.resolve(process.cwd());
+  let request = codexReviewPrompt(args);
+  let bundleMetrics = null;
+
+  if (side === "claude") {
+    const bundle = await buildReviewBundle({ cwd, ...args });
+    enforceBundleLimits(bundle.metrics);
+    if (args.dryRun) {
+      printReviewDryRun(bundle);
+      return;
+    }
+    request = bundle.text;
+    bundleMetrics = bundle.metrics;
+  } else if (args.dryRun) {
+    printCodexReviewDryRun(args);
+    return;
+  }
+
+  const stateRoot = stateRootPath();
+  const repoHash = hashCwd(cwd);
+  await ensureStateRoot(stateRoot);
+
+  const job = await createJob({
+    stateRoot,
+    cwd,
+    repoHash,
+    side,
+    action: "direct",
+    request,
+    model: args.model,
+    effort: args.effort,
+    background: false,
+    resumeFrom: null,
+    mode: "review",
+    scope: args.scope,
+    bundleMetrics,
+  });
+
+  if (bundleMetrics) {
+    const summary = formatBundleMetrics(bundleMetrics);
+    await fsp.appendFile(job.logFile, `bridge: review bundle ${summary}\n`);
+    process.stderr.write(`bridge: review bundle ${summary}\n`);
+  }
+
+  const finished = await runWorkerForJob(stateRoot, job);
+  await printDirectResult(finished);
 }
 
 async function runTask(side, action, argv) {
@@ -183,12 +286,20 @@ async function createJob({
   background,
   resumeFrom,
   mode,
+  scope = null,
+  bundleMetrics = null,
 }) {
   const id = makeJobId();
   const paths = pathsForJob(stateRoot, repoHash, id);
   await ensureRepoDirs(stateRoot, repoHash);
 
-  const promptText = action === "work" ? buildWorkPrompt(request) : `${request}\n`;
+  const promptText = action === "work"
+    ? buildWorkPrompt(request)
+    : action === "direct" && side === "cx" && mode === "consult"
+      ? buildConsultPrompt(request)
+      : action === "direct"
+        ? request
+        : `${request}\n`;
   await fsp.writeFile(paths.promptFile, promptText, { mode: 0o600 });
 
   const now = new Date().toISOString();
@@ -208,6 +319,8 @@ async function createJob({
     sessionId: null,
     resumeFrom,
     mode,
+    scope,
+    bundleMetrics,
     model,
     effort,
     background,
@@ -237,6 +350,20 @@ After making changes, inspect local project conventions to choose the narrowest 
 <action_safety>
 Stay narrow: change only what the work request requires. Do not do drive-by refactors, dependency bumps, generated-file churn, or unrelated formatting. If a risky or destructive step is required, stop and report instead.
 </action_safety>
+`;
+}
+
+function buildConsultPrompt(request) {
+  return `<task>
+${request}
+Context: the working directory is the repository to inspect. You have read-only access.
+</task>
+<compact_output_contract>
+Lead with the conclusion, then supporting detail. Be concise. Every claim about this repository must cite file paths (file:line where possible).
+</compact_output_contract>
+<grounding_rules>
+Only state what you can support by reading files in this repository or by well-established general knowledge. Label hypotheses as hypotheses. Never invent file contents or APIs.
+</grounding_rules>
 `;
 }
 
@@ -313,13 +440,13 @@ async function runWorkerForJob(stateRoot, job) {
 
   if (runResult.ok) {
     const sessionId = runResult.sessionId ?? (await parseSessionId(job.logFile));
-    if (sessionId) {
+    if (sessionId && isSessionSource(job.side, job.mode)) {
       await registerSession(stateRoot, job.repoHash, job.side, sessionId, {
         source: sessionSourceFor(job),
         cwd: job.cwd,
         jobId: job.id,
       });
-    } else if (job.action === "resume" && job.resumeFrom) {
+    } else if (job.action === "resume" && job.resumeFrom && isSessionSource(job.side, job.mode)) {
       await registerSession(stateRoot, job.repoHash, job.side, job.resumeFrom, {
         source: sessionSourceFor(job),
         cwd: job.cwd,
@@ -347,39 +474,7 @@ async function runWorkerForJob(stateRoot, job) {
 }
 
 async function runCodex(job, stateRoot) {
-  const codex = process.env.CLAUDE_CODEX_BRIDGE_CODEX_BIN || process.env.CODEX_BIN || "codex";
-  const args = codexArgs(job);
-  await fsp.appendFile(job.logFile, `bridge: running ${codex} ${args.map(shellish).join(" ")}\n`);
-
-  const logStream = fs.createWriteStream(job.logFile, { flags: "a" });
-  const inputHandle = await fsp.open(job.promptFile, "r");
-  const childEnv = { ...process.env, CLAUDE_CODEX_BRIDGE_STATE_HOME: stateRoot };
-  delete childEnv.ANTHROPIC_API_KEY;
-
-  const child = spawn(codex, args, {
-    cwd: job.cwd,
-    shell: shouldUseShell(codex),
-    env: childEnv,
-    stdio: [inputHandle.fd, "pipe", "pipe"],
-  });
-
-  await updateJob(stateRoot, job.repoHash, job.id, { childPid: child.pid ?? null });
-
-  child.stdout.pipe(logStream, { end: false });
-  child.stderr.pipe(logStream, { end: false });
-
-  const result = await new Promise((resolve) => {
-    let spawnError = null;
-    child.on("error", (error) => {
-      spawnError = error;
-    });
-    child.on("close", (code, signal) => {
-      resolve({ code, signal, spawnError });
-    });
-  });
-
-  await new Promise((resolve) => logStream.end(resolve));
-  await inputHandle.close().catch(() => {});
+  const result = await runNativeAgent("cx", job, stateRoot, codexArgs(job));
 
   if (result.spawnError) {
     const summary = result.spawnError.message;
@@ -404,39 +499,7 @@ async function runCodex(job, stateRoot) {
 }
 
 async function runClaude(job, stateRoot) {
-  const claude = process.env.CLAUDE_CODEX_BRIDGE_CLAUDE_BIN || process.env.CLAUDE_BIN || "claude";
-  const args = claudeArgs(job);
-  await fsp.appendFile(job.logFile, `bridge: running ${claude} ${args.map(shellish).join(" ")}\n`);
-
-  const logStream = fs.createWriteStream(job.logFile, { flags: "a" });
-  const inputHandle = await fsp.open(job.promptFile, "r");
-  const childEnv = { ...process.env, CLAUDE_CODEX_BRIDGE_STATE_HOME: stateRoot };
-  delete childEnv.ANTHROPIC_API_KEY;
-
-  const child = spawn(claude, args, {
-    cwd: job.cwd,
-    shell: shouldUseShell(claude),
-    env: childEnv,
-    stdio: [inputHandle.fd, "pipe", "pipe"],
-  });
-
-  await updateJob(stateRoot, job.repoHash, job.id, { childPid: child.pid ?? null });
-
-  child.stdout.pipe(logStream, { end: false });
-  child.stderr.pipe(logStream, { end: false });
-
-  const result = await new Promise((resolve) => {
-    let spawnError = null;
-    child.on("error", (error) => {
-      spawnError = error;
-    });
-    child.on("close", (code, signal) => {
-      resolve({ code, signal, spawnError });
-    });
-  });
-
-  await new Promise((resolve) => logStream.end(resolve));
-  await inputHandle.close().catch(() => {});
+  const result = await runNativeAgent("claude", job, stateRoot, claudeArgs(job));
 
   if (result.spawnError) {
     const summary = result.spawnError.message;
@@ -464,6 +527,46 @@ async function runClaude(job, stateRoot) {
     exitCode,
     errorSummary: `${reason}${tail ? `: ${firstLine(tail)}` : ""}`,
   };
+}
+
+async function runNativeAgent(agent, job, stateRoot, args) {
+  const command = resolveNativeAgent(agent);
+  try {
+    await ensureAgentStackAllows(agent, job.logFile);
+  } catch (error) {
+    return { code: null, signal: null, spawnError: error };
+  }
+  await fsp.appendFile(job.logFile, `bridge: running ${command} ${args.map(shellish).join(" ")}\n`);
+
+  const logStream = fs.createWriteStream(job.logFile, { flags: "a" });
+  const inputHandle = await fsp.open(job.promptFile, "r");
+  const childEnv = nativeAgentEnv(agent, stateRoot);
+  delete childEnv.ANTHROPIC_API_KEY;
+
+  const child = spawnCommand(command, args, {
+    cwd: job.cwd,
+    env: childEnv,
+    stdio: [inputHandle.fd, "pipe", "pipe"],
+  });
+
+  await updateJob(stateRoot, job.repoHash, job.id, { childPid: child.pid ?? null });
+
+  child.stdout.pipe(logStream, { end: false });
+  child.stderr.pipe(logStream, { end: false });
+
+  const result = await new Promise((resolve) => {
+    let spawnError = null;
+    child.on("error", (error) => {
+      spawnError = error;
+    });
+    child.on("close", (code, signal) => {
+      resolve({ code, signal, spawnError });
+    });
+  });
+
+  await new Promise((resolve) => logStream.end(resolve));
+  await inputHandle.close().catch(() => {});
+  return result;
 }
 
 function claudeArgs(job) {
@@ -516,6 +619,14 @@ function expandProfileArgs(template, job) {
       args.push(...modelAndEffortArgs(job));
       continue;
     }
+    if (token === "{modelArgs}") {
+      args.push(...modelArgs(job));
+      continue;
+    }
+    if (token === "{scope}") {
+      args.push(...scopeArgs(job));
+      continue;
+    }
     args.push(token);
   }
   return args;
@@ -559,6 +670,10 @@ function codexArgs(job) {
   return profileArgs("cx", job.mode ?? defaultProfile("cx"), job.action, job);
 }
 
+function modelArgs(job) {
+  return job.model ? ["-m", job.model] : [];
+}
+
 function modelAndEffortArgs(job) {
   const args = [];
   if (job.model) {
@@ -570,12 +685,136 @@ function modelAndEffortArgs(job) {
   return args;
 }
 
+function scopeArgs(job) {
+  if (Array.isArray(job.scope) && job.scope.length) {
+    return job.scope;
+  }
+  return ["--uncommitted"];
+}
+
+function resolveNativeAgent(agent) {
+  if (agent === "claude") {
+    return resolveAgentCommand({
+      agent,
+      commandName: "claude",
+      envNames: ["CLAUDE_CODEX_BRIDGE_CLAUDE_BIN", "CLAUDE_BIN"],
+      windowsCandidates: [
+        path.join(os.homedir(), ".local", "bin", "claude.exe"),
+        ...pathCommandCandidates("claude.exe"),
+        path.join(os.homedir(), "bin", "claude.cmd"),
+        ...pathCommandCandidates("claude.cmd"),
+      ],
+    });
+  }
+  if (agent === "cx") {
+    return resolveAgentCommand({
+      agent,
+      commandName: "codex",
+      envNames: ["CLAUDE_CODEX_BRIDGE_CODEX_BIN", "CODEX_BIN"],
+      windowsCandidates: [
+        path.join(os.homedir(), ".local", "bin", "codex.exe"),
+        ...pathCommandCandidates("codex.exe"),
+        path.join(os.homedir(), "bin", "codex.cmd"),
+        ...pathCommandCandidates("codex.cmd"),
+      ],
+    });
+  }
+  throw new UsageError(`unsupported native agent: ${agent}`);
+}
+
+function resolveAgentCommand({ commandName, envNames, windowsCandidates }) {
+  for (const envName of envNames) {
+    const explicit = process.env[envName];
+    if (explicit) {
+      return explicit;
+    }
+  }
+  if (process.platform !== "win32") {
+    return commandName;
+  }
+  return firstExistingFile(windowsCandidates) ?? `${commandName}.exe`;
+}
+
+function pathCommandCandidates(commandName) {
+  const pathValue = process.env.PATH || process.env.Path || "";
+  return pathValue
+    .split(path.delimiter)
+    .filter(Boolean)
+    .map((entry) => path.join(stripWrappingQuotes(entry), commandName));
+}
+
+function stripWrappingQuotes(value) {
+  const text = String(value).trim();
+  if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+    return text.slice(1, -1);
+  }
+  return text;
+}
+
+function firstExistingFile(candidates) {
+  const seen = new Set();
+  for (const candidate of candidates) {
+    if (!candidate || seen.has(candidate.toLowerCase())) {
+      continue;
+    }
+    seen.add(candidate.toLowerCase());
+    try {
+      if (fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function spawnCommand(command, args, options) {
+  const useShell = shouldUseShell(command);
+  const previousNoDeprecation = process.noDeprecation;
+  if (useShell && process.platform === "win32") {
+    process.noDeprecation = true;
+  }
+  try {
+    return spawn(command, args, { ...options, shell: useShell });
+  } finally {
+    process.noDeprecation = previousNoDeprecation;
+  }
+}
+
 function shouldUseShell(command) {
   if (process.platform !== "win32") {
     return false;
   }
   const ext = path.extname(command).toLowerCase();
   return ext === ".cmd" || ext === ".bat" || ext === "";
+}
+
+function nativeAgentEnv(agent, stateRoot) {
+  return {
+    ...process.env,
+    CLAUDE_CODEX_BRIDGE_STATE_HOME: stateRoot,
+    CLAUDE_CODEX_BRIDGE_AGENT_STACK: nextAgentStack(agent),
+  };
+}
+
+function nextAgentStack(agent) {
+  return [...currentAgentStack(), agent].join(",");
+}
+
+function currentAgentStack() {
+  return String(process.env.CLAUDE_CODEX_BRIDGE_AGENT_STACK || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function ensureAgentStackAllows(agent, logFile) {
+  const stack = currentAgentStack();
+  if (!stack.includes(agent)) {
+    return;
+  }
+  const message = `recursive bridge invocation blocked for ${agent}; stack=${stack.join(">")}`;
+  await fsp.appendFile(logFile, `bridge: ${message}\n`);
+  throw new Error(message);
 }
 
 async function printForegroundResult(job) {
@@ -587,6 +826,24 @@ async function printForegroundResult(job) {
     process.stdout.write(
       `bridge: job ${job.id} | status completed | session ${job.sessionId ?? "none"}\n`,
     );
+    return;
+  }
+
+  const tail = await tailFile(job.logFile, 50);
+  process.stdout.write(tail || job.errorSummary || `job ${job.id} failed\n`);
+  if (tail && !tail.endsWith("\n")) {
+    process.stdout.write("\n");
+  }
+  process.exit(job.exitCode || 1);
+}
+
+async function printDirectResult(job) {
+  if (job.status === "completed") {
+    const result = await fsp.readFile(job.resultFile, "utf8");
+    process.stdout.write(result);
+    if (!result.endsWith("\n")) {
+      process.stdout.write("\n");
+    }
     return;
   }
 
@@ -812,6 +1069,527 @@ async function reconcileJob(stateRoot, job) {
     completedAt: job.completedAt ?? new Date().toISOString(),
     errorSummary: "worker pid is no longer running and no result was recorded",
   });
+}
+
+async function parseDirectArgs(argv, { side }) {
+  const tokens = normalizeArgv(argv);
+  const options = { mode: null, model: null, effort: null, request: "" };
+  const request = [];
+  let promptFile = null;
+  let passthrough = false;
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (passthrough) {
+      request.push(token);
+      continue;
+    }
+    if (token === "--") {
+      passthrough = true;
+      continue;
+    }
+
+    const modeValue = inlineFlagValue(token, "--mode");
+    if (token === "--mode" || modeValue !== null) {
+      const value = modeValue !== null ? modeValue : requireValue(tokens, ++i, "--mode");
+      if (!isProfile(side, value)) {
+        throw new UsageError(`invalid ${sideLabel(side)} --mode value: ${value}`);
+      }
+      options.mode = value;
+      continue;
+    }
+
+    const modelValue = inlineFlagValue(token, "--model");
+    if (token === "--model" || modelValue !== null) {
+      options.model = modelValue !== null ? modelValue : requireValue(tokens, ++i, "--model");
+      continue;
+    }
+
+    const effortValue = inlineFlagValue(token, "--effort");
+    if (token === "--effort" || effortValue !== null) {
+      const value = effortValue !== null ? effortValue : requireValue(tokens, ++i, "--effort");
+      if (!VALID_EFFORTS.has(value)) {
+        throw new UsageError(`invalid --effort value: ${value}`);
+      }
+      options.effort = value;
+      continue;
+    }
+
+    const promptFileValue = inlineFlagValue(token, "--prompt-file");
+    if (token === "--prompt-file" || promptFileValue !== null) {
+      if (promptFile) {
+        throw new UsageError("--prompt-file may only be provided once");
+      }
+      promptFile = promptFileValue !== null ? promptFileValue : requireValue(tokens, ++i, "--prompt-file");
+      continue;
+    }
+
+    request.push(token);
+  }
+
+  if (promptFile) {
+    if (request.length) {
+      throw new UsageError("unexpected direct request arguments with --prompt-file");
+    }
+    options.request = await fsp.readFile(promptFile, "utf8");
+    return options;
+  }
+
+  options.request = request.join(" ");
+  return options;
+}
+
+async function parseReviewArgs(argv, { side }) {
+  const { tokens, rawText } = await extractArgsFile(argv);
+  const reviewTokens = rawText !== null ? [...tokens, ...splitCommandLine(rawText)] : normalizeArgv(tokens);
+  const options = {
+    side,
+    bundleProfile: "diff",
+    model: null,
+    effort: null,
+    paths: [],
+    focus: "",
+    target: { kind: "uncommitted" },
+    scope: ["--uncommitted"],
+    dryRun: false,
+  };
+  const focusParts = [];
+  let focusFile = null;
+  const pathFiles = [];
+  let passthrough = false;
+
+  for (let i = 0; i < reviewTokens.length; i += 1) {
+    const token = reviewTokens[i];
+    if (passthrough) {
+      focusParts.push(token);
+      continue;
+    }
+    if (token === "--") {
+      passthrough = true;
+      continue;
+    }
+    if (token === "--dry-run") {
+      options.dryRun = true;
+      continue;
+    }
+
+    const profileValue = inlineFlagValue(token, "--profile");
+    if (token === "--profile" || profileValue !== null) {
+      const value = profileValue !== null ? profileValue : requireValue(reviewTokens, ++i, "--profile");
+      if (!["diff", "files", "mixed"].includes(value)) {
+        throw new UsageError(`invalid --profile value: ${value}`);
+      }
+      options.bundleProfile = value;
+      continue;
+    }
+
+    const pathValue = inlineFlagValue(token, "--path");
+    if (token === "--path" || pathValue !== null) {
+      options.paths.push(pathValue !== null ? pathValue : requireValue(reviewTokens, ++i, "--path"));
+      continue;
+    }
+
+    const pathsFileValue = inlineFlagValue(token, "--paths-file");
+    if (token === "--paths-file" || pathsFileValue !== null) {
+      pathFiles.push(pathsFileValue !== null ? pathsFileValue : requireValue(reviewTokens, ++i, "--paths-file"));
+      continue;
+    }
+
+    const focusValue = inlineFlagValue(token, "--focus");
+    if (token === "--focus" || focusValue !== null) {
+      focusParts.push(focusValue !== null ? focusValue : requireValue(reviewTokens, ++i, "--focus"));
+      continue;
+    }
+
+    const focusFileValue = inlineFlagValue(token, "--focus-file");
+    if (token === "--focus-file" || focusFileValue !== null) {
+      if (focusFile) {
+        throw new UsageError("--focus-file may only be provided once");
+      }
+      focusFile = focusFileValue !== null ? focusFileValue : requireValue(reviewTokens, ++i, "--focus-file");
+      continue;
+    }
+
+    const baseValue = inlineFlagValue(token, "--base");
+    if (token === "--base" || baseValue !== null) {
+      const base = baseValue !== null ? baseValue : requireValue(reviewTokens, ++i, "--base");
+      options.target = { kind: "base", base };
+      options.scope = reviewTargetScope(options.target);
+      continue;
+    }
+
+    const commitValue = inlineFlagValue(token, "--commit");
+    if (token === "--commit" || commitValue !== null) {
+      const sha = commitValue !== null ? commitValue : requireValue(reviewTokens, ++i, "--commit");
+      options.target = { kind: "commit", sha };
+      options.scope = reviewTargetScope(options.target);
+      continue;
+    }
+
+    const modelValue = inlineFlagValue(token, "--model");
+    if (token === "--model" || modelValue !== null) {
+      options.model = modelValue !== null ? modelValue : requireValue(reviewTokens, ++i, "--model");
+      continue;
+    }
+
+    const effortValue = inlineFlagValue(token, "--effort");
+    if (token === "--effort" || effortValue !== null) {
+      const value = effortValue !== null ? effortValue : requireValue(reviewTokens, ++i, "--effort");
+      if (!VALID_EFFORTS.has(value)) {
+        throw new UsageError(`invalid --effort value: ${value}`);
+      }
+      options.effort = value;
+      continue;
+    }
+
+    focusParts.push(token);
+  }
+
+  for (const file of pathFiles) {
+    const text = await fsp.readFile(file, "utf8");
+    options.paths.push(...text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+  }
+
+  if (focusFile) {
+    if (focusParts.length) {
+      throw new UsageError("unexpected review focus arguments with --focus-file");
+    }
+    options.focus = await fsp.readFile(focusFile, "utf8");
+  } else {
+    options.focus = focusParts.join(" ");
+  }
+
+  if (!options.paths.length) {
+    options.paths.push(".");
+  }
+
+  return options;
+}
+
+function reviewTargetScope(target) {
+  if (target.kind === "base") {
+    return ["--base", target.base];
+  }
+  if (target.kind === "commit") {
+    return ["--commit", target.sha];
+  }
+  return ["--uncommitted"];
+}
+
+function reviewTargetLabel(target) {
+  if (target.kind === "base") {
+    return `--base ${target.base}`;
+  }
+  if (target.kind === "commit") {
+    return `--commit ${target.sha}`;
+  }
+  return "--uncommitted";
+}
+
+function codexReviewPrompt({ focus, paths }) {
+  const focusPaths = paths.filter((entry) => entry !== ".");
+  if (!focusPaths.length) {
+    return focus;
+  }
+
+  const pathFocus = ["Focus paths:", ...focusPaths.map((entry) => `- ${entry}`)].join("\n");
+  return focus.trim()
+    ? `${focus.trimEnd()}\n\n${pathFocus}\n`
+    : `${pathFocus}\n`;
+}
+
+async function buildReviewBundle({ cwd, paths, focus, target, bundleProfile }) {
+  const resolvedPaths = resolveReviewPaths(cwd, paths);
+  const pathArgs = resolvedPaths.map((entry) => entry.relative);
+  const includeDiff = bundleProfile === "diff" || bundleProfile === "mixed";
+  const includeFiles = bundleProfile === "files" || bundleProfile === "mixed";
+  const isCommit = target.kind === "commit";
+
+  const diffBase = target.kind === "base" ? `${target.base}...HEAD` : "HEAD";
+  const status = isCommit ? null : runGit(cwd, ["status", "--short", "--", ...pathArgs]);
+  const diff = !isCommit && includeDiff ? runGit(cwd, ["diff", diffBase, "--", ...pathArgs]) : null;
+  const diffStat = !isCommit && includeDiff ? runGit(cwd, ["diff", "--stat", diffBase, "--", ...pathArgs]) : null;
+  const commitShow = isCommit
+    ? runGit(cwd, ["show", "--format=fuller", "--stat", "--patch", "--find-renames", target.sha, "--", ...pathArgs])
+    : null;
+  const trackedFiles = isCommit ? { lines: [], error: null } : runGitLines(cwd, ["ls-files", "--", ...pathArgs]);
+  const untrackedFiles = isCommit
+    ? { lines: [], error: null }
+    : runGitLines(cwd, ["ls-files", "--others", "--exclude-standard", "--", ...pathArgs]);
+
+  const sections = [
+    "Review the local changes in this repository.",
+    "",
+    `Bundle profile: ${bundleProfile}`,
+    "Reviewer: claude",
+    `Review scope: ${reviewTargetLabel(target)}`,
+    "",
+    "Focus:",
+    focus.trim() || "general correctness, bugs, and risky changes",
+    "",
+    "Paths:",
+    ...resolvedPaths.map((entry) => `- ${entry.relative}`),
+    "",
+  ];
+
+  if (status) {
+    sections.push("Git status --short:", sectionText(status));
+  }
+  if (target.kind === "base") {
+    sections.push("", `Git base: ${diffBase}`);
+  }
+  if (diffStat) {
+    sections.push("", `Git diff --stat ${diffBase}:`, sectionText(diffStat));
+  }
+  if (diff) {
+    sections.push("", `Git diff ${diffBase}:`, sectionText(diff));
+  }
+  if (commitShow) {
+    sections.push("", `Git show --stat --patch --find-renames ${target.sha}:`, sectionText(commitShow));
+  }
+  if (trackedFiles.error) {
+    sections.push("", "Tracked file discovery:", trackedFiles.error);
+  }
+  if (untrackedFiles.lines.length || untrackedFiles.error) {
+    sections.push("", "Untracked files:", untrackedFiles.error || untrackedFiles.lines.join("\n"));
+  }
+
+  const suffixSections = [
+    "",
+    "Output contract - for each finding, one line:",
+    "P0-P3 | file:line | problem | evidence",
+    "Order by severity. Only report issues grounded in the diff or in files you actually read. No speculation, no style nitpicks unless asked. If there are no findings, say so explicitly.",
+    "",
+  ];
+
+  const snapshotFiles = isCommit
+    ? []
+    : includeFiles
+      ? [...trackedFiles.lines, ...untrackedFiles.lines]
+      : untrackedFiles.lines;
+  const snapshotCandidates = await readReviewSnapshots(cwd, snapshotFiles);
+  const snapshots = limitReviewSnapshots(
+    snapshotCandidates,
+    reviewSnapshotBudget(sections, suffixSections),
+  );
+  if (snapshots.items.length) {
+    sections.push("", "File snapshots:", ...snapshots.items);
+  }
+  if (snapshots.truncated) {
+    sections.push(
+      "",
+      `File snapshots truncated: included ${snapshots.items.length} of ${snapshots.total} files due to bundle limit`,
+    );
+  }
+
+  sections.push(...suffixSections);
+
+  const text = sections.join("\n");
+  return {
+    text,
+    metrics: bundleMetrics(text, {
+      pathCount: resolvedPaths.length,
+      trackedFileCount: trackedFiles.lines.length,
+      untrackedFileCount: untrackedFiles.lines.length,
+      diffStat: diffStat ? sectionText(diffStat) : "",
+      snapshotFileCount: snapshots.items.length,
+      snapshotFileTotal: snapshots.total,
+      snapshotTruncated: snapshots.truncated,
+    }),
+  };
+}
+
+function resolveReviewPaths(cwd, paths) {
+  const results = [];
+  const seen = new Set();
+  for (const input of paths) {
+    const absolute = path.resolve(cwd, input);
+    if (!isWithinDirectory(absolute, cwd)) {
+      throw new UsageError(`review path escapes the working directory: ${input}`);
+    }
+    const relative = normalizeRelativePath(path.relative(cwd, absolute) || ".");
+    const key = process.platform === "win32" ? relative.toLowerCase() : relative;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    results.push({ input, absolute, relative });
+  }
+  return results;
+}
+
+function isWithinDirectory(candidate, root) {
+  const resolvedRoot = path.resolve(root);
+  const resolvedCandidate = path.resolve(candidate);
+  const rootKey = process.platform === "win32" ? resolvedRoot.toLowerCase() : resolvedRoot;
+  const candidateKey = process.platform === "win32" ? resolvedCandidate.toLowerCase() : resolvedCandidate;
+  return candidateKey === rootKey || candidateKey.startsWith(`${rootKey}${path.sep}`);
+}
+
+function normalizeRelativePath(value) {
+  return value.split(path.sep).join("/");
+}
+
+function runGit(cwd, args) {
+  const result = spawnSync("git", args, { cwd, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 });
+  return {
+    ok: result.status === 0,
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
+    status: result.status,
+    args,
+  };
+}
+
+function runGitLines(cwd, args) {
+  const result = runGit(cwd, args);
+  if (!result.ok) {
+    return { lines: [], error: sectionText(result) };
+  }
+  return {
+    lines: result.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    error: null,
+  };
+}
+
+function sectionText(result) {
+  if (result.ok) {
+    return result.stdout.trimEnd() || "(empty)";
+  }
+  const command = ["git", ...result.args].map(shellish).join(" ");
+  const stderr = result.stderr.trim() || result.stdout.trim() || "no output";
+  return `[${command} failed with exit ${result.status ?? "unknown"}]\n${stderr}`;
+}
+
+async function readReviewSnapshots(cwd, files) {
+  const snapshots = [];
+  const seen = new Set();
+  for (const file of files.slice(0, 40)) {
+    const absolute = path.resolve(cwd, file);
+    if (!isWithinDirectory(absolute, cwd)) {
+      continue;
+    }
+    const relative = normalizeRelativePath(path.relative(cwd, absolute));
+    const key = process.platform === "win32" ? relative.toLowerCase() : relative;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    let stat = null;
+    try {
+      stat = await fsp.stat(absolute);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile() || stat.size > 20000) {
+      continue;
+    }
+    let text = "";
+    try {
+      text = await fsp.readFile(absolute, "utf8");
+    } catch {
+      continue;
+    }
+    snapshots.push(`--- ${relative}\n${text.trimEnd() || "(empty)"}`);
+  }
+  return snapshots;
+}
+
+function reviewSnapshotBudget(sections, suffixSections) {
+  const reserved = [
+    ...sections,
+    "",
+    "File snapshots:",
+    "",
+    "File snapshots truncated: included 000 of 000 files due to bundle limit",
+    ...suffixSections,
+  ].join("\n").length;
+  return Math.max(0, bundleLimits().chars - reserved);
+}
+
+function limitReviewSnapshots(snapshots, budgetChars) {
+  const items = [];
+  let used = 0;
+  for (const snapshot of snapshots) {
+    const separator = items.length ? 1 : 0;
+    const nextUsed = used + separator + snapshot.length;
+    if (nextUsed > budgetChars) {
+      return { items, total: snapshots.length, truncated: true };
+    }
+    items.push(snapshot);
+    used = nextUsed;
+  }
+  return { items, total: snapshots.length, truncated: false };
+}
+
+function bundleMetrics(text, extra) {
+  const lines = text.split(/\r?\n/);
+  return {
+    chars: text.length,
+    lines: lines.length,
+    maxLineLength: lines.reduce((max, line) => Math.max(max, line.length), 0),
+    ...extra,
+  };
+}
+
+function bundleLimits() {
+  return {
+    chars: Number(process.env.CLAUDE_CODEX_BRIDGE_MAX_BUNDLE_CHARS || 200000),
+    lines: Number(process.env.CLAUDE_CODEX_BRIDGE_MAX_BUNDLE_LINES || 8000),
+    maxLineLength: Number(process.env.CLAUDE_CODEX_BRIDGE_MAX_BUNDLE_LINE || 2000),
+    pathCount: Number(process.env.CLAUDE_CODEX_BRIDGE_MAX_REVIEW_PATHS || 200),
+  };
+}
+
+function enforceBundleLimits(metrics) {
+  const limits = bundleLimits();
+  if (metrics.chars > limits.chars) {
+    throw new UsageError(`review bundle too large: chars=${metrics.chars} limit=${limits.chars}`);
+  }
+  if (metrics.lines > limits.lines) {
+    throw new UsageError(`review bundle too tall: lines=${metrics.lines} limit=${limits.lines}`);
+  }
+  if (metrics.maxLineLength > limits.maxLineLength) {
+    throw new UsageError(
+      `review bundle has an overlong line: maxLineLength=${metrics.maxLineLength} limit=${limits.maxLineLength}; this often means multiline input lost newlines`,
+    );
+  }
+  if (metrics.pathCount > limits.pathCount) {
+    throw new UsageError(`review scope has too many paths: pathCount=${metrics.pathCount} limit=${limits.pathCount}`);
+  }
+}
+
+function formatBundleMetrics(metrics) {
+  return [
+    `chars=${metrics.chars}`,
+    `lines=${metrics.lines}`,
+    `maxLine=${metrics.maxLineLength}`,
+    `paths=${metrics.pathCount}`,
+    `tracked=${metrics.trackedFileCount}`,
+    `untracked=${metrics.untrackedFileCount}`,
+    `snapshots=${metrics.snapshotFileCount}`,
+    `snapshotTotal=${metrics.snapshotFileTotal}`,
+    `snapshotTruncated=${metrics.snapshotTruncated ? "yes" : "no"}`,
+  ].join(" ");
+}
+
+function printReviewDryRun(bundle) {
+  process.stdout.write(`bridge: review bundle ${formatBundleMetrics(bundle.metrics)}\n`);
+  process.stdout.write("--- bundle ---\n");
+  process.stdout.write(bundle.text);
+  if (!bundle.text.endsWith("\n")) {
+    process.stdout.write("\n");
+  }
+}
+
+function printCodexReviewDryRun(args) {
+  process.stdout.write(`bridge: codex review scope=${reviewTargetLabel(args.target)}\n`);
+  process.stdout.write("--- focus ---\n");
+  const prompt = codexReviewPrompt(args);
+  process.stdout.write(prompt);
+  if (!prompt.endsWith("\n")) {
+    process.stdout.write("\n");
+  }
 }
 
 async function parseTaskArgs(argv, { side, allowSession, allowMode = false }) {

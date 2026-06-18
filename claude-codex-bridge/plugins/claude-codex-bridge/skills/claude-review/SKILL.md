@@ -7,52 +7,29 @@ description: Ask Claude Code headlessly to review local git changes. Use when th
 
 Forward a code-review request to Claude Code running headless, then report its findings. Do not review the changes yourself.
 
-Let `ARGUMENTS` be the text after `/claude-review` or after a natural-language request to use this skill. If a base branch is mentioned, the diff scope is `git diff <base>...HEAD`; otherwise review uncommitted changes via `git diff HEAD` plus untracked files. Anything else in the arguments is review focus.
+Let `ARGUMENTS` be the text after `/claude-review` or after a natural-language request to use this skill. If a base branch or commit is mentioned, pass that scope to the companion; otherwise review uncommitted changes via `git diff HEAD` plus untracked files. Anything else in the arguments is review focus.
 
 ## Steps
 
-1. Parse routing flags. Strip `--model <model>` from the review scope/focus text and pass it to Claude as `--model <model>`. Everything else remains the scope/focus text.
+1. Parse routing flags. Strip these execution controls from the review text and pass them to the bridge companion:
 
-2. Billing guard: if the environment variable `ANTHROPIC_API_KEY` is set, unset it for the child process only. Never pass `--bare` and never use `--continue`.
+- `--model <model>`
+- `--base <branch>`
+- `--commit <sha>`
+- `--path <file-or-dir>`; repeat for multiple paths
 
-3. Write the following prompt to a temp file, filling in the scope and focus, then pipe it to Claude via stdin:
+Everything else is review focus. If no `--path` is provided, pass `--path .`.
 
-```text
-Review the local git changes in this repository.
-Scope: {git status --short + git diff HEAD + git ls-files --others --exclude-standard | git diff <base>...HEAD}
-Focus: {user focus, or "general correctness, bugs, and risky changes"}
+2. Write the review focus to a temp file, preserving it exactly. Do not run `git diff`, `git status`, or `git ls-files` yourself, and do not assemble a review prompt manually. The companion owns review bundle generation, newline preservation, scope metrics, and malformed-bundle limits.
 
-Output contract - for each finding, one line:
-P0-P3 | file:line | problem | evidence
-Order by severity. Only report issues grounded in the diff or in files you actually read. No speculation, no style nitpicks unless asked. If there are no findings, say so explicitly.
-```
-
-4. Run from the repository root, allowing up to 10 minutes.
-
-PowerShell:
-
-```powershell
-Get-Content <tmpfile> -Raw | claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" <optional model arg>
-```
-
-POSIX shell:
+3. Resolve `../../scripts/bridge-companion.mjs` relative to this `SKILL.md`, then run from the repository root in the foreground, allowing up to 10 minutes:
 
 ```sh
-env -u ANTHROPIC_API_KEY claude --print --output-format json --strict-mcp-config --tools "Read,Grep,Glob,Bash" --allowedTools "Read,Grep,Glob,Bash(git diff *),Bash(git log *),Bash(git status *),Bash(git ls-files *)" <optional model arg> < "$tmpfile"
+node "<resolved companion path>" claude review --path "<path>" --focus-file "<temporary review focus file>" <optional base/commit/model args>
 ```
 
-Replace `<optional model arg>` before running; never include placeholder text literally.
+Replace `<optional base/commit/model args>` before running; never include placeholder text literally. The companion owns billing guardrails, review bundle generation, Claude CLI resolution, JSON parsing, result rendering, and session tracking.
 
-5. Parse the JSON: `result`, `session_id`, `total_cost_usd`, `is_error`.
+4. Report the command output exactly as-is.
 
-6. Persist session metadata through the bridge companion, not by writing registry JSON yourself. Resolve `../../scripts/bridge-companion.mjs` relative to this `SKILL.md`, then run from the repository root:
-
-```sh
-node "<resolved companion path>" claude register-session --session "<session_id>" --source review
-```
-
-7. Report to the user:
-   - the full `result` text, unmodified
-   - then one final line: `cost: $<total_cost_usd> | session: <session_id>`
-
-8. If the command fails or `is_error` is true, show the raw error output and stop. Do not retry. Do not review the code yourself.
+5. If the command exits non-zero, show the raw output and stop. Do not retry. Do not review the code yourself.

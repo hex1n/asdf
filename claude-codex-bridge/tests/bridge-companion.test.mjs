@@ -266,6 +266,286 @@ test("foreground claude work writes result, cost footer, and Claude session regi
   assert.equal(lastSession.source, "work");
 });
 
+test("claude direct consult uses prompt file and registers consult session", async (t) => {
+  const ctx = await makeContext(t);
+  const promptText = [
+    'consult JSON {"a": "b c"}',
+    'keep literal routing text: --model "not-a-flag"',
+    String.raw`keep path text: C:\tmp\bridge\file.txt`,
+  ].join("\n");
+  const promptFile = path.join(ctx.cwd, "direct-prompt.txt");
+  await fs.writeFile(promptFile, promptText, "utf8");
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "direct",
+    "--mode",
+    "consult",
+    "--model",
+    "claude-direct-model",
+    "--prompt-file",
+    promptFile,
+  ], {
+    ANTHROPIC_API_KEY: "must-not-leak",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /fake claude work result/);
+  assert.match(result.stdout, /cost: \$0\.1234 \| session: 22222222-2222-4222-8222-222222222222/);
+  assert.match(result.stdout, /"--allowedTools","Read,Grep,Glob"/);
+  assert.match(result.stdout, /"--model","claude-direct-model"/);
+  assert.match(result.stdout, /--model "not-a-flag"/);
+  assert.doesNotMatch(result.stdout, /bridge: job job_/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs.length, 1);
+  const job = jobs[0];
+  assert.equal(job.side, "claude");
+  assert.equal(job.action, "direct");
+  assert.equal(job.mode, "consult");
+  assert.equal(job.status, "completed");
+  assert.equal(job.background, false);
+  assert.equal(job.sessionId, "22222222-2222-4222-8222-222222222222");
+
+  assert.equal(await fs.readFile(job.promptFile, "utf8"), promptText);
+
+  const lastSession = await readJson(
+    path.join(ctx.stateRoot, "sessions", job.repoHash, "claude-last-session.json"),
+  );
+  assert.equal(lastSession.sessionId, "22222222-2222-4222-8222-222222222222");
+  assert.equal(lastSession.source, "consult");
+});
+
+test("cx direct consult uses the shared native runner and prompt file", async (t) => {
+  const ctx = await makeContext(t);
+  const promptText = [
+    'consult Codex about JSON {"a": "b c"}',
+    'keep literal routing text: --model "not-a-flag"',
+  ].join("\n");
+  const promptFile = path.join(ctx.cwd, "codex-direct-prompt.txt");
+  await fs.writeFile(promptFile, promptText, "utf8");
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "direct",
+    "--mode",
+    "consult",
+    "--model",
+    "codex-direct-model",
+    "--effort",
+    "low",
+    "--prompt-file",
+    promptFile,
+  ], {
+    ANTHROPIC_API_KEY: "must-not-leak",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /fake codex work result/);
+  assert.match(result.stdout, /"--sandbox","read-only"/);
+  assert.match(result.stdout, /"codex-direct-model"/);
+  assert.match(result.stdout, /model_reasoning_effort=low/);
+  assert.match(result.stdout, /--model "not-a-flag"/);
+  assert.doesNotMatch(result.stdout, /bridge: job job_/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs.length, 1);
+  const job = jobs[0];
+  assert.equal(job.side, "cx");
+  assert.equal(job.action, "direct");
+  assert.equal(job.mode, "consult");
+  assert.equal(job.status, "completed");
+  assert.equal(job.background, false);
+  const prompt = await fs.readFile(job.promptFile, "utf8");
+  assert.match(prompt, /<task>/);
+  assert.match(prompt, /<compact_output_contract>/);
+  assert.match(prompt, /<grounding_rules>/);
+  assert.ok(prompt.includes(promptText), prompt);
+});
+
+test("cx review passes only custom focus to native codex review", async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "before\n", "utf8");
+  git(ctx, ["add", "reviewed.txt"]);
+  git(ctx, ["commit", "-m", "seed"]);
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "before\nafter\n", "utf8");
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "review",
+    "--path",
+    "reviewed.txt",
+    "--focus",
+    "check the changed line",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /fake codex work result/);
+  assert.match(result.stdout, /"exec","review","--uncommitted"/);
+  assert.match(result.stdout, /check the changed line/);
+  assert.match(result.stdout, /Focus paths:\n- reviewed\.txt/);
+  assert.doesNotMatch(result.stdout, /Git diff HEAD/);
+  assert.doesNotMatch(result.stdout, /Git status --short/);
+  assert.doesNotMatch(result.stdout, /Output contract/);
+  assert.doesNotMatch(result.stdout, /\+after/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(jobs[0].scope, ["--uncommitted"]);
+  assert.equal(jobs[0].bundleMetrics, null);
+});
+
+test("cx review forwards commit scope without building a bundle", async (t) => {
+  const ctx = await makeContext(t);
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "review",
+    "--commit",
+    "abc123",
+    "--focus",
+    "check that commit",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /"exec","review","--commit","abc123"/);
+  assert.match(result.stdout, /check that commit/);
+  assert.doesNotMatch(result.stdout, /Git show/);
+  assert.doesNotMatch(result.stdout, /Output contract/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.deepEqual(jobs[0].scope, ["--commit", "abc123"]);
+  assert.equal(jobs[0].bundleMetrics, null);
+});
+
+test("review dry-run builds a multiline bundle from paths", async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "before\n", "utf8");
+  git(ctx, ["add", "reviewed.txt"]);
+  git(ctx, ["commit", "-m", "seed"]);
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "before\nafter\n", "utf8");
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--dry-run",
+    "--path",
+    "reviewed.txt",
+    "--focus",
+    "check the changed line",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /bridge: review bundle chars=\d+ lines=\d+ maxLine=\d+ paths=1/);
+  assert.match(result.stdout, /Git diff HEAD:/);
+  assert.match(result.stdout, /\+after/);
+  assert.doesNotMatch(result.stdout, /before\\nafter/);
+
+  const maxLine = Number(result.stdout.match(/maxLine=(\d+)/)?.[1]);
+  assert.ok(maxLine > 0 && maxLine < 2000, result.stdout);
+});
+
+test("claude review commit dry-run uses commit patch instead of working tree diff", async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "before\n", "utf8");
+  git(ctx, ["add", "reviewed.txt"]);
+  git(ctx, ["commit", "-m", "seed"]);
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "before\nafter\n", "utf8");
+  git(ctx, ["add", "reviewed.txt"]);
+  git(ctx, ["commit", "-m", "change"]);
+  const sha = git(ctx, ["rev-parse", "HEAD"]).stdout.trim();
+  await fs.writeFile(path.join(ctx.cwd, "reviewed.txt"), "dirty working tree\n", "utf8");
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--dry-run",
+    "--commit",
+    sha,
+    "--path",
+    "reviewed.txt",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, new RegExp(`Review scope: --commit ${sha}`));
+  assert.match(result.stdout, new RegExp(`Git show --stat --patch --find-renames ${sha}:`));
+  assert.match(result.stdout, /\+after/);
+  assert.doesNotMatch(result.stdout, /Git diff HEAD/);
+  assert.doesNotMatch(result.stdout, /Git status --short/);
+  assert.doesNotMatch(result.stdout, /dirty working tree/);
+  assert.doesNotMatch(result.stdout, /Codex review scope/);
+});
+
+test("review files profile truncates snapshots to fit the bundle budget", async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  for (let i = 0; i < 10; i += 1) {
+    await fs.writeFile(path.join(ctx.cwd, `file-${i}.txt`), `file ${i}\n${"content\n".repeat(120)}`, "utf8");
+  }
+  git(ctx, ["add", "."]);
+  git(ctx, ["commit", "-m", "many files"]);
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--dry-run",
+    "--profile",
+    "files",
+    "--path",
+    ".",
+  ], {
+    CLAUDE_CODEX_BRIDGE_MAX_BUNDLE_CHARS: "3500",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /File snapshots truncated: included \d+ of 10 files due to bundle limit/);
+  assert.match(result.stdout, /snapshotTruncated=yes/);
+  assert.doesNotMatch(result.stderr, /review bundle too large/);
+});
+
+test("review bundle rejects overlong single-line input", async (t) => {
+  const ctx = await makeContext(t);
+  const focusFile = path.join(ctx.cwd, "long-focus.txt");
+  await fs.writeFile(focusFile, "x".repeat(2100), "utf8");
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--dry-run",
+    "--path",
+    ".",
+    "--focus-file",
+    focusFile,
+  ]);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /overlong line/);
+  assert.match(result.stderr, /lost newlines/);
+});
+
+test("native runner blocks recursive agent loops", async (t) => {
+  const ctx = await makeContext(t);
+  const promptFile = path.join(ctx.cwd, "recursive-prompt.txt");
+  await fs.writeFile(promptFile, "do not run", "utf8");
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "direct",
+    "--mode",
+    "consult",
+    "--prompt-file",
+    promptFile,
+  ], {
+    CLAUDE_CODEX_BRIDGE_AGENT_STACK: "claude,cx",
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /recursive bridge invocation blocked for cx/);
+});
+
 test("claude work accepts wrapper-fixed mode before args-file", async (t) => {
   const ctx = await makeContext(t);
   const argsFile = await writeArgsFile(ctx, '--foreground -- read-only follow-up with "quoted text"');
@@ -382,11 +662,15 @@ async function makeContext(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "ccb-test-"));
   const cwd = path.join(root, "repo");
   const stateRoot = path.join(root, "state");
+  const binDir = path.join(root, "bin");
   await fs.mkdir(cwd, { recursive: true });
+  await fs.mkdir(binDir, { recursive: true });
+  const fakeCodexBin = await fakeToolBin(binDir, "fake-codex", fakeCodex);
+  const fakeClaudeBin = await fakeToolBin(binDir, "fake-claude", fakeClaude);
   t.after(async () => {
-    await fs.rm(root, { recursive: true, force: true });
+    await rmWithRetries(root);
   });
-  return { cwd, stateRoot };
+  return { cwd, stateRoot, fakeCodexBin, fakeClaudeBin };
 }
 
 async function writeArgsFile(ctx, text) {
@@ -405,13 +689,57 @@ function runCompanionScript(ctx, script, args, env = {}) {
     env: {
       ...process.env,
       CLAUDE_CODEX_BRIDGE_STATE_HOME: ctx.stateRoot,
-      CLAUDE_CODEX_BRIDGE_CODEX_BIN: fakeCodex,
-      CLAUDE_CODEX_BRIDGE_CLAUDE_BIN: fakeClaude,
+      CLAUDE_CODEX_BRIDGE_CODEX_BIN: ctx.fakeCodexBin,
+      CLAUDE_CODEX_BRIDGE_CLAUDE_BIN: ctx.fakeClaudeBin,
       ...env,
     },
     encoding: "utf8",
     timeout: 30000,
   });
+}
+
+async function fakeToolBin(dir, name, script) {
+  if (process.platform !== "win32") {
+    return script;
+  }
+
+  const shim = path.join(dir, `${name}.cmd`);
+  await fs.writeFile(
+    shim,
+    `@echo off\r\n"${process.execPath}" "${script}" %*\r\n`,
+    "utf8",
+  );
+  return shim;
+}
+
+async function initGitRepo(ctx) {
+  git(ctx, ["init"]);
+  git(ctx, ["config", "user.email", "bridge-test@example.com"]);
+  git(ctx, ["config", "user.name", "Bridge Test"]);
+}
+
+function git(ctx, args) {
+  const result = spawnSync("git", args, {
+    cwd: ctx.cwd,
+    encoding: "utf8",
+    timeout: 30000,
+  });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  return result;
+}
+
+async function rmWithRetries(target) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    try {
+      await fs.rm(target, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (!["EBUSY", "EPERM", "ENOTEMPTY"].includes(error?.code) || attempt === 7) {
+        throw error;
+      }
+      await sleep(100 * (attempt + 1));
+    }
+  }
 }
 
 async function readJobs(stateRoot) {

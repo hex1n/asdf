@@ -2,8 +2,21 @@
 set -eu
 
 ROOT=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+PY_ROOT=$ROOT
+if command -v cygpath >/dev/null 2>&1; then
+  PY_ROOT=$(cygpath -w "$ROOT")
+fi
 
-python3 - "$ROOT" <<'PY'
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import sys; sys.exit(0)' >/dev/null 2>&1; then
+  PYTHON=python3
+elif command -v python >/dev/null 2>&1 && python -c 'import sys; sys.exit(0)' >/dev/null 2>&1; then
+  PYTHON=python
+else
+  echo "python 3 CLI not found on PATH" >&2
+  exit 1
+fi
+
+"$PYTHON" - "$PY_ROOT" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -22,12 +35,12 @@ for path in (marketplace_path, plugin_path, claude_marketplace_path, claude_plug
     if not path.exists():
         raise SystemExit(f"missing required file: {path}")
 
-marketplace = json.loads(marketplace_path.read_text())
-plugin = json.loads(plugin_path.read_text())
-claude_marketplace = json.loads(claude_marketplace_path.read_text())
-claude_plugin = json.loads(claude_plugin_path.read_text())
-catalog = json.loads(catalog_path.read_text())
-codex_catalog = json.loads(codex_catalog_path.read_text())
+marketplace = json.loads(marketplace_path.read_text(encoding="utf8"))
+plugin = json.loads(plugin_path.read_text(encoding="utf8"))
+claude_marketplace = json.loads(claude_marketplace_path.read_text(encoding="utf8"))
+claude_plugin = json.loads(claude_plugin_path.read_text(encoding="utf8"))
+catalog = json.loads(catalog_path.read_text(encoding="utf8"))
+codex_catalog = json.loads(codex_catalog_path.read_text(encoding="utf8"))
 
 if marketplace.get("name") != "claude-codex-bridge":
     raise SystemExit("marketplace name must be claude-codex-bridge")
@@ -156,7 +169,7 @@ for name, spec in claude_entrypoints.items():
     skill = skills_root / skill_name / "SKILL.md"
     if not skill.exists():
         raise SystemExit(f"missing skill: {skill}")
-    text = skill.read_text()
+    text = skill.read_text(encoding="utf8")
     if f"name: {skill_name}" not in text:
         raise SystemExit(f"skill {skill_name} must declare name: {skill_name}")
     if spec.get("type") in {"task", "lookup"}:
@@ -165,8 +178,21 @@ for name, spec in claude_entrypoints.items():
         if profile_name and f"--mode {profile_name}" not in text:
             raise SystemExit(f"skill {skill_name} must select catalog profile with --mode {profile_name}")
     if spec.get("type") == "direct" and profile_name:
-        require_profile_literals(text, "claude", profile_name, "direct", f"skill {skill_name}")
-    if spec.get("registerSession") and "register-session" not in text:
+        if "bridge-companion.mjs" not in text:
+            raise SystemExit(f"skill {skill_name} must call bridge-companion.mjs")
+        if profile_name == "review":
+            if "claude review" not in text:
+                raise SystemExit(f"skill {skill_name} must call companion review")
+            if "--focus-file" not in text:
+                raise SystemExit(f"skill {skill_name} must pass review focus through --focus-file")
+        else:
+            if f"claude direct --mode {profile_name}" not in text:
+                raise SystemExit(f"skill {skill_name} must call companion direct with --mode {profile_name}")
+            if "--prompt-file" not in text:
+                raise SystemExit(f"skill {skill_name} must pass direct prompts through --prompt-file")
+    if spec.get("registerSession") and spec.get("type") == "direct" and "session tracking" not in text:
+        raise SystemExit(f"skill {skill_name} must say companion owns session tracking")
+    if spec.get("registerSession") and spec.get("type") != "direct" and "register-session" not in text:
         raise SystemExit(f"skill {skill_name} must register sessions through the companion")
 
 for name, spec in cx_entrypoints.items():
@@ -177,7 +203,7 @@ for name, spec in cx_entrypoints.items():
     if not command.exists():
         raise SystemExit(f"missing Claude command: {command}")
     if spec.get("type") in {"task", "lookup"}:
-        text = command.read_text()
+        text = command.read_text(encoding="utf8")
         if 'scripts/bridge-companion.mjs" cx ' not in text:
             raise SystemExit(f"Claude command {name} must call bridge-companion.mjs")
         if "--args-file" not in text:
@@ -185,7 +211,19 @@ for name, spec in cx_entrypoints.items():
         if profile_name and f"--mode {profile_name}" not in text:
             raise SystemExit(f"Claude command {name} must select catalog profile with --mode {profile_name}")
     if spec.get("type") == "direct" and profile_name:
-        require_profile_literals(command.read_text(), "cx", profile_name, "direct", f"Claude command {name}")
+        text = command.read_text(encoding="utf8")
+        if 'scripts/bridge-companion.mjs" cx ' not in text:
+            raise SystemExit(f"Claude command {name} must call bridge-companion.mjs")
+        if profile_name == "review":
+            if "cx review" not in text:
+                raise SystemExit(f"Claude command {name} must call companion review")
+            if "--focus-file" not in text:
+                raise SystemExit(f"Claude command {name} must pass review focus through --focus-file")
+        else:
+            if f"cx direct --mode {profile_name}" not in text:
+                raise SystemExit(f"Claude command {name} must call companion direct with --mode {profile_name}")
+            if "--prompt-file" not in text:
+                raise SystemExit(f"Claude command {name} must pass direct prompts through --prompt-file")
 
 script_paths = [
     root / "scripts" / "bridge-companion.mjs",
@@ -220,7 +258,7 @@ cmp "$ROOT/plugins/cx/scripts/bridge-catalog.json" "$ROOT/plugins/claude-codex-b
 node --test "$ROOT/tests"/*.test.mjs
 
 if [ "${1:-}" = "--installed" ]; then
-  python3 - "$ROOT" <<'PY'
+  "$PYTHON" - "$PY_ROOT" <<'PY'
 import hashlib
 import json
 import re
@@ -229,8 +267,8 @@ import sys
 from pathlib import Path
 
 root = Path(sys.argv[1])
-plugin = json.loads((root / "plugins" / "claude-codex-bridge" / ".codex-plugin" / "plugin.json").read_text())
-catalog = json.loads((root / "plugins" / "claude-codex-bridge" / "scripts" / "bridge-catalog.json").read_text())
+plugin = json.loads((root / "plugins" / "claude-codex-bridge" / ".codex-plugin" / "plugin.json").read_text(encoding="utf8"))
+catalog = json.loads((root / "plugins" / "claude-codex-bridge" / "scripts" / "bridge-catalog.json").read_text(encoding="utf8"))
 expected_version = plugin["version"]
 
 def run(command):
@@ -285,7 +323,7 @@ if sha256(installed_catalog) != sha256(source_catalog):
 for path in installed_root.rglob("*"):
     if not path.is_file() or path.suffix not in {".md", ".mjs", ".json"}:
         continue
-    text = path.read_text(errors="ignore")
+    text = path.read_text(encoding="utf8", errors="ignore")
     for forbidden in ("cc-ask", "cc-task", "cc-resume", "cc-review", "gpt-5.3-codex-spark", "|spark"):
         if forbidden in text:
             raise SystemExit(f"installed file {path} contains deprecated text: {forbidden}")

@@ -37,6 +37,43 @@ Rules:
 - A local observation is not enough to make a general product claim; keep it repo-specific unless the external source supports the general behavior.
 - If local and external evidence conflict, the settled answer should use the local behavior for this repo and mark the external claim's applicability as unresolved or version-bound.
 
+## Perspective Scan
+
+An optional investigate strategy for External or Mixed Investigation at Deep depth, when the question is exploratory or strategic — market landscape, technology adoption, stakeholder analysis, multi-party tradeoff, or "why do different groups see this differently" — rather than single-fact verification.
+
+Run the scan after the source inventory (Investigate step 4) and before stating the key unknown (step 5). It does not replace evidence lanes; it seeds them with stance-diverse starting points so the lanes do not all follow the same mainstream narrative.
+
+### When to use
+
+Use when the question benefits from stance diversity — different roles, incentives, or epistemic positions would frame the topic differently. Skip when the question has a single factual answer, when the scenario is pure Codebase Investigation, or when Standard depth already settles the decision boundary.
+
+### Default roles
+
+Adapt the roles to the domain. The defaults below fit broad industry or technology questions:
+
+| Role | Lens |
+|---|---|
+| Practitioner | Daily operational reality; what works, what breaks, what academics miss |
+| Academic / Researcher | Peer-reviewed evidence; where evidence contradicts popular belief |
+| Skeptic | Strongest counterargument; evidence proponents ignore |
+| Incentive Analyst | Who profits; financial and structural incentives shaping the narrative |
+| Historian | Historical parallels; how similar patterns played out before |
+
+For codebase-adjacent questions (architecture direction, dependency adoption), replace with domain-appropriate roles — e.g. Maintainer, Downstream Consumer, Security Reviewer, Platform Team, Community Contributor.
+
+### Output
+
+For each role, state:
+- Core position (1-2 sentences)
+- Strongest supporting evidence — must cite a fetchable source or be marked `unsupported`
+- One claim unique to this perspective
+
+Then produce a **contradiction map**: list where two or more roles directly conflict, name the strongest evidence on each side, and identify the distinguishing check that would resolve each conflict. Feed unresolved conflicts into the evidence lanes as named unknowns.
+
+### Discipline
+
+The scan inherits the skill's evidence rules. Role-attributed claims without a source receipt are leads, not findings. Do not let a role's rhetorical framing substitute for verification. The contradiction map's distinguishing checks should become lane targets, not decoration.
+
 ## Current-State Research
 
 Use current-state evidence when current reality is central to the question: actual behavior, runtime environment data, external-call results, persisted state, logs, UI/runtime state, relevant lookup keys, freshness windows, queued work, or "why does this current result look wrong?"
@@ -124,6 +161,7 @@ Use this before Standard/Deep final answers to convert evidence into a bounded c
 | Confidence basis | Which independent evidence lanes support it, and which lane conflicts remain? |
 | Strongest unresolved counterexample | What rival explanation, edge case, or missing source could still matter? |
 | Flip condition | What specific evidence would change or downgrade the conclusion? |
+| Bias check | Which perspective or evidence lane may be overrepresented in the synthesis? Required after a perspective scan; optional otherwise. |
 | Stop reason | Why should the investigation stop now, or what one next check is still worth running? |
 
 If the stop reason is weak, run one more distinguishing check or lower confidence. If the flip condition is broad or unknowable, narrow the decision boundary instead of pretending the question is settled.

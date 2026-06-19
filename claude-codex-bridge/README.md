@@ -2,7 +2,7 @@
 
 Claude Code ↔ Codex 双向桥:在 Claude Code 里用斜杠命令把任务委派给 Codex,在 Codex 里把任务委派给 Claude Code。
 
-当前设计:consult/review 保持薄转发;work/resume 通过无第三方依赖的 Node companion 升级为可追踪、可取消、可恢复的任务系统。状态、日志、prompt、result 都写入用户状态目录,不写入目标仓库。两个方向都走各自的订阅计费。
+当前设计:consult/review 保持薄转发;work/resume 通过无第三方依赖的 Node companion 升级为可追踪、可取消、可恢复的任务系统。状态、日志、prompt、result 都写入用户状态目录,不写入目标仓库。bridge 默认按订阅登录路径运行;检测到常见直连 API 计费环境变量时会失败关闭,除非用户显式 opt in。
 
 运行时要求:
 
@@ -59,7 +59,7 @@ codex plugin add claude-codex-bridge@claude-codex-bridge
 | `/cx:resume [--session id] [--foreground\|--wait] [--model m] [--effort e] [--] <增量指令>` | 续接 bridge 记录的 Codex 工作 session 或显式 session;默认后台 job | workspace-write |
 | `/cx:status [job-id] [--json]` | 查看 bridge-owned Codex job 状态 | n/a |
 | `/cx:result [job-id] [--json]` | 取回 job 结果或失败日志尾部 | n/a |
-| `/cx:cancel [job-id] [--json]` | 取消 bridge-owned running job 及其子进程 | n/a |
+| `/cx:cancel [job-id] [--json]` | 请求取消 bridge-owned running job | n/a |
 
 通用旗标:`--model <model>` 原样传给 Codex;`--effort` 合法值 `none/minimal/low/medium/high/xhigh`。
 
@@ -73,16 +73,16 @@ codex plugin add claude-codex-bridge@claude-codex-bridge
 | `/claude-resume [--session id] [--mode consult\|review\|work] [--foreground\|--wait] [--model m] [--] <增量指令>` | 续接 bridge 记录的 Claude session 或显式 session;默认后台 job | 继承原权限模式 |
 | `/claude-status [job-id] [--json]` | 查看 bridge-owned Claude job 状态 | n/a |
 | `/claude-result [job-id] [--json]` | 取回 Claude job 结果或失败日志尾部 | n/a |
-| `/claude-cancel [job-id] [--json]` | 取消 bridge-owned running Claude job 及其子进程 | n/a |
+| `/claude-cancel [job-id] [--json]` | 请求取消 bridge-owned running Claude job | n/a |
 
 每次 Codex→Claude 调用末尾会显示 `cost: $x.xx | session: <uuid>`。
 
 ## 计费说明(重要)
 
-- **Codex 方向**:`codex exec` 走 ChatGPT 订阅登录,无额外费用。
-- **Claude 方向**:`claude --print` 自 **2026-06-15** 起由订阅自带的月度 Agent SDK 额度覆盖(Pro $20 / Max 5x $100 / Max 20x $200)。在此之前按 API 计费(实测单次简单问答 $0.07-0.23)。
-- **不要开启 usage credits**:额度耗尽时请求直接失败,这是天然的费用熔断;开了就会继续扣钱。
-- **不要设置 `ANTHROPIC_API_KEY` 环境变量**:存在时 `claude --print` 优先用它按 API 计费。安装脚本和各桥接技能都有检查,但根治办法是移除该变量。
+- **默认意图**:Codex 方向使用 `codex exec` 的 ChatGPT 登录态;Claude 方向使用 `claude --print` 的 Claude Code 登录态。bridge 不承诺平台永远不会改变计费规则,只保证默认不主动传直连 API 计费配置。
+- **失败关闭**:默认检测到常见直连 API 计费环境变量会拒绝运行 native agent。Claude 侧包括 `ANTHROPIC_API_KEY`、`ANTHROPIC_AUTH_TOKEN`、Bedrock/Vertex 相关变量;Codex 侧包括 `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`AZURE_OPENAI_API_KEY`。
+- **显式 opt in**:确实要允许直连 API 计费时,设置 `CLAUDE_CODEX_BRIDGE_ALLOW_DIRECT_API_BILLING=1`。设置后 bridge 不再阻止这些环境变量传给底层 CLI。
+- **不要开启 usage credits**:额度耗尽时请求直接失败,这是天然的费用熔断;开了就可能继续扣钱。
 - **禁用 `--bare`**:它跳过 OAuth 只认 API key,等于强制 API 计费。
 
 ## 设计规则(改动前先读)
@@ -92,7 +92,10 @@ codex plugin add claude-codex-bridge@claude-codex-bridge
 - **work 合同通用**:`/cx:work` 与 `/claude-work` 使用同一套完成标准、验证循环和动作安全边界;差异只在外层 CLI、权限和沙箱。
 - **新增 profile 只改 catalog + wrapper**:`plugins/*/scripts/bridge-catalog.json` 是两侧 profile 参数、session source 和 entrypoint 的事实源。新增 Claude 或 Codex profile 时先加 `profiles.<side>.<profile>` 和 entrypoint,再加一个显式传 `--mode <profile> --args-file <tmp>` 的 thin wrapper; companion 和 verify 不应再新增硬编码 profile 分支。
 - **结果一律走 `-o <file>`**:`codex exec` 的 stdout 事件流含大量启动噪音(可超 100KB);最终回复用 `-o` 单独落盘,事件流进日志文件、只在失败时取尾部。
-- **job state 不进仓库**:`/cx:work` 和 `/claude-work` 默认后台运行,返回 job id;用对应的 `status`, `result`, `cancel` 命令管理。prompt/log/result/job JSON 都在用户状态目录。
+- **job state 不进仓库**:`/cx:work` 和 `/claude-work` 默认后台运行,返回 job id;用对应的 `status`, `result`, `cancel` 命令管理。prompt/log/result/job JSON 都在用户状态目录。显式 job id 只在当前 workspace 的 repo hash 下查找,不会跨 workspace fallback。
+- **成功必须有 completion marker**:异常恢复只能用 completion marker + result hash 把 running job 恢复为 completed;非空 result 文件不能单独证明成功。
+- **cancel 只发取消请求**:`cancel` 命令不信任 job JSON 里的 PID,不会直接 kill stale PID。运行中的 worker 通过 heartbeat 看到取消请求后,只终止自己创建的 native child。
+- **review bundle 不跟随 symlink**:Claude review bundle 只读取 realpath 仍在 workspace 内的普通文件;symlink 默认不进入 file snapshot。
 - **resume 不用“最近会话”**:`--continue` 和 `codex exec resume --last` 都可能撞上用户正开的交互式会话。Claude 方向一律 `--resume <session_id>`;无参数 resume 只是读取 bridge registry 的 last 指针,也可用 `--session <id>` 回到历史 session。Codex 方向只续接显式 session 或 bridge registry 中记录的 session。
 - **不要让模型自动调用桥命令**:`/cx:*` command 和内部 skill 都禁用 model invocation,只允许用户显式 slash command 触发。
 - bridge state 存在用户状态目录,不是仓库目录:Windows `%LOCALAPPDATA%\claude-codex-bridge\`,macOS/Linux `${XDG_STATE_HOME:-~/.local/state}/claude-codex-bridge/`。

@@ -19,6 +19,31 @@ const VALID_EFFORTS = new Set([
 ]);
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const JOB_ID_RE = /^job_\d{8}_\d{6}_[0-9a-f]{6,16}$/;
+const REPO_HASH_RE = /^[0-9a-f]{16}$/;
+const HEARTBEAT_INTERVAL_MS = 250;
+const HEARTBEAT_STALE_MS = 15000;
+const CANCEL_WAIT_MS = 5000;
+const CANCEL_POLL_MS = 100;
+const LOCK_STALE_MS = 30000;
+const DIRECT_BILLING_ENV = {
+  claude: [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+  ],
+  cx: [
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "AZURE_OPENAI_API_KEY",
+  ],
+};
+const ALL_DIRECT_BILLING_ENV = [...new Set(Object.values(DIRECT_BILLING_ENV).flat())];
 
 const scriptPath = fileURLToPath(import.meta.url);
 const catalogPath = path.join(path.dirname(scriptPath), "bridge-catalog.json");
@@ -127,6 +152,7 @@ async function runDirect(side, argv) {
   if (!args.request.trim()) {
     throw new UsageError("missing direct prompt");
   }
+  await ensureDirectBillingEnvAllowed(side);
 
   const stateRoot = stateRootPath();
   const cwd = path.resolve(process.cwd());
@@ -177,6 +203,7 @@ async function runReview(side, argv) {
     printCodexReviewDryRun(args);
     return;
   }
+  await ensureDirectBillingEnvAllowed(side);
 
   const stateRoot = stateRootPath();
   const repoHash = hashCwd(cwd);
@@ -249,6 +276,7 @@ async function runTask(side, action, argv) {
     }
   }
   requireSessionSource(side, mode);
+  await ensureDirectBillingEnvAllowed(side);
 
   const job = await createJob({
     stateRoot,
@@ -316,6 +344,7 @@ async function createJob({
     completedAt: null,
     pid: null,
     childPid: null,
+    heartbeatAt: null,
     sessionId: null,
     resumeFrom,
     mode,
@@ -327,6 +356,7 @@ async function createJob({
     promptFile: paths.promptFile,
     logFile: paths.logFile,
     resultFile: paths.resultFile,
+    completionFile: paths.completionFile,
     exitCode: null,
     errorSummary: null,
   };
@@ -394,6 +424,7 @@ async function startBackgroundWorker(stateRoot, job) {
   await updateJob(stateRoot, job.repoHash, job.id, {
     status: "running",
     startedAt: new Date().toISOString(),
+    heartbeatAt: new Date().toISOString(),
     pid: worker.pid ?? null,
   });
 }
@@ -415,6 +446,7 @@ async function runWorkerForJob(stateRoot, job) {
     status: "running",
     startedAt,
     pid: process.pid,
+    heartbeatAt: new Date().toISOString(),
     errorSummary: null,
   });
 
@@ -433,6 +465,7 @@ async function runWorkerForJob(stateRoot, job) {
       status: "cancelled",
       completedAt,
       exitCode: runResult.exitCode,
+      heartbeatAt: null,
       errorSummary: "cancelled by bridge",
     });
     return readJob(stateRoot, job.repoHash, job.id);
@@ -454,11 +487,17 @@ async function runWorkerForJob(stateRoot, job) {
       });
     }
 
+    await writeCompletionMarker(stateRoot, job, {
+      exitCode: 0,
+      sessionId: sessionId ?? job.resumeFrom ?? null,
+      completedAt,
+    });
     await updateJob(stateRoot, job.repoHash, job.id, {
       status: "completed",
       completedAt,
       exitCode: 0,
       sessionId: sessionId ?? job.resumeFrom ?? null,
+      heartbeatAt: null,
       errorSummary: null,
     });
     return readJob(stateRoot, job.repoHash, job.id);
@@ -468,6 +507,7 @@ async function runWorkerForJob(stateRoot, job) {
     status: "failed",
     completedAt,
     exitCode: runResult.exitCode,
+    heartbeatAt: null,
     errorSummary: runResult.errorSummary,
   });
   return readJob(stateRoot, job.repoHash, job.id);
@@ -533,6 +573,7 @@ async function runNativeAgent(agent, job, stateRoot, args) {
   const command = resolveNativeAgent(agent);
   try {
     await ensureAgentStackAllows(agent, job.logFile);
+    await ensureDirectBillingEnvAllowed(agent, job.logFile);
   } catch (error) {
     return { code: null, signal: null, spawnError: error };
   }
@@ -541,7 +582,6 @@ async function runNativeAgent(agent, job, stateRoot, args) {
   const logStream = fs.createWriteStream(job.logFile, { flags: "a" });
   const inputHandle = await fsp.open(job.promptFile, "r");
   const childEnv = nativeAgentEnv(agent, stateRoot);
-  delete childEnv.ANTHROPIC_API_KEY;
 
   const child = spawnCommand(command, args, {
     cwd: job.cwd,
@@ -550,6 +590,16 @@ async function runNativeAgent(agent, job, stateRoot, args) {
   });
 
   await updateJob(stateRoot, job.repoHash, job.id, { childPid: child.pid ?? null });
+  let childKillRequested = false;
+  const heartbeat = setInterval(() => {
+    void pulseJobHeartbeat(stateRoot, job, child).then((status) => {
+      if (status === "cancelling" && !childKillRequested) {
+        childKillRequested = true;
+        void killNativeChild(child);
+      }
+    }).catch(() => {});
+  }, HEARTBEAT_INTERVAL_MS);
+  heartbeat.unref?.();
 
   child.stdout.pipe(logStream, { end: false });
   child.stderr.pipe(logStream, { end: false });
@@ -560,6 +610,7 @@ async function runNativeAgent(agent, job, stateRoot, args) {
       spawnError = error;
     });
     child.on("close", (code, signal) => {
+      clearInterval(heartbeat);
       resolve({ code, signal, spawnError });
     });
   });
@@ -774,7 +825,11 @@ function spawnCommand(command, args, options) {
     process.noDeprecation = true;
   }
   try {
-    return spawn(command, args, { ...options, shell: useShell });
+    return spawn(command, args, {
+      ...options,
+      shell: useShell,
+      detached: process.platform !== "win32",
+    });
   } finally {
     process.noDeprecation = previousNoDeprecation;
   }
@@ -794,6 +849,68 @@ function nativeAgentEnv(agent, stateRoot) {
     CLAUDE_CODEX_BRIDGE_STATE_HOME: stateRoot,
     CLAUDE_CODEX_BRIDGE_AGENT_STACK: nextAgentStack(agent),
   };
+}
+
+async function ensureDirectBillingEnvAllowed(agent, logFile) {
+  if (process.env.CLAUDE_CODEX_BRIDGE_ALLOW_DIRECT_API_BILLING === "1") {
+    return;
+  }
+  const present = ALL_DIRECT_BILLING_ENV.filter((name) => process.env[name]);
+  if (!present.length) {
+    return;
+  }
+  const message = [
+    `direct API billing environment is set for ${agent}: ${present.join(", ")}`,
+    "unset it or set CLAUDE_CODEX_BRIDGE_ALLOW_DIRECT_API_BILLING=1 to proceed explicitly",
+  ].join("; ");
+  if (logFile) {
+    await fsp.appendFile(logFile, `bridge: ${message}\n`);
+  }
+  throw new Error(message);
+}
+
+async function pulseJobHeartbeat(stateRoot, job, child) {
+  let status = null;
+  await mutateJob(stateRoot, job.repoHash, job.id, (current) => {
+    status = current.status;
+    if (current.status !== "running") {
+      return current;
+    }
+    return {
+      ...current,
+      childPid: child.pid ?? current.childPid ?? null,
+      heartbeatAt: new Date().toISOString(),
+    };
+  });
+  return status;
+}
+
+async function killNativeChild(child) {
+  const pid = child.pid;
+  if (!Number.isInteger(pid) || pid <= 0) {
+    return;
+  }
+
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {}
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {}
+  await sleep(200);
+  if (isPidAlive(pid)) {
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {}
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {}
+  }
 }
 
 function nextAgentStack(agent) {
@@ -968,26 +1085,36 @@ async function cancelJob(side, argv) {
   }
   ensureJobSide(job, side);
 
-  if (!["running", "cancelling"].includes(job.status)) {
-    throw new UsageError(`job ${job.id} is ${job.status}, not running`);
+  const current = await reconcileJob(stateRoot, job);
+  if (!["running", "cancelling"].includes(current.status)) {
+    throw new UsageError(`job ${current.id} is ${current.status}, not running`);
   }
 
-  await updateJob(stateRoot, job.repoHash, job.id, {
-    status: "cancelling",
-    errorSummary: "cancellation requested",
+  const requested = await mutateJob(stateRoot, current.repoHash, current.id, (latest) => {
+    if (!["running", "cancelling"].includes(latest.status)) {
+      return latest;
+    }
+    return {
+      ...latest,
+      status: "cancelling",
+      cancelRequestedAt: new Date().toISOString(),
+      errorSummary: "cancellation requested",
+    };
   });
-  await killJobProcessTree(job);
-  const cancelled = await updateJob(stateRoot, job.repoHash, job.id, {
-    status: "cancelled",
-    completedAt: new Date().toISOString(),
-    errorSummary: "cancelled by bridge",
-  });
+  if (!["running", "cancelling"].includes(requested.status)) {
+    throw new UsageError(`job ${requested.id} is ${requested.status}, not running`);
+  }
+  const cancelled = await waitForCancellation(stateRoot, requested.repoHash, requested.id);
 
   if (args.json) {
     printJson(cancelled);
     return;
   }
-  process.stdout.write(`cancelled: ${cancelled.id}\n`);
+  if (cancelled.status === "cancelled") {
+    process.stdout.write(`cancelled: ${cancelled.id}\n`);
+    return;
+  }
+  process.stdout.write(`cancellation requested: ${cancelled.id}\n`);
 }
 
 async function registerSessionCommand(side, argv) {
@@ -1004,37 +1131,18 @@ async function registerSessionCommand(side, argv) {
   process.stdout.write(`${sideLabel(side)} session registered: ${args.session} | source ${args.source}\n`);
 }
 
-async function killJobProcessTree(job) {
-  const pids = [job.childPid, job.pid].filter((pid) => Number.isInteger(pid) && pid > 0);
-  if (!pids.length) {
-    return;
-  }
-
-  if (process.platform === "win32") {
-    for (const pid of pids) {
-      spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+async function waitForCancellation(stateRoot, repoHash, jobId) {
+  const deadline = Date.now() + CANCEL_WAIT_MS;
+  let latest = await readJob(stateRoot, repoHash, jobId);
+  while (Date.now() < deadline) {
+    latest = await reconcileJob(stateRoot, latest);
+    if (latest.status === "cancelled" || latest.status === "orphaned") {
+      return latest;
     }
-    return;
+    await sleep(CANCEL_POLL_MS);
+    latest = await readJob(stateRoot, repoHash, jobId);
   }
-
-  if (job.pid) {
-    try {
-      process.kill(-job.pid, "SIGTERM");
-    } catch {}
-  }
-  for (const pid of pids) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {}
-  }
-  await sleep(200);
-  for (const pid of pids) {
-    if (isPidAlive(pid)) {
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {}
-    }
-  }
+  return latest;
 }
 
 async function reconcileJob(stateRoot, job) {
@@ -1042,32 +1150,36 @@ async function reconcileJob(stateRoot, job) {
     return job;
   }
 
-  const workerAlive = job.pid ? isPidAlive(job.pid) : false;
-  const childAlive = job.childPid ? isPidAlive(job.childPid) : false;
-  if (workerAlive || childAlive) {
+  if (isHeartbeatFresh(job.heartbeatAt)) {
     return job;
+  }
+
+  const completion = await readValidCompletion(job);
+  if (completion) {
+    return updateJob(stateRoot, job.repoHash, job.id, {
+      status: "completed",
+      completedAt: completion.completedAt ?? job.completedAt ?? new Date().toISOString(),
+      exitCode: completion.exitCode ?? 0,
+      sessionId: completion.sessionId ?? job.sessionId ?? null,
+      heartbeatAt: null,
+      errorSummary: null,
+    });
   }
 
   if (job.status === "cancelling") {
     return updateJob(stateRoot, job.repoHash, job.id, {
-      status: "cancelled",
+      status: "orphaned",
       completedAt: job.completedAt ?? new Date().toISOString(),
-      errorSummary: "cancelled by bridge",
-    });
-  }
-
-  if (await fileHasContent(job.resultFile)) {
-    return updateJob(stateRoot, job.repoHash, job.id, {
-      status: "completed",
-      completedAt: job.completedAt ?? new Date().toISOString(),
-      exitCode: 0,
+      heartbeatAt: null,
+      errorSummary: "cancellation requested but worker heartbeat became stale before acknowledgement",
     });
   }
 
   return updateJob(stateRoot, job.repoHash, job.id, {
     status: "orphaned",
     completedAt: job.completedAt ?? new Date().toISOString(),
-    errorSummary: "worker pid is no longer running and no result was recorded",
+    heartbeatAt: null,
+    errorSummary: "worker heartbeat is stale and no valid completion marker was recorded",
   });
 }
 
@@ -1299,7 +1411,7 @@ function codexReviewPrompt({ focus, paths }) {
 }
 
 async function buildReviewBundle({ cwd, paths, focus, target, bundleProfile }) {
-  const resolvedPaths = resolveReviewPaths(cwd, paths);
+  const resolvedPaths = await resolveReviewPaths(cwd, paths);
   const pathArgs = resolvedPaths.map((entry) => entry.relative);
   const includeDiff = bundleProfile === "diff" || bundleProfile === "mixed";
   const includeFiles = bundleProfile === "files" || bundleProfile === "mixed";
@@ -1399,13 +1511,27 @@ async function buildReviewBundle({ cwd, paths, focus, target, bundleProfile }) {
   };
 }
 
-function resolveReviewPaths(cwd, paths) {
+async function resolveReviewPaths(cwd, paths) {
   const results = [];
   const seen = new Set();
+  const cwdReal = await fsp.realpath(cwd);
   for (const input of paths) {
     const absolute = path.resolve(cwd, input);
     if (!isWithinDirectory(absolute, cwd)) {
       throw new UsageError(`review path escapes the working directory: ${input}`);
+    }
+    let stat = null;
+    try {
+      stat = await fsp.lstat(absolute);
+    } catch {}
+    if (stat?.isSymbolicLink()) {
+      throw new UsageError(`review path is a symlink and will not be bundled: ${input}`);
+    }
+    if (stat) {
+      const real = await fsp.realpath(absolute);
+      if (!isWithinDirectory(real, cwdReal)) {
+        throw new UsageError(`review path resolves outside the working directory: ${input}`);
+      }
     }
     const relative = normalizeRelativePath(path.relative(cwd, absolute) || ".");
     const key = process.platform === "win32" ? relative.toLowerCase() : relative;
@@ -1464,6 +1590,7 @@ function sectionText(result) {
 async function readReviewSnapshots(cwd, files) {
   const snapshots = [];
   const seen = new Set();
+  const cwdReal = await fsp.realpath(cwd);
   for (const file of files.slice(0, 40)) {
     const absolute = path.resolve(cwd, file);
     if (!isWithinDirectory(absolute, cwd)) {
@@ -1476,8 +1603,17 @@ async function readReviewSnapshots(cwd, files) {
     }
     seen.add(key);
     let stat = null;
+    let real = null;
     try {
-      stat = await fsp.stat(absolute);
+      const linkStat = await fsp.lstat(absolute);
+      if (linkStat.isSymbolicLink()) {
+        continue;
+      }
+      real = await fsp.realpath(absolute);
+      if (!isWithinDirectory(real, cwdReal)) {
+        continue;
+      }
+      stat = await fsp.stat(real);
     } catch {
       continue;
     }
@@ -1486,7 +1622,7 @@ async function readReviewSnapshots(cwd, files) {
     }
     let text = "";
     try {
-      text = await fsp.readFile(absolute, "utf8");
+      text = await fsp.readFile(real, "utf8");
     } catch {
       continue;
     }
@@ -1865,6 +2001,7 @@ async function parseLookupArgs(argv) {
     }
     if (!result.jobId) {
       result.jobId = token;
+      validateJobId(result.jobId);
       continue;
     }
     throw new UsageError(`unexpected argument: ${token}`);
@@ -1888,6 +2025,7 @@ function parseRegisterSessionArgs(argv, side) {
     }
     if (token === "--job-id") {
       result.jobId = requireValue(tokens, ++i, "--job-id");
+      validateJobId(result.jobId);
       continue;
     }
     throw new UsageError(`unexpected register-session argument: ${token}`);
@@ -1909,6 +2047,7 @@ function parseWorkerArgs(argv) {
   if (!jobId) {
     throw new UsageError("usage: bridge-companion.mjs worker <job-id>");
   }
+  validateJobId(jobId);
   let stateRoot = null;
   let repoHash = null;
   for (let i = 0; i < argv.length; i += 1) {
@@ -1918,6 +2057,7 @@ function parseWorkerArgs(argv) {
     }
     if (argv[i] === "--repo-hash") {
       repoHash = requireValue(argv, ++i, "--repo-hash");
+      validateRepoHash(repoHash);
       continue;
     }
     throw new UsageError(`unexpected worker argument: ${argv[i]}`);
@@ -1988,6 +2128,18 @@ function requireValue(tokens, index, flag) {
     throw new UsageError(`${flag} requires a value`);
   }
   return value;
+}
+
+function validateJobId(jobId) {
+  if (!JOB_ID_RE.test(String(jobId))) {
+    throw new UsageError(`invalid job id: ${jobId}`);
+  }
+}
+
+function validateRepoHash(repoHash) {
+  if (!REPO_HASH_RE.test(String(repoHash))) {
+    throw new UsageError(`invalid repo hash: ${repoHash}`);
+  }
 }
 
 function validateSessionId(sessionId) {
@@ -2075,12 +2227,15 @@ async function ensureStateRoot(stateRoot) {
 }
 
 async function ensureRepoDirs(stateRoot, repoHash) {
+  validateRepoHash(repoHash);
   for (const dir of [
     path.join(stateRoot, "jobs", repoHash),
     path.join(stateRoot, "logs", repoHash),
     path.join(stateRoot, "results", repoHash),
     path.join(stateRoot, "prompts", repoHash),
     path.join(stateRoot, "sessions", repoHash),
+    path.join(stateRoot, "completions", repoHash),
+    path.join(stateRoot, "locks", repoHash),
   ]) {
     await fsp.mkdir(dir, { recursive: true, mode: 0o700 });
   }
@@ -2091,33 +2246,40 @@ function hashCwd(cwd) {
 }
 
 function pathsForJob(stateRoot, repoHash, jobId) {
+  validateRepoHash(repoHash);
+  validateJobId(jobId);
   return {
     jobFile: path.join(stateRoot, "jobs", repoHash, `${jobId}.json`),
     indexFile: path.join(stateRoot, "jobs", repoHash, "index.json"),
     logFile: path.join(stateRoot, "logs", repoHash, `${jobId}.log`),
     resultFile: path.join(stateRoot, "results", repoHash, `${jobId}.md`),
     promptFile: path.join(stateRoot, "prompts", repoHash, `${jobId}.txt`),
+    completionFile: path.join(stateRoot, "completions", repoHash, `${jobId}.json`),
+    lockFile: path.join(stateRoot, "locks", repoHash, `${jobId}.lock`),
+    indexLockFile: path.join(stateRoot, "locks", repoHash, "index.lock"),
   };
 }
 
 async function appendIndex(stateRoot, repoHash, job) {
   const paths = pathsForJob(stateRoot, repoHash, job.id);
-  let index = { schemaVersion: SCHEMA_VERSION, jobs: [] };
-  try {
-    index = await readJson(paths.indexFile);
-  } catch {}
-  if (!Array.isArray(index.jobs)) {
-    index.jobs = [];
-  }
-  index.jobs = index.jobs.filter((entry) => entry.id !== job.id);
-  index.jobs.unshift({
-    id: job.id,
-    action: job.action,
-    createdAt: job.createdAt,
-    cwd: job.cwd,
+  await withFileLock(paths.indexLockFile, async () => {
+    let index = { schemaVersion: SCHEMA_VERSION, jobs: [] };
+    try {
+      index = await readJson(paths.indexFile);
+    } catch {}
+    if (!Array.isArray(index.jobs)) {
+      index.jobs = [];
+    }
+    index.jobs = index.jobs.filter((entry) => entry.id !== job.id);
+    index.jobs.unshift({
+      id: job.id,
+      action: job.action,
+      createdAt: job.createdAt,
+      cwd: job.cwd,
+    });
+    index.updatedAt = new Date().toISOString();
+    await writeJsonAtomic(paths.indexFile, index);
   });
-  index.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(paths.indexFile, index);
 }
 
 async function readJob(stateRoot, repoHash, jobId) {
@@ -2125,39 +2287,35 @@ async function readJob(stateRoot, repoHash, jobId) {
 }
 
 async function updateJob(stateRoot, repoHash, jobId, patch) {
-  const current = await readJob(stateRoot, repoHash, jobId);
-  const next = { ...current, ...patch };
-  await writeJsonAtomic(pathsForJob(stateRoot, repoHash, jobId).jobFile, next);
-  return next;
+  return mutateJob(stateRoot, repoHash, jobId, (current) => ({ ...current, ...patch }));
+}
+
+async function mutateJob(stateRoot, repoHash, jobId, mutator) {
+  const paths = pathsForJob(stateRoot, repoHash, jobId);
+  return withFileLock(paths.lockFile, async () => {
+    const current = await readJson(paths.jobFile);
+    const next = await mutator(current);
+    await writeJsonAtomic(paths.jobFile, next);
+    return next;
+  });
 }
 
 async function findJob(stateRoot, jobId, preferredRepoHash = null) {
-  if (preferredRepoHash) {
-    const file = pathsForJob(stateRoot, preferredRepoHash, jobId).jobFile;
-    if (fs.existsSync(file)) {
-      return readJson(file);
-    }
-  }
-
-  const jobsRoot = path.join(stateRoot, "jobs");
-  let repoHashes = [];
-  try {
-    repoHashes = await fsp.readdir(jobsRoot);
-  } catch {
+  validateJobId(jobId);
+  if (!preferredRepoHash) {
     return null;
   }
-  for (const repoHash of repoHashes) {
-    const file = pathsForJob(stateRoot, repoHash, jobId).jobFile;
-    if (fs.existsSync(file)) {
-      return readJson(file);
-    }
+  validateRepoHash(preferredRepoHash);
+  const file = pathsForJob(stateRoot, preferredRepoHash, jobId).jobFile;
+  if (fs.existsSync(file)) {
+    return readJson(file);
   }
   return null;
 }
 
 async function listRepoJobs(stateRoot, repoHash, side = null) {
-  const paths = pathsForJob(stateRoot, repoHash, "placeholder");
-  const dir = path.dirname(paths.jobFile);
+  validateRepoHash(repoHash);
+  const dir = path.join(stateRoot, "jobs", repoHash);
   const jobs = [];
   let files = [];
   try {
@@ -2207,6 +2365,41 @@ async function writeJsonAtomic(file, value) {
   await fsp.rename(tmp, file);
 }
 
+async function withFileLock(lockFile, fn) {
+  await fsp.mkdir(path.dirname(lockFile), { recursive: true, mode: 0o700 });
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    let handle = null;
+    try {
+      handle = await fsp.open(lockFile, "wx", 0o600);
+      try {
+        return await fn();
+      } finally {
+        await handle.close().catch(() => {});
+        await fsp.unlink(lockFile).catch(() => {});
+      }
+    } catch (error) {
+      if (handle) {
+        await handle.close().catch(() => {});
+      }
+      if (error?.code !== "EEXIST") {
+        throw error;
+      }
+      await removeStaleLock(lockFile);
+      await sleep(10 + Math.min(attempt, 20) * 5);
+    }
+  }
+  throw new Error(`timed out waiting for state lock: ${lockFile}`);
+}
+
+async function removeStaleLock(lockFile) {
+  try {
+    const stat = await fsp.stat(lockFile);
+    if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+      await fsp.unlink(lockFile);
+    }
+  } catch {}
+}
+
 async function readLastSession(stateRoot, repoHash, side) {
   const file = path.join(stateRoot, "sessions", repoHash, `${side}-last-session.json`);
   try {
@@ -2219,9 +2412,15 @@ async function readLastSession(stateRoot, repoHash, side) {
 }
 
 async function readSession(stateRoot, repoHash, side, sessionId) {
-  const file = path.join(stateRoot, "sessions", repoHash, `${side}-sessions.json`);
+  const file = sessionFileFor(stateRoot, repoHash, side, sessionId);
   try {
-    const data = await readJson(file);
+    const entry = await readJson(file);
+    return { ...entry, sessionId: entry.sessionId ?? entry.session_id ?? sessionId };
+  } catch {}
+
+  const legacyFile = path.join(stateRoot, "sessions", repoHash, `${side}-sessions.json`);
+  try {
+    const data = await readJson(legacyFile);
     const entry = data.sessions?.[sessionId] ?? null;
     if (!entry) {
       return null;
@@ -2237,25 +2436,23 @@ async function registerSession(stateRoot, repoHash, side, sessionId, metadata) {
     return;
   }
   await ensureRepoDirs(stateRoot, repoHash);
-  const sessionDir = path.join(stateRoot, "sessions", repoHash);
-  const registryFile = path.join(sessionDir, `${side}-sessions.json`);
-  const lastFile = path.join(sessionDir, `${side}-last-session.json`);
-  let registry = { schemaVersion: SCHEMA_VERSION, sessions: {} };
-  try {
-    registry = await readJson(registryFile);
-  } catch {}
-  if (!registry.sessions || Array.isArray(registry.sessions)) {
-    registry.sessions = {};
-  }
-  registry.sessions[sessionId] = {
+  const sessionDir = path.join(stateRoot, "sessions", repoHash, side);
+  const lastFile = path.join(stateRoot, "sessions", repoHash, `${side}-last-session.json`);
+  await fsp.mkdir(sessionDir, { recursive: true, mode: 0o700 });
+  const entry = {
     sessionId,
     session_id: sessionId,
     ...metadata,
     updatedAt: new Date().toISOString(),
   };
-  registry.updatedAt = new Date().toISOString();
-  await writeJsonAtomic(registryFile, registry);
-  await writeJsonAtomic(lastFile, registry.sessions[sessionId]);
+  await writeJsonAtomic(sessionFileFor(stateRoot, repoHash, side, sessionId), entry);
+  await writeJsonAtomic(lastFile, entry);
+}
+
+function sessionFileFor(stateRoot, repoHash, side, sessionId) {
+  validateRepoHash(repoHash);
+  validateSessionId(sessionId);
+  return path.join(stateRoot, "sessions", repoHash, side, `${sessionId}.json`);
 }
 
 async function parseSessionId(logFile) {
@@ -2299,6 +2496,77 @@ function findSessionId(value) {
   return null;
 }
 
+async function writeCompletionMarker(stateRoot, job, { exitCode, sessionId, completedAt }) {
+  const resultFile = job.resultFile;
+  const stat = await fsp.stat(resultFile);
+  const marker = {
+    schemaVersion: SCHEMA_VERSION,
+    jobId: job.id,
+    repoHash: job.repoHash,
+    side: job.side,
+    exitCode,
+    sessionId,
+    completedAt,
+    resultFile,
+    resultBytes: stat.size,
+    resultSha256: await sha256File(resultFile),
+  };
+  await writeJsonAtomic(completionFileForJob(stateRoot, job), marker);
+}
+
+async function readValidCompletion(job) {
+  let marker = null;
+  try {
+    marker = await readJson(completionFileForJob(null, job));
+  } catch {
+    return null;
+  }
+  if (marker.jobId !== job.id || marker.repoHash !== job.repoHash || marker.exitCode !== 0) {
+    return null;
+  }
+  try {
+    const stat = await fsp.stat(job.resultFile);
+    if (stat.size !== marker.resultBytes) {
+      return null;
+    }
+    const digest = await sha256File(job.resultFile);
+    if (digest !== marker.resultSha256) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return marker;
+}
+
+function completionFileForJob(stateRoot, job) {
+  if (job.completionFile) {
+    return job.completionFile;
+  }
+  if (!stateRoot) {
+    return null;
+  }
+  return pathsForJob(stateRoot, job.repoHash, job.id).completionFile;
+}
+
+async function sha256File(file) {
+  const hash = crypto.createHash("sha256");
+  const handle = await fsp.open(file, "r");
+  try {
+    for await (const chunk of handle.createReadStream()) {
+      hash.update(chunk);
+    }
+  } finally {
+    await handle.close().catch(() => {});
+  }
+  return hash.digest("hex");
+}
+
+function isHeartbeatFresh(heartbeatAt) {
+  const ms = Date.now() - Date.parse(heartbeatAt);
+  return Number.isFinite(ms) && ms >= 0 && ms <= HEARTBEAT_STALE_MS;
+}
+
 async function fileHasContent(file) {
   try {
     const stat = await fsp.stat(file);
@@ -2330,7 +2598,7 @@ function makeJobId() {
     .replace(/[-:]/g, "")
     .replace(/\..+$/, "")
     .replace("T", "_");
-  return `job_${stamp}_${crypto.randomBytes(3).toString("hex")}`;
+  return `job_${stamp}_${crypto.randomBytes(6).toString("hex")}`;
 }
 
 function isPidAlive(pid) {

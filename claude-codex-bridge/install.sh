@@ -46,9 +46,24 @@ for skill_name in cc-ask cc-review cc-task cc-resume claude-ask claude-task clau
   cleanup_path "$CODEX_HOME/skills/$skill_name" "skill"
 done
 
-if [ "${ANTHROPIC_API_KEY:-}" ]; then
-  echo "warning: ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the /claude-* commands." >&2
-fi
+for billing_env in \
+  ANTHROPIC_API_KEY \
+  ANTHROPIC_AUTH_TOKEN \
+  CLAUDE_CODE_USE_BEDROCK \
+  CLAUDE_CODE_USE_VERTEX \
+  AWS_ACCESS_KEY_ID \
+  AWS_SECRET_ACCESS_KEY \
+  AWS_SESSION_TOKEN \
+  GOOGLE_APPLICATION_CREDENTIALS \
+  OPENAI_API_KEY \
+  OPENAI_BASE_URL \
+  AZURE_OPENAI_API_KEY
+do
+  eval "billing_value=\${$billing_env:-}"
+  if [ "$billing_value" ]; then
+    echo "warning: $billing_env is set. Bridge task commands fail closed on direct API billing environment by default; unset it or explicitly set CLAUDE_CODEX_BRIDGE_ALLOW_DIRECT_API_BILLING=1." >&2
+  fi
+done
 
 codex plugin marketplace add "$SCRIPT_DIR"
 codex plugin add "$PLUGIN_NAME@$MARKETPLACE_NAME"

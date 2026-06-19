@@ -48,8 +48,22 @@ function Remove-LegacyPath {
     Remove-LegacyPath (Join-Path $codexHome "skills\$_") 'skill'
 }
 
-if ($env:ANTHROPIC_API_KEY) {
-    Write-Warning "ANTHROPIC_API_KEY is set in this environment. 'claude --print' will bill it as API usage instead of your subscription. Remove the variable before using the /claude-* commands."
+@(
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'CLAUDE_CODE_USE_BEDROCK',
+    'CLAUDE_CODE_USE_VERTEX',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_SESSION_TOKEN',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'OPENAI_API_KEY',
+    'OPENAI_BASE_URL',
+    'AZURE_OPENAI_API_KEY'
+) | ForEach-Object {
+    if ([Environment]::GetEnvironmentVariable($_)) {
+        Write-Warning "$_ is set. Bridge task commands fail closed on direct API billing environment by default; unset it or explicitly set CLAUDE_CODEX_BRIDGE_ALLOW_DIRECT_API_BILLING=1."
+    }
 }
 
 codex plugin marketplace add "$PSScriptRoot"

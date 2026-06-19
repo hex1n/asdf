@@ -47,9 +47,9 @@ Run the scan after the source inventory (Investigate step 4) and before stating 
 
 Use when the question benefits from stance diversity — different roles, incentives, or epistemic positions would frame the topic differently. Skip when the question has a single factual answer, when the scenario is pure Codebase Investigation, or when Standard depth already settles the decision boundary.
 
-### Default roles
+### Roles
 
-Adapt the roles to the domain. The defaults below fit broad industry or technology questions:
+Pick the two or three roles most likely to surface genuine disagreement on this question — not all five by default, which turns a three-lane question into a role-performance ritual. Expand the roster only when an unresolved conflict survives the first pass. Adapt the roles to the domain; the set below fits broad industry or technology questions:
 
 | Role | Lens |
 |---|---|
@@ -66,9 +66,9 @@ For codebase-adjacent questions (architecture direction, dependency adoption), r
 For each role, state:
 - Core position (1-2 sentences)
 - Strongest supporting evidence — must cite a fetchable source or be marked `unsupported`
-- One claim unique to this perspective
+- A material observation only this role could raise — a code path, data point, mechanism, source, or incentive, not a rephrasing. If there is none, write `none`; a forced unique claim is fabrication, not a finding.
 
-Then produce a **contradiction map**: list where two or more roles directly conflict, name the strongest evidence on each side, and identify the distinguishing check that would resolve each conflict. Feed unresolved conflicts into the evidence lanes as named unknowns.
+Then produce a **contradiction map**: list where two or more roles directly conflict, name the strongest evidence on each side, and identify the distinguishing check that would resolve each conflict. Feed unresolved conflicts into the evidence lanes as named unknowns. If the roles do not actually conflict, do not record consensus yet — first name the strongest opposing position actually held by a substantial expert community (a strawman you can dismiss does not count). A role counts as holding that position only if its stated stance prescribes it, not merely describes or borders it; on that test, if a chosen role already holds it, the agreement is genuine. If none does but the position is real, the agreement is an artifact of homogeneous role selection — add a role that holds it and re-run before trusting the finding. Only once a chosen role covers that opposition, or no credible opposition exists, record `no direct conflict`, note that you ran this check, and treat the cross-stance agreement as a high-confidence finding — do not manufacture a dispute to fill the map, nor invent one to dodge this check.
 
 ### Discipline
 

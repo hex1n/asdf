@@ -1,6 +1,6 @@
 {
   "name": "claude-codex-bridge",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "description": "Delegate consult and review to headless Claude Code, and manage trackable Claude work/resume jobs.",
   "author": {
     "name": "hexin"

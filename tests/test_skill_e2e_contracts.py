@@ -961,6 +961,11 @@ class PerspectiveScanContractTest(unittest.TestCase):
         "gate_reason",
         "checks",
     }
+    # The eval fixtures live in the recoverable eval workspace, which is not
+    # committed. When it is absent (clean checkout) the eval-data tests skip
+    # rather than error; the skill-contract tests do not depend on it.
+    CASES_PATH = ROOT / "evals" / "perspective-scan" / "cases.jsonl"
+    CASES_AVAILABLE = CASES_PATH.exists()
 
     def setUp(self) -> None:
         self.skill = read_text("skills/deep-research/SKILL.md")
@@ -968,12 +973,15 @@ class PerspectiveScanContractTest(unittest.TestCase):
         self.scan = self.reference.split("## Perspective Scan", 1)[1].split(
             "## Current-State Research", 1
         )[0]
-        cases_path = ROOT / "evals" / "perspective-scan" / "cases.jsonl"
-        self.cases = [
-            json.loads(line)
-            for line in cases_path.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
+        self.cases = (
+            [
+                json.loads(line)
+                for line in self.CASES_PATH.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            if self.CASES_AVAILABLE
+            else []
+        )
 
     def test_pointer_is_gated_not_unconditional(self) -> None:
         # The SKILL.md pointer must gate on exploratory/strategic + Deep, so the scan
@@ -1024,6 +1032,9 @@ class PerspectiveScanContractTest(unittest.TestCase):
         # adjacent role stance cannot be claimed to already hold the opposition.
         self.assertIn("not merely describes or borders", scan)
 
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/perspective-scan/cases.jsonl not committed"
+    )
     def test_eval_cases_are_wellformed(self) -> None:
         self.assertEqual(7, len(self.cases))
         labels = [c["label"] for c in self.cases]
@@ -1037,6 +1048,9 @@ class PerspectiveScanContractTest(unittest.TestCase):
                 self.assertTrue(case["checks"], "each case needs grading checks")
                 self.assertTrue(case["gate_reason"].strip())
 
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/perspective-scan/cases.jsonl not committed"
+    )
     def test_no_trigger_cases_bind_to_a_real_skip_clause(self) -> None:
         scan = self.scan.lower()
         for case in self.cases:
@@ -1051,6 +1065,9 @@ class PerspectiveScanContractTest(unittest.TestCase):
                 else:
                     self.assertIn("single factual answer", scan)
 
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/perspective-scan/cases.jsonl not committed"
+    )
     def test_trigger_cases_match_the_gate(self) -> None:
         for case in self.cases:
             if case["expected_decision"] != "trigger":

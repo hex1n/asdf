@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -931,6 +932,142 @@ class SkillE2EContractsTest(unittest.TestCase):
                 description = frontmatter_description(read_text(path))
                 self.assertLessEqual(len(description), 1024)
                 self.assertRegex(description, r"\bUse (when|for)\b")
+
+
+class PerspectiveScanContractTest(unittest.TestCase):
+    """Contract + fixture wellformedness for the deep-research Perspective Scan.
+
+    These checks verify the *contract*, not live model behavior: the trigger gate,
+    skip clauses, and anti-regression allowances exist and are single-sourced, and
+    every eval case is wellformed and bound to a clause that exists in the skill.
+    Output quality (real contradiction, no forced role performance) is graded by the
+    model-in-the-loop layer described in evals/perspective-scan/RUBRIC.md.
+    """
+
+    REQUIRED_LABELS = {
+        "should_trigger",
+        "should_not_trigger",
+        "anti_regression",
+        "anti_regression_high_conflict",
+        "output_quality",
+    }
+    CASE_FIELDS = {
+        "id",
+        "label",
+        "scenario",
+        "depth",
+        "prompt",
+        "expected_decision",
+        "gate_reason",
+        "checks",
+    }
+
+    def setUp(self) -> None:
+        self.skill = read_text("skills/deep-research/SKILL.md")
+        self.reference = read_text("skills/deep-research/REFERENCE.md")
+        self.scan = self.reference.split("## Perspective Scan", 1)[1].split(
+            "## Current-State Research", 1
+        )[0]
+        cases_path = ROOT / "evals" / "perspective-scan" / "cases.jsonl"
+        self.cases = [
+            json.loads(line)
+            for line in cases_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+    def test_pointer_is_gated_not_unconditional(self) -> None:
+        # The SKILL.md pointer must gate on exploratory/strategic + Deep, so the scan
+        # does not fire on every External question. This is the false-positive guard.
+        pointer = [line for line in self.skill.splitlines() if "#perspective-scan" in line]
+        self.assertEqual(1, len(pointer), "expected exactly one gated pointer")
+        line = pointer[0].lower()
+        self.assertIn("deep", line)
+        self.assertIn("exploratory or strategic", line)
+
+    def test_skip_clauses_and_antiregression_are_single_sourced(self) -> None:
+        scan = self.scan.lower()
+        # Skip clauses that produce the should_not_trigger decisions.
+        self.assertIn("single factual answer", scan)
+        self.assertIn("pure codebase investigation", scan)
+        # Anti-regression allowances that defuse forced novelty and ritual conflict.
+        self.assertIn("write `none`", scan)
+        self.assertIn("no direct conflict", scan)
+        self.assertIn("fabrication, not a finding", scan)
+        # Role-selection guard: consensus must survive the strongest opposing position,
+        # so `no direct conflict` cannot launder homogeneous role selection into a finding.
+        self.assertIn("homogeneous role selection", scan)
+        # Roster discipline: two or three roles, not all five by default.
+        self.assertIn("two or three roles", scan)
+        # The allowances live only in the scan section, not duplicated elsewhere.
+        self.assertEqual(1, self.reference.count("no direct conflict"))
+
+    def test_consensus_guard_precedes_the_no_conflict_allowance(self) -> None:
+        # An independent falsification pass (2026-06-19) broke an earlier guard three
+        # ways: the `no direct conflict` write sat BEFORE the guard (a top-to-bottom
+        # reader bypassed it by early termination), "strongest" was unenforceable
+        # (a strawman satisfied the letter), and there was no exit for a genuinely
+        # uncontested finding (the guard forced a junk role). The rewrite must keep
+        # all three closed; these are structural, not phrase-presence, checks.
+        scan = self.scan.lower()
+        # Placement: the opposing-position check must precede the consensus write, so
+        # the `no direct conflict` permission is never reachable before the guard.
+        self.assertLess(
+            scan.index("strongest opposing position"),
+            scan.index("no direct conflict"),
+            "consensus write must come after the opposing-position check",
+        )
+        # Anti-strawman: the opposition must be a real expert position, not a soft target.
+        self.assertIn("substantial expert community", scan)
+        # Exit clause: a genuinely uncontested finding must not be forced to add a role.
+        self.assertIn("no credible opposition", scan)
+        # False-attribution defense: "holds" is prescriptive, so a descriptive or
+        # adjacent role stance cannot be claimed to already hold the opposition.
+        self.assertIn("not merely describes or borders", scan)
+
+    def test_eval_cases_are_wellformed(self) -> None:
+        self.assertEqual(7, len(self.cases))
+        labels = [c["label"] for c in self.cases]
+        self.assertEqual(self.REQUIRED_LABELS, set(labels))
+        self.assertEqual(2, labels.count("should_trigger"))
+        self.assertEqual(2, labels.count("should_not_trigger"))
+        for case in self.cases:
+            with self.subTest(case=case.get("id")):
+                self.assertEqual(self.CASE_FIELDS, set(case))
+                self.assertIn(case["expected_decision"], {"trigger", "no_trigger"})
+                self.assertTrue(case["checks"], "each case needs grading checks")
+                self.assertTrue(case["gate_reason"].strip())
+
+    def test_no_trigger_cases_bind_to_a_real_skip_clause(self) -> None:
+        scan = self.scan.lower()
+        for case in self.cases:
+            if case["label"] != "should_not_trigger":
+                continue
+            with self.subTest(case=case["id"]):
+                self.assertEqual("no_trigger", case["expected_decision"])
+                # The decision must rest on a clause that actually exists in the skill,
+                # not on a label the fixture invented.
+                if case["scenario"] == "codebase":
+                    self.assertIn("pure codebase investigation", scan)
+                else:
+                    self.assertIn("single factual answer", scan)
+
+    def test_trigger_cases_match_the_gate(self) -> None:
+        for case in self.cases:
+            if case["expected_decision"] != "trigger":
+                continue
+            with self.subTest(case=case["id"]):
+                self.assertIn(case["scenario"], {"external", "mixed"})
+                self.assertEqual("deep", case["depth"])
+
+    def test_scan_markers_do_not_leak_into_other_skills(self) -> None:
+        markers = ("perspective scan", "contradiction map", "no direct conflict")
+        for path in MAIN_CONTEXT_FILES:
+            if path.startswith("skills/deep-research/"):
+                continue
+            text = read_text(path).lower()
+            for marker in markers:
+                with self.subTest(path=path, marker=marker):
+                    self.assertNotIn(marker, text, f"{marker!r} leaked into {path}")
 
 
 if __name__ == "__main__":

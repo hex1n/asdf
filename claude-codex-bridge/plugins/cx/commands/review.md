@@ -1,6 +1,6 @@
 ---
 description: Have Codex review local git changes through the bridge companion
-argument-hint: "[--path <file-or-dir>]... [--base <branch>] [--commit <sha>] [--model <m>] [custom review focus]"
+argument-hint: "[--path <file-or-dir>]... [--base <branch>] [--commit <sha>] [--model <m>] [--include-untracked-content] [custom review focus]"
 allowed-tools: Bash
 disable-model-invocation: true
 ---
@@ -18,6 +18,7 @@ Strip these execution controls from the text and pass them to the companion:
 - `--commit <sha>` -> pass through.
 - `--model <m>` -> pass through.
 - `--effort <e>` -> pass through when present.
+- `--include-untracked-content` -> pass through when present. By default the bundle lists untracked file paths only and withholds their content; this opt-in includes untracked file content. Sensitive filenames (for example `.env`, `*.pem`, `*.key`, `credentials.json`) stay withheld even with this flag, and matched secrets are redacted.
 
 Everything else is custom review focus. If no `--path` is provided, pass `--path .`.
 

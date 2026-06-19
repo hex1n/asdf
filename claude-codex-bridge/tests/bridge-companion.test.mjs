@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -26,9 +28,7 @@ test("foreground cx work writes state, result, log, prompt, and session registry
     "low",
     "--",
     "change exactly one file",
-  ], {
-    ANTHROPIC_API_KEY: "must-not-leak",
-  });
+  ]);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /fake codex work result/);
@@ -45,6 +45,7 @@ test("foreground cx work writes state, result, log, prompt, and session registry
   assert.equal(job.effort, "low");
   assert.equal(job.background, false);
   assert.equal(job.sessionId, "11111111-1111-4111-8111-111111111111");
+  assert.equal(await pathExists(job.completionFile), true);
 
   const prompt = await fs.readFile(job.promptFile, "utf8");
   assert.match(prompt, /change exactly one file/);
@@ -205,6 +206,48 @@ test("cx cancel only cancels a bridge-owned running job", async (t) => {
   assert.match(result.stdout, /status: cancelled/);
 });
 
+test("cx cancel does not kill a stale pid from job state", async (t) => {
+  const ctx = await makeContext(t);
+  const unrelated = spawn(process.execPath, ["-e", "setTimeout(() => {}, 30000)"], {
+    stdio: "ignore",
+  });
+  t.after(() => {
+    if (unrelated.pid && isPidAlive(unrelated.pid)) {
+      unrelated.kill("SIGKILL");
+    }
+  });
+  assert.ok(unrelated.pid);
+
+  const job = await writeFakeJob(ctx, {
+    id: "job_20260619_010203_deadbeefcafe",
+    status: "running",
+    pid: unrelated.pid,
+    childPid: unrelated.pid,
+  });
+
+  const cancelled = runCompanion(ctx, ["cx", "cancel", job.id]);
+  assert.equal(cancelled.status, 2);
+  assert.match(cancelled.stderr, /not running|orphaned/);
+  assert.equal(isPidAlive(unrelated.pid), true);
+});
+
+test("stale cancelling jobs stay orphaned without worker acknowledgement", async (t) => {
+  const ctx = await makeContext(t);
+  const job = await writeFakeJob(ctx, {
+    id: "job_20260619_010205_cafebabecafe",
+    status: "cancelling",
+    pid: 99999999,
+    childPid: 99999999,
+    errorSummary: "cancellation requested",
+  });
+
+  const status = runCompanion(ctx, ["cx", "status", job.id, "--json"]);
+  assert.equal(status.status, 0, status.stderr);
+  const parsed = JSON.parse(status.stdout);
+  assert.equal(parsed.status, "orphaned");
+  assert.match(parsed.errorSummary, /cancellation requested/);
+});
+
 test("cx resume uses bridge session registry and never passes --last", async (t) => {
   const ctx = await makeContext(t);
   const work = runCompanion(ctx, ["cx", "work", "--foreground", "--", "seed session"]);
@@ -240,9 +283,7 @@ test("foreground claude work writes result, cost footer, and Claude session regi
     "claude-sonnet-4-5",
     "--",
     "change through Claude",
-  ], {
-    ANTHROPIC_API_KEY: "must-not-leak",
-  });
+  ]);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /fake claude work result/);
@@ -285,9 +326,7 @@ test("claude direct consult uses prompt file and registers consult session", asy
     "claude-direct-model",
     "--prompt-file",
     promptFile,
-  ], {
-    ANTHROPIC_API_KEY: "must-not-leak",
-  });
+  ]);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /fake claude work result/);
@@ -336,9 +375,7 @@ test("cx direct consult uses the shared native runner and prompt file", async (t
     "low",
     "--prompt-file",
     promptFile,
-  ], {
-    ANTHROPIC_API_KEY: "must-not-leak",
-  });
+  ]);
 
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /fake codex work result/);
@@ -447,6 +484,29 @@ test("review dry-run builds a multiline bundle from paths", async (t) => {
   assert.ok(maxLine > 0 && maxLine < 2000, result.stdout);
 });
 
+test("review files profile does not snapshot symlinks that resolve outside the workspace", {
+  skip: process.platform === "win32" ? "symlink privileges vary on Windows" : false,
+}, async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  const outside = path.join(path.dirname(ctx.cwd), "outside-secret.txt");
+  await fs.writeFile(outside, "OUTSIDE_SECRET_SHOULD_NOT_BE_BUNDLED\n", "utf8");
+  await fs.symlink(outside, path.join(ctx.cwd, "leak.txt"));
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--dry-run",
+    "--profile",
+    "files",
+    "--path",
+    ".",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stdout, /OUTSIDE_SECRET_SHOULD_NOT_BE_BUNDLED/);
+});
+
 test("claude review commit dry-run uses commit patch instead of working tree diff", async (t) => {
   const ctx = await makeContext(t);
   await initGitRepo(ctx);
@@ -544,6 +604,34 @@ test("native runner blocks recursive agent loops", async (t) => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stdout, /recursive bridge invocation blocked for cx/);
+});
+
+test("native runner rejects direct API billing environment by default", async (t) => {
+  const ctx = await makeContext(t);
+
+  const claude = runCompanion(ctx, ["claude", "work", "--foreground", "--", "billing check"], {
+    ANTHROPIC_API_KEY: "must-be-explicit",
+  });
+  assert.notEqual(claude.status, 0);
+  assert.match(`${claude.stdout}${claude.stderr}`, /direct API billing environment is set for claude/);
+
+  const codex = runCompanion(ctx, ["cx", "work", "--foreground", "--", "billing check"], {
+    OPENAI_API_KEY: "must-be-explicit",
+  });
+  assert.notEqual(codex.status, 0);
+  assert.match(`${codex.stdout}${codex.stderr}`, /direct API billing environment is set for cx/);
+
+  const crossCodex = runCompanion(ctx, ["cx", "work", "--foreground", "--", "cross billing check"], {
+    ANTHROPIC_API_KEY: "must-not-leak-cross-agent",
+  });
+  assert.notEqual(crossCodex.status, 0);
+  assert.match(`${crossCodex.stdout}${crossCodex.stderr}`, /ANTHROPIC_API_KEY/);
+
+  const crossClaude = runCompanion(ctx, ["claude", "work", "--foreground", "--", "cross billing check"], {
+    OPENAI_API_KEY: "must-not-leak-cross-agent",
+  });
+  assert.notEqual(crossClaude.status, 0);
+  assert.match(`${crossClaude.stdout}${crossClaude.stderr}`, /OPENAI_API_KEY/);
 });
 
 test("claude work accepts wrapper-fixed mode before args-file", async (t) => {
@@ -656,6 +744,74 @@ test("claude register-session lets explicit resume recover consult permissions",
   assert.doesNotMatch(resume.stdout, /acceptEdits/);
 });
 
+test("lookup rejects path-shaped job ids before touching state paths", async (t) => {
+  const ctx = await makeContext(t);
+
+  const status = runCompanion(ctx, ["cx", "status", "../../attack/evil"]);
+
+  assert.equal(status.status, 2);
+  assert.match(status.stderr, /invalid job id/);
+});
+
+test("lookup does not fall back to another workspace with the same state root", async (t) => {
+  const ctx = await makeContext(t);
+  const otherCwd = path.join(path.dirname(ctx.cwd), "other-repo");
+  await fs.mkdir(otherCwd, { recursive: true });
+  const other = { ...ctx, cwd: otherCwd };
+
+  const work = runCompanion(ctx, ["cx", "work", "--foreground", "--", "workspace scoped job"]);
+  assert.equal(work.status, 0, work.stderr);
+  const jobId = parseJobId(work.stdout);
+
+  const status = runCompanion(other, ["cx", "status", jobId]);
+  assert.equal(status.status, 2);
+  assert.match(status.stderr, /job not found/);
+});
+
+test("orphan recovery does not mark a nonempty partial result as completed", async (t) => {
+  const ctx = await makeContext(t);
+  const job = await writeFakeJob(ctx, {
+    id: "job_20260619_010204_feedfacecafe",
+    status: "running",
+    pid: 99999999,
+    childPid: 99999999,
+    resultText: "PARTIAL_RESULT_WITHOUT_COMPLETION_MARKER\n",
+  });
+
+  const status = runCompanion(ctx, ["cx", "status", job.id, "--json"]);
+  assert.equal(status.status, 0, status.stderr);
+  const parsed = JSON.parse(status.stdout);
+  assert.equal(parsed.status, "orphaned");
+  assert.notEqual(parsed.status, "completed");
+});
+
+test("register-session writes concurrent sessions without registry lost updates", async (t) => {
+  const ctx = await makeContext(t);
+  const sessions = Array.from({ length: 40 }, (_, index) => {
+    const suffix = String(index + 1).padStart(12, "0");
+    return `33333333-3333-4333-8333-${suffix}`;
+  });
+
+  const results = await Promise.all(
+    sessions.map((session) => runCompanionAsync(ctx, [
+      "claude",
+      "register-session",
+      "--session",
+      session,
+      "--source",
+      "consult",
+    ])),
+  );
+
+  for (const result of results) {
+    assert.equal(result.status, 0, result.stderr);
+  }
+
+  const sessionDir = path.join(ctx.stateRoot, "sessions", repoHashFor(ctx.cwd), "claude");
+  const files = await fs.readdir(sessionDir);
+  assert.equal(files.filter((file) => file.endsWith(".json")).length, sessions.length);
+});
+
 async function makeContext(t) {
   await fs.chmod(fakeCodex, 0o755);
   await fs.chmod(fakeClaude, 0o755);
@@ -687,7 +843,7 @@ function runCompanionScript(ctx, script, args, env = {}) {
   return spawnSync(process.execPath, [script, ...args], {
     cwd: ctx.cwd,
     env: {
-      ...process.env,
+      ...testEnv(),
       CLAUDE_CODEX_BRIDGE_STATE_HOME: ctx.stateRoot,
       CLAUDE_CODEX_BRIDGE_CODEX_BIN: ctx.fakeCodexBin,
       CLAUDE_CODEX_BRIDGE_CLAUDE_BIN: ctx.fakeClaudeBin,
@@ -696,6 +852,55 @@ function runCompanionScript(ctx, script, args, env = {}) {
     encoding: "utf8",
     timeout: 30000,
   });
+}
+
+function runCompanionAsync(ctx, args, env = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [companion, ...args], {
+      cwd: ctx.cwd,
+      env: {
+        ...testEnv(),
+        CLAUDE_CODEX_BRIDGE_STATE_HOME: ctx.stateRoot,
+        CLAUDE_CODEX_BRIDGE_CODEX_BIN: ctx.fakeCodexBin,
+        CLAUDE_CODEX_BRIDGE_CLAUDE_BIN: ctx.fakeClaudeBin,
+        ...env,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("close", (status, signal) => {
+      resolve({ status, signal, stdout, stderr });
+    });
+  });
+}
+
+function testEnv() {
+  const env = { ...process.env };
+  for (const name of [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "AZURE_OPENAI_API_KEY",
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+  ]) {
+    delete env[name];
+  }
+  return env;
 }
 
 async function fakeToolBin(dir, name, script) {
@@ -760,6 +965,60 @@ async function readJobs(stateRoot) {
   return jobs;
 }
 
+async function writeFakeJob(ctx, patch = {}) {
+  const repoHash = repoHashFor(ctx.cwd);
+  const id = patch.id ?? "job_20260619_010203_abcdefabcdef";
+  const jobDir = path.join(ctx.stateRoot, "jobs", repoHash);
+  const logDir = path.join(ctx.stateRoot, "logs", repoHash);
+  const resultDir = path.join(ctx.stateRoot, "results", repoHash);
+  const promptDir = path.join(ctx.stateRoot, "prompts", repoHash);
+  const completionDir = path.join(ctx.stateRoot, "completions", repoHash);
+  await fs.mkdir(jobDir, { recursive: true });
+  await fs.mkdir(logDir, { recursive: true });
+  await fs.mkdir(resultDir, { recursive: true });
+  await fs.mkdir(promptDir, { recursive: true });
+  await fs.mkdir(completionDir, { recursive: true });
+  const job = {
+    schemaVersion: 1,
+    id,
+    repoHash,
+    cwd: ctx.cwd,
+    side: "cx",
+    action: "work",
+    status: "running",
+    createdAt: new Date().toISOString(),
+    startedAt: new Date().toISOString(),
+    completedAt: null,
+    pid: null,
+    childPid: null,
+    heartbeatAt: null,
+    sessionId: null,
+    resumeFrom: null,
+    mode: "work",
+    scope: null,
+    bundleMetrics: null,
+    model: null,
+    effort: null,
+    background: true,
+    promptFile: path.join(promptDir, `${id}.txt`),
+    logFile: path.join(logDir, `${id}.log`),
+    resultFile: path.join(resultDir, `${id}.md`),
+    completionFile: path.join(completionDir, `${id}.json`),
+    exitCode: null,
+    errorSummary: null,
+    ...patch,
+  };
+  await fs.writeFile(job.promptFile, "fake prompt\n", "utf8");
+  await fs.writeFile(job.logFile, "fake log\n", "utf8");
+  await fs.writeFile(job.resultFile, patch.resultText ?? "", "utf8");
+  await fs.writeFile(path.join(jobDir, `${id}.json`), `${JSON.stringify(job, null, 2)}\n`, "utf8");
+  return job;
+}
+
+function repoHashFor(cwd) {
+  return crypto.createHash("sha256").update(fsSync.realpathSync(cwd)).digest("hex").slice(0, 16);
+}
+
 async function waitForJob(ctx, jobId, expectedStatus, side = "cx") {
   const deadline = Date.now() + 30000;
   let last = null;
@@ -780,7 +1039,7 @@ async function waitForJob(ctx, jobId, expectedStatus, side = "cx") {
 }
 
 function parseJobId(output) {
-  const match = output.match(/job_\d{8}_\d{6}_[0-9a-f]{6}/);
+  const match = output.match(/job_\d{8}_\d{6}_[0-9a-f]{6,16}/);
   assert.ok(match, `missing job id in output: ${output}`);
   return match[0];
 }
@@ -800,4 +1059,13 @@ async function pathExists(file) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }

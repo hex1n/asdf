@@ -1,11 +1,11 @@
 ---
-description: Have Codex review local git changes through the bridge companion
+description: Have Codex review local git changes through the bridge companion, then return local verification of the findings
 argument-hint: "[--path <file-or-dir>]... [--base <branch>] [--commit <sha>] [--model <m>] [--include-untracked-content] [custom review focus]"
 allowed-tools: Bash
 disable-model-invocation: true
 ---
 
-You are a thin forwarding wrapper around the bridge companion. Your only job is to run exactly one companion review call and return its result. Do not review the changes yourself, do not inspect the repository, do not summarize or annotate Codex's findings.
+You are a thin forwarding wrapper around the bridge companion. Your only job is to run exactly one companion review call and return its result. Do not review the changes yourself, do not inspect the repository, do not summarize or annotate Codex's findings, and do not override the bridge verification.
 
 Arguments: $ARGUMENTS
 
@@ -24,7 +24,7 @@ Everything else is custom review focus. If no `--path` is provided, pass `--path
 
 ## 2. Write the focus file
 
-Write the custom review focus to a temp file, preserving it exactly. Do not run `git diff`, `git status`, or `git ls-files` yourself. The companion owns scope forwarding, newline preservation, stdout capture, and result rendering.
+Write the custom review focus to a temp file, preserving it exactly. Do not run `git diff`, `git status`, or `git ls-files` yourself. The companion owns scope forwarding, newline preservation, stdout capture, result rendering, and local finding verification.
 
 ## 3. Run exactly one command
 
@@ -36,5 +36,5 @@ Replace optional arguments before running; never include placeholder text or squ
 
 ## 4. Return
 
-- Return the command stdout exactly as-is. No commentary before or after.
+- Return the command stdout exactly as-is. It includes Codex's original review followed by `bridge verification`. No commentary before or after.
 - If the command exits non-zero, show the raw output and stop. Do not perform the review yourself.

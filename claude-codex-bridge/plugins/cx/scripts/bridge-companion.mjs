@@ -34,6 +34,7 @@ const CANCEL_POLL_MS = 100;
 const LOCK_STALE_MS = 30000;
 const GIT_TIMEOUT_MS = Number(process.env.CLAUDE_CODEX_BRIDGE_GIT_TIMEOUT_MS || 20000);
 const GIT_MAX_BUFFER = 64 * 1024 * 1024;
+const REVIEW_FINDING_RE = /^\s*(P[0-3])\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*(.+?)\s*$/;
 const DIRECT_BILLING_ENV = {
   claude: [
     "ANTHROPIC_API_KEY",
@@ -58,6 +59,7 @@ const catalogPath = path.join(path.dirname(scriptPath), "bridge-catalog.json");
 const BRIDGE_CATALOG = loadBridgeCatalog(catalogPath);
 const PROFILES = BRIDGE_CATALOG.profiles;
 const SESSION_SOURCES = BRIDGE_CATALOG.sessionSources;
+const ENTRYPOINTS = BRIDGE_CATALOG.entrypoints;
 
 function numericEnv(name, fallback) {
   const raw = process.env[name];
@@ -78,6 +80,9 @@ function loadBridgeCatalog(file) {
   }
   if (!catalog.sessionSources || typeof catalog.sessionSources !== "object") {
     throw new Error("bridge catalog must define sessionSources");
+  }
+  if (!catalog.entrypoints || typeof catalog.entrypoints !== "object") {
+    throw new Error("bridge catalog must define entrypoints");
   }
   return catalog;
 }
@@ -126,38 +131,8 @@ async function sideMain(side, argv) {
   const action = argv.shift();
   if (!action) {
     throw new UsageError(
-      `usage: bridge-companion.mjs ${side} <direct|review|work|resume|status|result|cancel|register-session> ...`,
+      `usage: bridge-companion.mjs ${side} <${entrypointUsage(side)}|direct|register-session> ...`,
     );
-  }
-
-  if (action === "direct") {
-    await runDirect(side, argv);
-    return;
-  }
-
-  if (action === "review") {
-    await runReview(side, argv);
-    return;
-  }
-
-  if (action === "work" || action === "resume") {
-    await runTask(side, action, argv);
-    return;
-  }
-
-  if (action === "status") {
-    await printStatus(side, argv);
-    return;
-  }
-
-  if (action === "result") {
-    await printResult(side, argv);
-    return;
-  }
-
-  if (action === "cancel") {
-    await cancelJob(side, argv);
-    return;
   }
 
   if (action === "register-session") {
@@ -165,11 +140,67 @@ async function sideMain(side, argv) {
     return;
   }
 
+  if (action === "direct") {
+    await runDirect(side, argv);
+    return;
+  }
+
+  const entrypoint = entrypointConfig(side, action);
+  if (entrypoint) {
+    await runEntrypoint(side, action, entrypoint, argv);
+    return;
+  }
+
   throw new UsageError(`unsupported ${side} action: ${action}`);
 }
 
-async function runDirect(side, argv) {
+async function runEntrypoint(side, name, entrypoint, argv) {
+  const companionAction = entrypoint.action ?? name;
+  if (entrypoint.type === "direct") {
+    if (entrypoint.profile === "review") {
+      await runReview(side, companionAction, argv);
+      return;
+    }
+    await runDirect(side, argv, { fixedMode: entrypoint.profile ?? null });
+    return;
+  }
+  if (entrypoint.type === "task") {
+    await runTask(side, companionAction, argv);
+    return;
+  }
+  if (entrypoint.type === "lookup") {
+    if (companionAction === "status") {
+      await printStatus(side, argv);
+      return;
+    }
+    if (companionAction === "result") {
+      await printResult(side, argv);
+      return;
+    }
+    if (companionAction === "cancel") {
+      await cancelJob(side, argv);
+      return;
+    }
+    if (companionAction === "setup") {
+      await printSetup(side, argv);
+      return;
+    }
+    if (companionAction === "verify-review") {
+      await printVerifyReview(side, argv);
+      return;
+    }
+  }
+  throw new UsageError(`unsupported ${side} entrypoint ${name}: ${entrypoint.type}/${companionAction}`);
+}
+
+async function runDirect(side, argv, { fixedMode = null } = {}) {
   const args = await parseDirectArgs(argv, { side });
+  if (fixedMode && args.mode && args.mode !== fixedMode) {
+    throw new UsageError(`${sideLabel(side)} ${fixedMode} entrypoint cannot use --mode ${args.mode}`);
+  }
+  if (fixedMode && !args.mode) {
+    args.mode = fixedMode;
+  }
   if (!args.mode) {
     throw new UsageError(`${sideLabel(side)} direct requires --mode ${profileList(side)}`);
   }
@@ -207,8 +238,9 @@ async function runDirect(side, argv) {
   await printDirectResult(finished);
 }
 
-async function runReview(side, argv) {
+async function runReview(side, reviewKind, argv) {
   const args = await parseReviewArgs(argv, { side });
+  args.reviewKind = reviewKind;
   const profile = profileConfig(side, "review");
   if (!Array.isArray(profile.actions?.direct)) {
     throw new UsageError(`${sideLabel(side)} profile review does not support direct action`);
@@ -249,6 +281,7 @@ async function runReview(side, argv) {
     background: false,
     resumeFrom: null,
     mode: "review",
+    reviewKind,
     scope: args.scope,
     bundleMetrics,
   });
@@ -342,6 +375,7 @@ async function createJob({
   background,
   resumeFrom,
   mode,
+  reviewKind = null,
   scope = null,
   bundleMetrics = null,
 }) {
@@ -365,6 +399,9 @@ async function createJob({
     repoHash,
     cwd,
     side,
+    originAgent: originAgentForSide(side),
+    targetAgent: side,
+    workflow: workflowName({ action, mode, reviewKind }),
     action,
     status: "created",
     createdAt: now,
@@ -380,8 +417,10 @@ async function createJob({
     sessionId: null,
     resumeFrom,
     mode,
+    reviewKind,
     scope,
     bundleMetrics,
+    reviewVerification: null,
     model,
     effort,
     background,
@@ -555,6 +594,7 @@ async function runWorkerForJob(stateRoot, job) {
         completedAt,
         exitCode: 0,
         sessionId: completedSessionId,
+        reviewVerification: runResult.reviewVerification ?? current.reviewVerification ?? null,
         heartbeatAt: null,
         mayStillBeRunning: false,
         errorSummary: null,
@@ -613,7 +653,10 @@ async function runCodex(job, stateRoot, leaseId) {
 
   const hasResult = await fileHasContent(job.resultFile);
   if (result.code === 0 && hasResult) {
-    return { ok: true, exitCode: 0, errorSummary: null };
+    const reviewVerification = isReviewJob(job)
+      ? await verifyReviewResultFile(job)
+      : null;
+    return { ok: true, exitCode: 0, errorSummary: null, reviewVerification };
   }
 
   const tail = await tailFile(job.logFile, 20);
@@ -638,12 +681,20 @@ async function runClaude(job, stateRoot, leaseId) {
 
   const parsed = await parseClaudeOutput(job.logFile);
   if (result.code === 0 && parsed && parsed.is_error !== true && typeof parsed.result === "string") {
-    await fsp.writeFile(job.resultFile, renderClaudeResult(parsed), "utf8");
+    let rendered = renderClaudeResult(parsed);
+    const reviewVerification = isReviewJob(job)
+      ? await verifyReviewText(job, rendered)
+      : null;
+    if (reviewVerification) {
+      rendered = appendReviewVerification(rendered, reviewVerification);
+    }
+    await fsp.writeFile(job.resultFile, rendered, "utf8");
     return {
       ok: true,
       exitCode: 0,
       errorSummary: null,
       sessionId: normalizeSessionId(parsed.session_id ?? parsed.sessionId),
+      reviewVerification,
     };
   }
 
@@ -828,6 +879,199 @@ function renderClaudeResult(parsed) {
   const cost = typeof parsed.total_cost_usd === "number" ? parsed.total_cost_usd.toFixed(4) : "unknown";
   const sessionId = parsed.session_id ?? parsed.sessionId ?? "none";
   return `${result}cost: $${cost} | session: ${sessionId}\n`;
+}
+
+function isReviewJob(job) {
+  return job.action === "direct" && job.mode === "review";
+}
+
+async function verifyReviewResultFile(job, { append = true } = {}) {
+  const resultText = await fsp.readFile(job.resultFile, "utf8");
+  const verification = await verifyReviewText(job, resultText);
+  if (append) {
+    await fsp.writeFile(job.resultFile, appendReviewVerification(resultText, verification), "utf8");
+  }
+  return verification;
+}
+
+async function verifyReviewText(job, resultText) {
+  const promptText = await readTextIfExists(job.promptFile);
+  const findings = extractReviewFindings(resultText);
+  const checked = [];
+  for (const finding of findings) {
+    checked.push(await verifyReviewFinding(job.cwd, finding, promptText));
+  }
+  const counts = { verified: 0, "plausible-unverified": 0, rejected: 0 };
+  for (const finding of checked) {
+    counts[finding.classification] += 1;
+  }
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    verifier: "bridge-local-review-verifier",
+    checkedAt: new Date().toISOString(),
+    findingCount: checked.length,
+    counts,
+    findings: checked,
+    note:
+      "verified means the file/line and evidence anchor were found locally; it does not prove the reviewer's conclusion.",
+  };
+}
+
+function extractReviewFindings(text) {
+  const findings = [];
+  for (const line of text.split(/\r?\n/)) {
+    const match = line.match(REVIEW_FINDING_RE);
+    if (!match) {
+      continue;
+    }
+    findings.push({
+      index: findings.length + 1,
+      severity: match[1],
+      location: match[2].trim(),
+      problem: match[3].trim(),
+      evidence: match[4].trim(),
+      raw: line.trim(),
+    });
+  }
+  return findings;
+}
+
+async function verifyReviewFinding(cwd, finding, promptText) {
+  const parsed = parseReviewLocation(finding.location);
+  if (!parsed.line) {
+    return classifiedFinding(finding, "plausible-unverified", "location is not in file:line form");
+  }
+
+  const absolute = path.resolve(cwd, parsed.file);
+  if (!isWithinDirectory(absolute, cwd)) {
+    return classifiedFinding(finding, "rejected", "review location escapes the workspace");
+  }
+
+  let stat = null;
+  try {
+    stat = await fsp.lstat(absolute);
+  } catch {
+    return classifiedFinding(finding, "rejected", "file does not exist");
+  }
+  if (stat.isSymbolicLink()) {
+    return classifiedFinding(finding, "rejected", "location is a symlink and will not be read");
+  }
+  if (!stat.isFile()) {
+    return classifiedFinding(finding, "rejected", "location is not a regular file");
+  }
+
+  let real = null;
+  try {
+    const cwdReal = await fsp.realpath(cwd);
+    real = await fsp.realpath(absolute);
+    if (!isWithinDirectory(real, cwdReal)) {
+      return classifiedFinding(finding, "rejected", "review location resolves outside the workspace");
+    }
+  } catch {
+    return classifiedFinding(finding, "rejected", "file cannot be resolved safely");
+  }
+
+  const text = await fsp.readFile(real, "utf8");
+  const lines = text.split(/\r?\n/);
+  if (parsed.line < 1 || parsed.line > lines.length) {
+    return classifiedFinding(finding, "rejected", `line ${parsed.line} is outside file range 1-${lines.length}`);
+  }
+
+  const nearby = lines.slice(Math.max(0, parsed.line - 4), Math.min(lines.length, parsed.line + 3)).join("\n");
+  if (evidenceMatches(finding.evidence, nearby) || evidenceMatches(finding.evidence, text)) {
+    return classifiedFinding(finding, "verified", "file, line, and evidence text were found in the current file");
+  }
+  if (evidenceMatches(finding.evidence, promptText)) {
+    return classifiedFinding(finding, "verified", "file and line exist; evidence text was found in the review bundle");
+  }
+  return classifiedFinding(finding, "plausible-unverified", "file and line exist, but evidence text was not found locally");
+}
+
+function parseReviewLocation(location) {
+  const cleaned = stripWrappingTicks(location);
+  const match = cleaned.match(/^(.+?):(\d+)(?::\d+)?$/);
+  if (!match) {
+    return { file: cleaned, line: null };
+  }
+  return { file: match[1], line: Number(match[2]) };
+}
+
+function stripWrappingTicks(value) {
+  return String(value).trim().replace(/^`+|`+$/g, "");
+}
+
+function classifiedFinding(finding, classification, reason) {
+  return {
+    ...finding,
+    classification,
+    reason,
+  };
+}
+
+function evidenceMatches(evidence, haystack) {
+  const needle = normalizeEvidence(evidence);
+  if (!needle) {
+    return false;
+  }
+  return normalizeEvidence(haystack).includes(needle);
+}
+
+function normalizeEvidence(text) {
+  const stripped = stripWrappingTicks(text)
+    .replace(/^["']+|["']+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  if (stripped.length < 6) {
+    return "";
+  }
+  if (/^(see|check|look at|line|same as above)\b/i.test(stripped)) {
+    return "";
+  }
+  return stripped;
+}
+
+function appendReviewVerification(resultText, verification) {
+  const text = resultText.endsWith("\n") ? resultText : `${resultText}\n`;
+  return `${text}\n${renderReviewVerification(verification)}`;
+}
+
+function renderReviewVerification(verification) {
+  const lines = [
+    "bridge verification:",
+    `- verified: ${verification.counts.verified}`,
+    `- plausible-unverified: ${verification.counts["plausible-unverified"]}`,
+    `- rejected: ${verification.counts.rejected}`,
+    `- note: ${verification.note}`,
+  ];
+  if (!verification.findings.length) {
+    lines.push("- no parseable P0-P3 findings were returned; nothing was verified.");
+    return `${lines.join("\n")}\n`;
+  }
+
+  for (const label of ["verified", "plausible-unverified", "rejected"]) {
+    const items = verification.findings.filter((finding) => finding.classification === label);
+    if (!items.length) {
+      continue;
+    }
+    lines.push("", `${label}:`);
+    for (const finding of items) {
+      lines.push(`- ${finding.severity} | ${finding.location} | ${finding.problem}`);
+      lines.push(`  reason: ${finding.reason}`);
+    }
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+async function readTextIfExists(file) {
+  if (!file) {
+    return "";
+  }
+  try {
+    return await fsp.readFile(file, "utf8");
+  } catch {
+    return "";
+  }
 }
 
 function codexArgs(job) {
@@ -1275,6 +1519,125 @@ async function cancelJob(side, argv) {
   process.stdout.write(`cancellation requested: ${cancelled.id}\n`);
 }
 
+async function printSetup(side, argv) {
+  const args = await parseSetupArgs(argv);
+  const cwd = path.resolve(process.cwd());
+  const stateRoot = stateRootPath();
+  const state = await stateDiagnostic(stateRoot);
+  const command = resolveNativeAgent(side);
+  const commandStatus = nativeCommandDiagnostic(command);
+  const billing = directBillingPolicy(side);
+  const stack = currentAgentStack();
+  const recursive = stack.includes(side);
+  const report = {
+    schemaVersion: SCHEMA_VERSION,
+    side,
+    label: sideLabel(side),
+    cwd,
+    repoHash: hashCwd(cwd),
+    stateRoot,
+    stateWritable: state.ok,
+    stateError: state.error,
+    nativeCommand: command,
+    nativeCommandFound: commandStatus.found,
+    nativeCommandDetail: commandStatus.detail,
+    directBilling: {
+      present: billing.present,
+      allowed: billing.allowed,
+      agentFlag: billing.agentFlag,
+      blocked: billing.present.length > 0 && !billing.allowed,
+    },
+    agentStack: stack,
+    recursiveBlocked: recursive,
+    reviewVerification: "enabled",
+  };
+
+  if (args.json) {
+    printJson(report);
+    return;
+  }
+
+  process.stdout.write(`bridge setup: ${report.label}\n`);
+  process.stdout.write(`cwd: ${report.cwd}\n`);
+  process.stdout.write(`stateRoot: ${report.stateRoot}\n`);
+  process.stdout.write(`stateWritable: ${report.stateWritable ? "yes" : "no"}\n`);
+  if (report.stateError) {
+    process.stdout.write(`stateError: ${report.stateError}\n`);
+  }
+  process.stdout.write(`nativeCommand: ${report.nativeCommand}\n`);
+  process.stdout.write(`nativeCommandFound: ${report.nativeCommandFound ? "yes" : "no"}\n`);
+  if (report.nativeCommandDetail) {
+    process.stdout.write(`nativeCommandDetail: ${report.nativeCommandDetail}\n`);
+  }
+  process.stdout.write(`directBillingBlocked: ${report.directBilling.blocked ? "yes" : "no"}\n`);
+  if (report.directBilling.present.length) {
+    process.stdout.write(`directBillingVars: ${report.directBilling.present.join(", ")}\n`);
+    process.stdout.write(`directBillingAllowFlag: ${report.directBilling.agentFlag}\n`);
+  }
+  process.stdout.write(`recursiveBlocked: ${report.recursiveBlocked ? "yes" : "no"}\n`);
+  if (report.agentStack.length) {
+    process.stdout.write(`agentStack: ${report.agentStack.join(">")}\n`);
+  }
+  process.stdout.write(`reviewVerification: ${report.reviewVerification}\n`);
+}
+
+async function printVerifyReview(side, argv) {
+  const args = await parseVerifyReviewArgs(argv);
+  const cwd = path.resolve(process.cwd());
+  let source = null;
+  let verification = null;
+
+  if (args.file) {
+    const reviewFile = await resolveWorkspaceFile(cwd, args.file, "review file");
+    const promptFile = args.promptFile
+      ? await resolveWorkspaceFile(cwd, args.promptFile, "prompt file")
+      : null;
+    const resultText = await fsp.readFile(reviewFile, "utf8");
+    verification = await verifyReviewText({ cwd, promptFile }, resultText);
+    source = { type: "file", reviewFile, promptFile };
+  } else {
+    const stateRoot = stateRootPath();
+    const repoHash = hashCwd(cwd);
+    await ensureStateRoot(stateRoot);
+    const job = await findJob(stateRoot, args.jobId, repoHash);
+    if (!job) {
+      throw new UsageError(`job not found: ${args.jobId}`);
+    }
+    ensureJobSide(job, side);
+    if (!isReviewJob(job)) {
+      throw new UsageError(`job ${job.id} is not a review job`);
+    }
+    if (job.status !== "completed") {
+      throw new UsageError(`job ${job.id} is ${job.status}, not completed`);
+    }
+    if (!(await fileHasContent(job.resultFile))) {
+      throw new UsageError(`job ${job.id} has no review result`);
+    }
+    verification = await verifyReviewResultFile(job, { append: false });
+    source = {
+      type: "job",
+      jobId: job.id,
+      resultFile: job.resultFile,
+      promptFile: job.promptFile,
+    };
+  }
+
+  const report = {
+    schemaVersion: SCHEMA_VERSION,
+    side,
+    source,
+    verification,
+  };
+  if (args.json) {
+    printJson(report);
+    return;
+  }
+
+  const sourceLabel = source.type === "job" ? source.jobId : source.reviewFile;
+  process.stdout.write(`bridge verify-review: ${sourceLabel}\n`);
+  process.stdout.write(renderReviewVerification(verification));
+}
+
 async function registerSessionCommand(side, argv) {
   const args = parseRegisterSessionArgs(argv, side);
   const stateRoot = stateRootPath();
@@ -1435,6 +1798,7 @@ async function parseReviewArgs(argv, { side }) {
   };
   const focusParts = [];
   let focusFile = null;
+  let focusStdin = false;
   const pathFiles = [];
   let passthrough = false;
 
@@ -1454,6 +1818,10 @@ async function parseReviewArgs(argv, { side }) {
     }
     if (token === "--include-untracked-content") {
       options.includeUntrackedContent = true;
+      continue;
+    }
+    if (token === "--focus-stdin") {
+      focusStdin = true;
       continue;
     }
 
@@ -1535,10 +1903,15 @@ async function parseReviewArgs(argv, { side }) {
   }
 
   if (focusFile) {
-    if (focusParts.length) {
+    if (focusStdin || focusParts.length) {
       throw new UsageError("unexpected review focus arguments with --focus-file");
     }
     options.focus = await fsp.readFile(focusFile, "utf8");
+  } else if (focusStdin) {
+    if (focusParts.length) {
+      throw new UsageError("unexpected review focus arguments with --focus-stdin");
+    }
+    options.focus = await readStdinText();
   } else {
     options.focus = focusParts.join(" ");
   }
@@ -1570,16 +1943,49 @@ function reviewTargetLabel(target) {
   return "--uncommitted";
 }
 
-function codexReviewPrompt({ focus, paths }) {
+function adversarialProblemContractText() {
+  return "For adversarial review, the problem field must state the concrete failure mechanism, including the dependency, state, or ordering path when relevant.";
+}
+
+function adversarialReviewText({ includeProblemContract = false } = {}) {
+  const lines = [
+    "Adversarial review: actively try to falsify the change's safety and correctness.",
+    "",
+    "Finding admission gate: before reporting any finding, name the changed behavior, invariant, or dependency assumption being challenged; construct a concrete failure path through input, state, ordering, retries, concurrent actions, configuration, or a previous-step result; and anchor it to the diff or files you actually read.",
+    "Do not report generic risk, missing tests alone, style preference, or 'could be' objections without that failure path and local evidence anchor.",
+    "",
+    "Priority lenses: stateful workflows whose later actions depend on earlier results; async completion, stale state, retries, idempotency, rollback; concurrency and cross-request consistency; boundary inputs; and security or performance only when the changed code creates a concrete path.",
+    "Prefer one high-confidence finding over several weak objections.",
+  ];
+  if (includeProblemContract) {
+    lines.push("", adversarialProblemContractText());
+  }
+  return lines.join("\n");
+}
+
+function codexReviewPrompt({ focus, paths, reviewKind = "review" }) {
+  const baseFocus = reviewKind === "adversarial-review"
+    ? adversarialReviewText({ includeProblemContract: true })
+    : "";
   const focusPaths = paths.filter((entry) => entry !== ".");
+  const focusText = [baseFocus, focus.trim()].filter(Boolean).join("\n\n");
   if (!focusPaths.length) {
-    return focus;
+    return focusText;
   }
 
   const pathFocus = ["Focus paths:", ...focusPaths.map((entry) => `- ${entry}`)].join("\n");
-  return focus.trim()
-    ? `${focus.trimEnd()}\n\n${pathFocus}\n`
+  return focusText.trim()
+    ? `${focusText.trimEnd()}\n\n${pathFocus}\n`
     : `${pathFocus}\n`;
+}
+
+function reviewFocusText({ focus, reviewKind }) {
+  const provided = focus.trim();
+  if (reviewKind !== "adversarial-review") {
+    return provided || "general correctness, bugs, and risky changes";
+  }
+  const adversarial = adversarialReviewText();
+  return provided ? `${adversarial}\n\n${provided}` : adversarial;
 }
 
 // The untrusted-data fence is sealed with a per-bundle random nonce so repository
@@ -1616,7 +2022,15 @@ function assertUntrustedFenceIntact(text, fence) {
   }
 }
 
-async function buildReviewBundle({ cwd, paths, focus, target, bundleProfile, includeUntrackedContent = false }) {
+async function buildReviewBundle({
+  cwd,
+  paths,
+  focus,
+  target,
+  bundleProfile,
+  includeUntrackedContent = false,
+  reviewKind = "review",
+}) {
   const resolvedPaths = await resolveReviewPaths(cwd, paths);
   const pathArgs = resolvedPaths.map((entry) => entry.relative);
   const includeDiff = bundleProfile === "diff" || bundleProfile === "mixed";
@@ -1662,16 +2076,19 @@ async function buildReviewBundle({ cwd, paths, focus, target, bundleProfile, inc
 
   const fence = makeUntrustedFence();
   const headSections = [
-    "Review the local changes in this repository.",
+    reviewKind === "adversarial-review"
+      ? "Adversarially review the local changes in this repository."
+      : "Review the local changes in this repository.",
     "",
     `Bundle profile: ${bundleProfile}`,
     "Reviewer: claude",
+    `Review kind: ${reviewKind}`,
     `Review scope: ${reviewTargetLabel(target)}`,
     "",
     // Operator-supplied focus is a trusted instruction and must sit above the
     // untrusted fence, not inside the "never instructions to follow" region.
     "Focus:",
-    focus.trim() || "general correctness, bugs, and risky changes",
+    reviewFocusText({ focus, reviewKind }),
     "",
     fence.open,
     "",
@@ -1706,11 +2123,17 @@ async function buildReviewBundle({ cwd, paths, focus, target, bundleProfile, inc
     );
   }
 
+  const outputContractDetails = [
+    "Order by severity. Only report issues grounded in the diff or in files you actually read.",
+    reviewKind === "adversarial-review" ? adversarialProblemContractText() : null,
+    "Evidence should quote or name the local anchor the caller can verify. No speculation, no style nitpicks unless asked. If there are no findings, say so explicitly.",
+  ].filter(Boolean).join(" ");
+
   const suffixSections = [
     "",
     "Output contract - for each finding, one line:",
     "P0-P3 | file:line | problem | evidence",
-    "Order by severity. Only report issues grounded in the diff or in files you actually read. No speculation, no style nitpicks unless asked. If there are no findings, say so explicitly.",
+    outputContractDetails,
     "",
   ];
 
@@ -1786,6 +2209,32 @@ async function resolveReviewPaths(cwd, paths) {
     results.push({ input, absolute, relative });
   }
   return results;
+}
+
+async function resolveWorkspaceFile(cwd, input, label) {
+  const absolute = path.resolve(cwd, input);
+  if (!isWithinDirectory(absolute, cwd)) {
+    throw new UsageError(`${label} escapes the working directory: ${input}`);
+  }
+  let stat = null;
+  try {
+    stat = await fsp.lstat(absolute);
+  } catch {
+    throw new UsageError(`${label} not found: ${input}`);
+  }
+  if (stat.isSymbolicLink()) {
+    throw new UsageError(`${label} is a symlink and will not be read: ${input}`);
+  }
+  if (!stat.isFile()) {
+    throw new UsageError(`${label} is not a regular file: ${input}`);
+  }
+
+  const cwdReal = await fsp.realpath(cwd);
+  const real = await fsp.realpath(absolute);
+  if (!isWithinDirectory(real, cwdReal)) {
+    throw new UsageError(`${label} resolves outside the working directory: ${input}`);
+  }
+  return real;
 }
 
 function isWithinDirectory(candidate, root) {
@@ -2422,6 +2871,70 @@ async function parseLookupArgs(argv) {
   return result;
 }
 
+async function parseSetupArgs(argv) {
+  const { tokens, rawText } = await extractArgsFile(argv);
+  const setupTokens = rawText !== null ? splitCommandLine(rawText) : normalizeArgv(tokens);
+  const result = { json: false };
+  for (const token of setupTokens) {
+    if (token === "--json") {
+      result.json = true;
+      continue;
+    }
+    throw new UsageError(`unexpected setup argument: ${token}`);
+  }
+  return result;
+}
+
+async function parseVerifyReviewArgs(argv) {
+  const { tokens, rawText } = await extractArgsFile(argv);
+  const verifyTokens = rawText !== null ? splitCommandLine(rawText) : normalizeArgv(tokens);
+  const result = { jobId: null, file: null, promptFile: null, json: false };
+  for (let i = 0; i < verifyTokens.length; i += 1) {
+    const token = verifyTokens[i];
+    if (token === "--json") {
+      result.json = true;
+      continue;
+    }
+
+    const fileValue = inlineFlagValue(token, "--file");
+    if (token === "--file" || fileValue !== null) {
+      result.file = fileValue !== null ? fileValue : requireValue(verifyTokens, ++i, "--file");
+      if (!result.file) {
+        throw new UsageError("--file requires a value");
+      }
+      continue;
+    }
+
+    const promptFileValue = inlineFlagValue(token, "--prompt-file");
+    if (token === "--prompt-file" || promptFileValue !== null) {
+      result.promptFile = promptFileValue !== null
+        ? promptFileValue
+        : requireValue(verifyTokens, ++i, "--prompt-file");
+      if (!result.promptFile) {
+        throw new UsageError("--prompt-file requires a value");
+      }
+      continue;
+    }
+
+    if (!result.jobId) {
+      result.jobId = token;
+      validateJobId(result.jobId);
+      continue;
+    }
+    throw new UsageError(`unexpected verify-review argument: ${token}`);
+  }
+  if (result.jobId && result.file) {
+    throw new UsageError("verify-review accepts either <job-id> or --file, not both");
+  }
+  if (!result.jobId && !result.file) {
+    throw new UsageError("verify-review requires <job-id> or --file <review-output>");
+  }
+  if (result.promptFile && !result.file) {
+    throw new UsageError("--prompt-file can only be used with --file");
+  }
+  return result;
+}
+
 function parseRegisterSessionArgs(argv, side) {
   const tokens = normalizeArgv(argv);
   const result = { session: null, source: null, jobId: null };
@@ -2535,6 +3048,18 @@ function splitCommandLine(input) {
   return tokens;
 }
 
+function readStdinText() {
+  return new Promise((resolve, reject) => {
+    let text = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+      text += chunk;
+    });
+    process.stdin.on("end", () => resolve(text));
+    process.stdin.on("error", reject);
+  });
+}
+
 function requireValue(tokens, index, flag) {
   const value = tokens[index];
   if (!value) {
@@ -2567,6 +3092,19 @@ function normalizeSessionId(sessionId) {
 
 function hasProfiles(side) {
   return Boolean(PROFILES[side] && typeof PROFILES[side] === "object");
+}
+
+function entrypointConfig(side, name) {
+  const sideEntrypoints = ENTRYPOINTS[side];
+  if (!sideEntrypoints || typeof sideEntrypoints !== "object") {
+    return null;
+  }
+  const entrypoint = sideEntrypoints[name];
+  return entrypoint && typeof entrypoint === "object" ? entrypoint : null;
+}
+
+function entrypointUsage(side) {
+  return Object.keys(ENTRYPOINTS[side] ?? {}).join("|");
 }
 
 function profileConfig(side, profileName) {
@@ -2615,6 +3153,17 @@ function sideLabel(side) {
   return side === "claude" ? "Claude Code" : "Codex";
 }
 
+function originAgentForSide(side) {
+  return side === "claude" ? "cx" : "claude";
+}
+
+function workflowName({ action, mode, reviewKind }) {
+  if (action === "direct") {
+    return mode === "review" ? (reviewKind ?? "review") : mode;
+  }
+  return action;
+}
+
 function sessionSourceFor(job) {
   requireSessionSource(job.side, job.mode);
   return job.mode;
@@ -2624,12 +3173,91 @@ function stateRootPath() {
   if (process.env.CLAUDE_CODEX_BRIDGE_STATE_HOME) {
     return path.resolve(process.env.CLAUDE_CODEX_BRIDGE_STATE_HOME);
   }
+  if (stateRootPath.memoized) {
+    return stateRootPath.memoized;
+  }
+  const candidates = defaultStateRootCandidates();
+  for (const candidate of candidates) {
+    if (canUseStateRoot(candidate)) {
+      stateRootPath.memoized = candidate;
+      return candidate;
+    }
+  }
+  stateRootPath.memoized = candidates[candidates.length - 1];
+  return stateRootPath.memoized;
+}
+stateRootPath.memoized = null;
+
+function defaultStateRootCandidates() {
+  const candidates = [];
+  if (process.env.CLAUDE_PLUGIN_DATA) {
+    candidates.push(path.resolve(process.env.CLAUDE_PLUGIN_DATA, APP_NAME));
+  }
   if (process.platform === "win32") {
     const base = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local");
-    return path.join(base, APP_NAME);
+    candidates.push(path.join(base, APP_NAME));
+  } else {
+    if (process.env.XDG_STATE_HOME) {
+      candidates.push(path.join(process.env.XDG_STATE_HOME, APP_NAME));
+    }
+    candidates.push(path.join(os.homedir(), ".local", "state", APP_NAME));
   }
-  const base = process.env.XDG_STATE_HOME || path.join(os.homedir(), ".local", "state");
-  return path.join(base, APP_NAME);
+  candidates.push(path.join(os.tmpdir(), APP_NAME));
+  return [...new Set(candidates)];
+}
+
+function canUseStateRoot(candidate) {
+  try {
+    fs.mkdirSync(candidate, { recursive: true, mode: 0o700 });
+    try {
+      fs.chmodSync(candidate, 0o700);
+    } catch {}
+    fs.accessSync(candidate, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function stateDiagnostic(stateRoot) {
+  try {
+    await ensureStateRoot(stateRoot);
+    const probe = path.join(stateRoot, `.setup-probe-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
+    await fsp.writeFile(probe, "ok\n", { mode: 0o600 });
+    await fsp.unlink(probe);
+    return { ok: true, error: null };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function nativeCommandDiagnostic(command) {
+  if (!command) {
+    return { found: false, detail: "empty command" };
+  }
+  if (isPathLikeCommand(command)) {
+    try {
+      const stat = fs.statSync(command);
+      return stat.isFile()
+        ? { found: true, detail: "explicit executable path exists" }
+        : { found: false, detail: "explicit path is not a file" };
+    } catch (error) {
+      return { found: false, detail: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  const probe = process.platform === "win32"
+    ? spawnSync("where.exe", [command], { encoding: "utf8", timeout: 5000 })
+    : spawnSync("sh", ["-c", "command -v \"$1\"", "sh", command], { encoding: "utf8", timeout: 5000 });
+  if (probe.status === 0 && String(probe.stdout || "").trim()) {
+    return { found: true, detail: firstLine(probe.stdout) };
+  }
+  const detail = firstLine(probe.stderr) || firstLine(probe.stdout) || `exit ${probe.status ?? "unknown"}`;
+  return { found: false, detail };
+}
+
+function isPathLikeCommand(command) {
+  return path.isAbsolute(command) || command.includes("/") || command.includes("\\");
 }
 
 async function ensureStateRoot(stateRoot) {

@@ -11,6 +11,42 @@ PLACEHOLDER_PATTERN = re.compile(
     r"\b(tbd|todo|placeholder)\b|to\s+(?:be\s+)?(?:define|defined|fill|filled)\s+later|待定|未定|占位|暂无|待(?:补充|定义|确定|完善)|稍后(?:补充|定义|确定|完善)|后续(?:补充|定义|确定|完善)",
     re.IGNORECASE,
 )
+VAR_PATTERN = re.compile(r"`([^`]+)`")
+IDENTIFIER_VAR_PATTERN = re.compile(
+    r"\b(?:[A-Za-z][A-Za-z0-9]*(?:Id|ID|Token|Key|No|Code|Event|Intent)|[a-z]+(?:_[a-z0-9]+)*(?:_id|_token|_key|_no|_code|_event|_intent)|[A-Z]+(?:_[A-Z0-9]+)*(?:_ID|_TOKEN|_KEY|_NO|_CODE|_EVENT|_INTENT))\b"
+)
+SCENARIO_PATTERN = re.compile(r"\b[-\w]*e2e-\d+[a-z]?\b", re.IGNORECASE)
+NODE_PATTERN = re.compile(r"\bn\d+\b", re.IGNORECASE)
+
+
+def extract_variables(cell: str) -> set[str]:
+    return {
+        *[variable.lower() for variable in VAR_PATTERN.findall(cell)],
+        *[variable.lower() for variable in IDENTIFIER_VAR_PATTERN.findall(cell)],
+    }
+
+
+def parse_markdown_table(test_case: unittest.TestCase, section: str) -> list[dict[str, str]]:
+    table_lines = [line.strip() for line in section.splitlines() if line.strip().startswith("|")]
+    if len(table_lines) < 3:
+        return []
+    headers = [cell.strip().lower() for cell in table_lines[0].strip("|").split("|")]
+    separator_cells = [cell.strip() for cell in table_lines[1].strip("|").split("|")]
+    test_case.assertEqual(len(headers), len(separator_cells), "DAG table separator must match header width")
+    rows: list[dict[str, str]] = []
+    for line in table_lines[2:]:
+        cells = [cell.strip() for cell in line.strip("|").split("|")]
+        test_case.assertEqual(len(headers), len(cells), f"malformed markdown table row: {line}")
+        rows.append(dict(zip(headers, cells)))
+    return rows
+
+
+def get_dag_cell(row: dict[str, str], english: str, chinese: str) -> str:
+    return row.get(english, row.get(chinese, "")).strip()
+
+
+def is_source_supported(variable: str, sourced_text: str) -> bool:
+    return f"`{variable}`" in sourced_text or variable in sourced_text
 
 
 def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None:
@@ -56,6 +92,7 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
         ("agent execution contract", "agent 执行契约", "执行契约", "执行合约"),
         ("risk map", "风险图谱", "风险地图"),
         ("test scenarios", "测试场景", "测试计划"),
+        ("execution dag", "执行 dag"),
     )
     indexes = [heading_index(*section) for section in core_sections]
     closure_indexes = [
@@ -151,6 +188,11 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
     test_case.assertRegex(contract_lines["cleanup"], r"`[^`]+`", "cleanup must name cleanup keys or records")
 
     scenario_matches = list(re.finditer(r"^###\s+[-\w]*e2e-\d+[a-z]?\b", lower, re.MULTILINE))
+    scenario_ids = {
+        SCENARIO_PATTERN.search(match.group(0)).group(0).lower()
+        for match in scenario_matches
+        if SCENARIO_PATTERN.search(match.group(0))
+    }
     scenarios = [
         text[match.start() : scenario_matches[index + 1].start() if index + 1 < len(scenario_matches) else len(text)]
         for index, match in enumerate(scenario_matches)
@@ -184,6 +226,176 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
         test_case.assertRegex(scenario_lower, r"\b[a-z]*j\d+\b", "scenario must cite business-flow edge IDs")
         test_case.assertRegex(scenario_lower, r"(consumes|produces|capture|captures|取|依赖)")
 
+    execution_dag_original = text[indexes[5] : min(closure_indexes)]
+    execution_dag = execution_dag_original.lower()
+    dag_header_lines = [line for line in execution_dag.splitlines() if line.strip().startswith("|")]
+    test_case.assertTrue(dag_header_lines, "execution DAG must include a table")
+    dag_header = dag_header_lines[0]
+    english_headers = (
+        "node",
+        "scenario",
+        "depends on",
+        "consumes",
+        "produces",
+        "required capabilities",
+        "side-effect scope",
+        "isolation key",
+        "parallel safety",
+        "cleanup dependency",
+        "disruptive marker",
+    )
+    chinese_headers = (
+        "节点",
+        "场景",
+        "依赖",
+        "消费",
+        "产出",
+        "所需能力",
+        "副作用范围",
+        "隔离键",
+        "并行安全",
+        "清理依赖",
+        "扰动标记",
+    )
+    test_case.assertTrue(
+        all(header in dag_header for header in english_headers)
+        or all(header in dag_header for header in chinese_headers),
+        "execution DAG must use stable headers",
+    )
+    dag_rows = parse_markdown_table(test_case, execution_dag_original)
+    test_case.assertGreaterEqual(len(dag_rows), 1, "execution DAG must include executable rows")
+    dag_scenarios: set[str] = set()
+    dependency_graph: dict[str, set[str]] = {}
+    produced_by_node = {
+        get_dag_cell(row, "node", "节点").lower(): extract_variables(get_dag_cell(row, "produces", "产出"))
+        for row in dag_rows
+        if get_dag_cell(row, "node", "节点")
+    }
+    node_ids = set(produced_by_node)
+    sourced_before_dag = text[: indexes[5]].lower()
+    for row in dag_rows:
+        node = get_dag_cell(row, "node", "节点").lower()
+        scenario = get_dag_cell(row, "scenario", "场景").lower()
+        depends_on_original = get_dag_cell(row, "depends on", "依赖")
+        depends_on = depends_on_original.lower()
+        consumes = get_dag_cell(row, "consumes", "消费")
+        produces = get_dag_cell(row, "produces", "产出")
+        capabilities = get_dag_cell(row, "required capabilities", "所需能力").lower()
+        side_effect_scope = get_dag_cell(row, "side-effect scope", "副作用范围").lower()
+        isolation_key = get_dag_cell(row, "isolation key", "隔离键").lower()
+        parallel_safety = get_dag_cell(row, "parallel safety", "并行安全").lower()
+        cleanup_dependency = get_dag_cell(row, "cleanup dependency", "清理依赖").lower()
+        disruptive_marker = get_dag_cell(row, "disruptive marker", "扰动标记").lower()
+
+        test_case.assertRegex(node, NODE_PATTERN, "execution DAG must use stable node IDs")
+        row_scenarios = {match.group(0).lower() for match in SCENARIO_PATTERN.finditer(scenario)}
+        test_case.assertTrue(row_scenarios, "each DAG row must map to a scenario")
+        test_case.assertTrue(row_scenarios <= scenario_ids, f"DAG row references unknown scenario: {scenario}")
+        dag_scenarios.update(row_scenarios)
+        test_case.assertRegex(depends_on, r"\b(?:[a-z]*j\d+|n\d+)\b|ready|可用", "each DAG row must cite edges, predecessor nodes, or readiness dependencies")
+        test_case.assertGreaterEqual(len(consumes.strip()), 3, "each DAG row must name consumed inputs")
+        test_case.assertGreaterEqual(len(produces.strip()), 3, "each DAG row must name produced outputs")
+        depends_on_variables = extract_variables(depends_on_original)
+        row_consumed_variables = extract_variables(consumes)
+        row_produced_variables = extract_variables(produces)
+        predecessor_nodes = {match.group(0).lower() for match in NODE_PATTERN.finditer(depends_on_original)}
+        dependency_graph[node] = predecessor_nodes
+        unknown_predecessors = predecessor_nodes - node_ids
+        test_case.assertFalse(unknown_predecessors, f"Depends on references unknown DAG nodes: {sorted(unknown_predecessors)}")
+        available_from_predecessors = {
+            variable
+            for predecessor in predecessor_nodes
+            for variable in produced_by_node.get(predecessor, set())
+        }
+        for variable in row_consumed_variables | depends_on_variables:
+            if is_source_supported(variable, sourced_before_dag):
+                continue
+            test_case.assertNotIn(
+                variable,
+                row_produced_variables,
+                f"DAG node {node} consumes non-source-supported variable it also produces: {variable}",
+            )
+            test_case.assertIn(
+                variable,
+                available_from_predecessors,
+                f"DAG node {node} consumes variable without source support or predecessor producer: {variable}",
+            )
+        test_case.assertRegex(
+            capabilities,
+            r"\b(api|rpc|cli|db|mq|job|log|metric|stub|ui)\b|任务|替身",
+            "each DAG row must name required capabilities",
+        )
+        test_case.assertRegex(
+            side_effect_scope,
+            r"table|queue|cache|ledger|invoice|order|stock|event|表|队列|缓存|事件|发票|订单|支付",
+            "each DAG row must name side-effect scope",
+        )
+        test_case.assertRegex(
+            isolation_key,
+            r"`[^`]+`|prefix|batch|trace|tenant|account|id|前缀|批次|租户|账号",
+            "each DAG row must name an isolation key",
+        )
+        test_case.assertRegex(
+            parallel_safety,
+            r"^(safe|unsafe|unknown|安全|不安全|未知)\s*[:：]\s*\S.{5,}$",
+            "parallel safety must be safe/unsafe/unknown with a non-empty reason",
+        )
+        test_case.assertRegex(
+            cleanup_dependency,
+            r"cleanup|清理",
+            "each DAG row must include cleanup dependencies",
+        )
+        cleanup_variables = extract_variables(cleanup_dependency)
+        test_case.assertTrue(
+            cleanup_variables,
+            "cleanup dependency must name the produced or source-supported variables needed for cleanup",
+        )
+        unsupported_cleanup_variables = {
+            variable
+            for variable in cleanup_variables
+            if variable not in row_produced_variables
+            and variable not in available_from_predecessors
+            and not is_source_supported(variable, sourced_before_dag)
+        }
+        test_case.assertFalse(
+            unsupported_cleanup_variables,
+            f"cleanup dependency uses variables without producers or source support: {sorted(unsupported_cleanup_variables)}",
+        )
+        test_case.assertTrue(
+            cleanup_variables & (row_produced_variables | available_from_predecessors)
+            or any(is_source_supported(variable, sourced_before_dag) for variable in cleanup_variables),
+            "cleanup dependency must be tied to produced or source-supported variables",
+        )
+        test_case.assertRegex(
+            disruptive_marker,
+            r"none|concurrency|recovery|compensation|load|race|callback|无|回调|并发|恢复|补偿|压测",
+            "each DAG row must mark disruptive behavior or none",
+        )
+    missing_scenarios = {
+        scenario
+        for scenario in scenario_ids - dag_scenarios
+        if not re.search(rf"\b{re.escape(scenario)}\b.*\b(manual|blocked|手工|阻塞)\b", execution_dag)
+    }
+    test_case.assertFalse(missing_scenarios, f"scenarios missing from execution DAG: {sorted(missing_scenarios)}")
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(node: str) -> bool:
+        if node in visiting:
+            return False
+        if node in visited:
+            return True
+        visiting.add(node)
+        for predecessor in dependency_graph.get(node, set()):
+            if not visit(predecessor):
+                return False
+        visiting.remove(node)
+        visited.add(node)
+        return True
+
+    for node in node_ids:
+        test_case.assertTrue(visit(node), f"execution DAG contains a cycle involving {node}")
+
 
 class E2ETestPlannerContractTest(unittest.TestCase):
     def test_skill_keeps_dependency_aware_planning_core(self) -> None:
@@ -211,7 +423,10 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "stable field labels",
             "keep these labels exact",
             "machine-scannable",
+            "dependency dag facts",
             "agent execution contract",
+            "execution dag",
+            "executor-consumable dag",
             "target surfaces",
             "data fixtures",
             "named variables",
@@ -229,6 +444,13 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "concurrency",
             "idempotency and recovery",
             "performance and scale",
+            "parallel safety",
+            "required capabilities",
+            "side-effect scope",
+            "isolation key",
+            "cleanup dependency",
+            "disruptive marker",
+            "predecessor nodes named in `depends on`",
             "source-only suspected defects",
             "coverage matrix",
             "level-2 `coverage matrix`",
@@ -294,19 +516,59 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         graph_index = skill.index("## 2. business flow diagram + journey graph")
         agent_index = skill.index("## 3. agent execution contract")
         risk_index = skill.index("## 4. risk map")
-        plan_index = skill.index("## 5. test plan")
-        closure_index = skill.index("## 6. closure")
+        plan_index = skill.index("## 5. test scenarios")
+        dag_index = skill.index("## 6. execution dag")
+        closure_index = skill.index("## 7. closure")
 
         self.assertLess(source_index, graph_index)
         self.assertLess(graph_index, agent_index)
         self.assertLess(agent_index, risk_index)
         self.assertLess(risk_index, plan_index)
-        self.assertLess(plan_index, closure_index)
+        self.assertLess(plan_index, dag_index)
+        self.assertLess(dag_index, closure_index)
         self.assertIn("before scenarios, draw a mermaid business flow diagram", skill)
         self.assertIn("every important diagram edge appears in the table", skill)
         self.assertIn("every later scenario cites the edge ids it covers", skill)
         self.assertIn("before risk mapping, define what a follow-on agent can execute", skill)
         self.assertIn("derive scenarios from the journey graph, not from a generic checklist", skill)
+        self.assertIn("execution order can be derived from `depends on`", skill)
+
+    def test_execution_dag_contract_requires_scheduler_facts(self) -> None:
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+        section = skill.split("## 6. execution dag", 1)[1].split("## 7. closure", 1)[0]
+
+        for marker in (
+            "executor-consumable dag",
+            "does not decide the runtime schedule",
+            "`node`",
+            "`scenario`",
+            "`depends on`",
+            "`consumes`",
+            "`produces`",
+            "`required capabilities`",
+            "`side-effect scope`",
+            "`isolation key`",
+            "`parallel safety`",
+            "`cleanup dependency`",
+            "`disruptive marker`",
+            "`节点`",
+            "`场景`",
+            "`依赖`",
+            "`消费`",
+            "`产出`",
+            "`所需能力`",
+            "`副作用范围`",
+            "`隔离键`",
+            "`并行安全`",
+            "`清理依赖`",
+            "`扰动标记`",
+            "`safe`, `unsafe`, or `unknown`",
+            "every variable used across scenarios has a producer or source-supported fixture and a consumer",
+            "produced variables consumed by a node come from predecessor nodes named in `depends on`",
+            "the dag is acyclic",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, section)
 
     def test_agent_execution_contract_requires_agent_handoff_fields(self) -> None:
         skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
@@ -390,6 +652,174 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             assert_valid_generated_plan(self, text)
 
+    def test_generated_plan_output_contract_rejects_missing_execution_dag(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+        before_dag, after_dag = text.split("\n## 6. Execution DAG", 1)
+        _, after_coverage = after_dag.split("\n## 7. Coverage Matrix", 1)
+        without_dag = before_dag + "\n## 6. Coverage Matrix" + after_coverage
+
+        with self.assertRaises(ValueError):
+            assert_valid_generated_plan(self, without_dag)
+
+    def test_generated_plan_output_contract_rejects_thin_execution_dag(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+        before_dag, after_dag = text.split("\n## 6. Execution DAG", 1)
+        _, after_coverage = after_dag.split("\n## 7. Coverage Matrix", 1)
+        thin_dag = (
+            before_dag
+            + "\n## 6. Execution DAG\n\n"
+            + "| Node | Scenario | Depends on | Consumes | Produces | Required capabilities | Side-effect scope | Isolation key | Parallel safety | Cleanup dependency | Disruptive marker |\n"
+            + "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+            + "| N1 | CHECKOUT-E2E-001 | none | none | none | none | none | none | ok | none | none |\n"
+            + "\n## 7. Coverage Matrix"
+            + after_coverage
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, thin_dag)
+
+    def test_generated_plan_output_contract_rejects_dag_unknown_scenario(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| N1 | CHECKOUT-E2E-001 |",
+            "| N1 | CHECKOUT-E2E-999 |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_malformed_dag_row(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |",
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |\n"
+            "| N2 | CHECKOUT-E2E-999 | J1 | `ghostToken` | `ghostId` | API | order table | `ghostId` | unsafe: bad | reason | cleanup by `ghostId` | none |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_dag_unsourced_consumed_variable(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU |",
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `ghostToken`, stocked SKU |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_unquoted_unsourced_consumed_variable(self) -> None:
+        cases = (
+            (FIXTURES / "valid-generated-plan.md")
+            .read_text(encoding="utf-8")
+            .replace(
+                "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU |",
+                "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | ghostToken, stocked SKU |",
+            ),
+            (FIXTURES / "valid-generated-plan.md")
+            .read_text(encoding="utf-8")
+            .replace(
+                "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU |",
+                "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | ghost_token, stocked SKU |",
+            ),
+            (FIXTURES / "valid-generated-plan.md")
+            .read_text(encoding="utf-8")
+            .replace(
+                "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU |",
+                "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | GHOST_TOKEN, stocked SKU |",
+            ),
+        )
+
+        for text in cases:
+            with self.subTest():
+                with self.assertRaises(AssertionError):
+                    assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_depends_on_unsourced_variable(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready |",
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, ghostToken ready |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_future_producer_not_in_depends(self) -> None:
+        base = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+        original_row = "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |"
+        mutated_row = "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `futureToken`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |"
+        future_row = "| N2 | CHECKOUT-E2E-001 | N1 | `orderId` | `futureToken` | API, DB, job, stub | order table | `futureToken` prefix | unsafe: depends on N1 output | cleanup by `futureToken` | none |"
+        text = base.replace(original_row, mutated_row + "\n" + future_row)
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_same_node_consumes_own_output(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` |",
+            "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `sameNodeToken`, stocked SKU | `sameNodeToken`, `cartId`, `orderId`, `paymentEventId`, `invoiceId` |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_cleanup_from_later_unrelated_node(self) -> None:
+        base = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+        original_row = "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |"
+        mutated_row = "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | cleanup by `futureCleanupId` | none |"
+        future_row = "| N2 | CHECKOUT-E2E-001 | N1 | `orderId` | `futureCleanupId` | API, DB, job, stub | order table | `futureCleanupId` prefix | unsafe: depends on N1 output | cleanup by `futureCleanupId` | none |"
+        text = base.replace(original_row, mutated_row + "\n" + future_row)
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_cyclic_execution_dag(self) -> None:
+        base = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+        original_row = "| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |"
+        n1 = "| N1 | CHECKOUT-E2E-001 | N2, J1-J4 | `futureToken`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: waits on N2 output | after invoice probe, cleanup by `orderId` | none |"
+        n2 = "| N2 | CHECKOUT-E2E-001 | N1 | `orderId` | `futureToken` | API, DB, job, stub | order table | `futureToken` prefix | unsafe: waits on N1 output | cleanup by `futureToken` | none |"
+        text = base.replace(original_row, n1 + "\n" + n2)
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_parallel_safety_without_reason(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` |",
+            "| `orderId` batch prefix | unsafe: | after invoice probe, cleanup by `orderId` |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_dag_row_without_cleanup_dependency(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8").replace(
+            "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` |",
+            "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_cleanup_without_supported_variable(self) -> None:
+        cases = (
+            (FIXTURES / "valid-generated-plan.md")
+            .read_text(encoding="utf-8")
+            .replace(
+                "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` |",
+                "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | cleanup later |",
+            ),
+            (FIXTURES / "valid-generated-plan.md")
+            .read_text(encoding="utf-8")
+            .replace(
+                "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` |",
+                "| `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `ghostCleanupId` |",
+            ),
+        )
+
+        for text in cases:
+            with self.subTest():
+                with self.assertRaises(AssertionError):
+                    assert_valid_generated_plan(self, text)
+
     def test_generated_plan_output_contract_rejects_marker_only_plan(self) -> None:
         text = (FIXTURES / "marker-only-plan.md").read_text(encoding="utf-8")
 
@@ -413,21 +843,21 @@ class E2ETestPlannerContractTest(unittest.TestCase):
 
     def test_generated_plan_output_contract_accepts_without_optional_minimal_slice(self) -> None:
         text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
-        without_minimal_slice = text.split("\n## 10. Minimal First Automation Slice", 1)[0].rstrip()
+        without_minimal_slice = text.split("\n## 11. Minimal First Automation Slice", 1)[0].rstrip()
 
         assert_valid_generated_plan(self, without_minimal_slice)
 
     def test_generated_plan_output_contract_rejects_thin_agent_ready_gates(self) -> None:
         text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
-        before_gates, after_gates = text.split("## 9. Agent-ready Gates", 1)
-        _, after_minimal = after_gates.split("## 10. Minimal First Automation Slice", 1)
+        before_gates, after_gates = text.split("## 10. Agent-ready Gates", 1)
+        _, after_minimal = after_gates.split("## 11. Minimal First Automation Slice", 1)
         thin_gates = (
             before_gates
-            + "## 9. Agent-ready Gates\n\n"
+            + "## 10. Agent-ready Gates\n\n"
             + "- Entry: ok.\n"
             + "- Exit: done.\n"
             + "- Suspend: stop.\n\n"
-            + "## 10. Minimal First Automation Slice"
+            + "## 11. Minimal First Automation Slice"
             + after_minimal
         )
 
@@ -452,8 +882,9 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             original.replace("- 期望：", "- 期望结果："),
             original.replace("- 自动化级别：", "- 自动化："),
             original.replace("- 阻塞/缺口：", "- 阻塞："),
-            original.replace("## 6. 覆盖矩阵", "### 覆盖矩阵"),
-            original.replace("## 9. Agent 就绪门禁", "## 9. 门禁"),
+            original.replace("| 节点 | 场景 | 依赖 | 消费 | 产出 | 所需能力 | 副作用范围 | 隔离键 | 并行安全 | 清理依赖 | 扰动标记 |", "| 节点 | 场景 | 前置 | 输入 | 输出 | 能力 | 影响 | 隔离 | 并发 | 清理 | 扰动 |"),
+            original.replace("## 7. 覆盖矩阵", "### 覆盖矩阵"),
+            original.replace("## 10. Agent 就绪门禁", "## 10. 门禁"),
         )
 
         for text in cases:

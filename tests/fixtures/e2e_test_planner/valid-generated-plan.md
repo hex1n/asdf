@@ -53,28 +53,34 @@ flowchart TD
 - Automation: E2E API integration.
 - Isolation/Cleanup: Delete by `orderId`, release stock reservation, reset provider stub.
 
-## 6. Coverage Matrix
+## 6. Execution DAG
+
+| Node | Scenario | Depends on | Consumes | Produces | Required capabilities | Side-effect scope | Isolation key | Parallel safety | Cleanup dependency | Disruptive marker |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N1 | CHECKOUT-E2E-001 | J1-J4, provider stub ready | `userId`, stocked SKU | `cartId`, `orderId`, `paymentEventId`, `invoiceId` | API, DB, job, stub | order, stock, callback ledger, invoice tables | `orderId` batch prefix | unsafe: main chain consumes produced IDs in order | after invoice probe, cleanup by `orderId` | none |
+
+## 7. Coverage Matrix
 
 | Edge/Risk | Scenario |
 | --- | --- |
 | J1-J4 checkout -> payment -> invoice | CHECKOUT-E2E-001 |
 | J3 duplicate callback idempotency | CHECKOUT-E2E-001 |
 
-## 7. Gaps, Assumptions, Questions
+## 8. Gaps, Assumptions, Questions
 
 - Payment-provider timeout behavior is not covered in this first slice.
 - SLA targets are unverified.
 
-## 8. Execution Order
+## 9. Execution Order
 
 1. Run CHECKOUT-E2E-001 against the provider stub.
 
-## 9. Agent-ready Gates
+## 10. Agent-ready Gates
 
 - Entry: `POST /checkout`, callback endpoint, invoice worker trigger, and provider stub are available.
 - Exit: CHECKOUT-E2E-001 captures `orderId`, `paymentEventId`, `invoiceId`, API/DB probes, and cleanup evidence.
 - Suspend: stop if provider stub, invoice worker trigger, or cleanup by `orderId` is unavailable.
 
-## 10. Minimal First Automation Slice
+## 11. Minimal First Automation Slice
 
 Automate checkout, one successful callback, and invoice assertion first.

@@ -10,7 +10,7 @@ Build a source-backed, dependency-aware test plan. The core move is the **busine
 
 Output language: use the language the user explicitly requests; otherwise infer from the user's latest prompt, then the dominant source-document language. For mixed-language input, write prose in the user's conversational language and preserve code identifiers, paths, API names, enum values, logs, and quoted source text as-is. If the language choice remains ambiguous, state the assumed output language once.
 
-Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, and blockers. Avoid approval-only template sections unless the user asks for a formal QA document.
+Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, dependency DAG facts, and blockers. Avoid approval-only template sections unless the user asks for a formal QA document.
 
 ## 1. Source Inventory
 
@@ -62,7 +62,7 @@ Derive scenarios from the journey graph, not from a generic checklist. Cover eac
 
 Completion criterion: each requirement, API variant, required-input branch, state transition, business-flow edge, dependency edge, and high-risk failure mode is covered by at least one scenario or listed as a gap. Treat source-only suspected defects as verification targets unless runtime evidence or tests reproduce them.
 
-## 5. Test Plan
+## 5. Test Scenarios
 
 Write scenarios at the level a downstream implementation agent can execute without rediscovering the analysis. For each scenario include:
 
@@ -76,13 +76,32 @@ Write scenarios at the level a downstream implementation agent can execute witho
 
 Completion criterion: no scenario assumes an impossible state, hidden setup, or unavailable previous result.
 
-## 6. Closure
+## 6. Execution DAG
+
+After scenarios, provide an executor-consumable DAG. The DAG states scheduling facts; it does not decide the runtime schedule for a specific machine or environment.
+
+Use a table with one row per executable node. Nodes usually map to scenarios; split setup, probe, disruptive, or cleanup nodes only when a downstream executor needs different dependencies or isolation. Include:
+
+- Node ID and scenario ID.
+- Depends on: predecessor nodes, business-flow edges, and required produced variables.
+- Consumes and produces: named variables such as IDs, tokens, event IDs, records, and evidence handles.
+- Required capabilities: API, RPC, CLI, UI, DB, MQ, job, log, metric, stub, or local service controls.
+- Side-effect scope and isolation key: affected tables, queues, caches, external stubs, tenant/account, batch ID, trace ID, or data prefix.
+- Parallel safety: `safe`, `unsafe`, or `unknown`, with a short reason.
+- Cleanup dependency: when cleanup may run and which produced variables it needs.
+- Disruptive marker: concurrency, recovery, compensation, load, callback race, or none.
+
+Use stable table headers. For English output, use `Node`, `Scenario`, `Depends on`, `Consumes`, `Produces`, `Required capabilities`, `Side-effect scope`, `Isolation key`, `Parallel safety`, `Cleanup dependency`, and `Disruptive marker`. For Chinese output, use `节点`, `场景`, `依赖`, `消费`, `产出`, `所需能力`, `副作用范围`, `隔离键`, `并行安全`, `清理依赖`, and `扰动标记`.
+
+Completion criterion: every scenario appears in the DAG or is listed as intentionally manual/blocked; every `unsafe` or `unknown` node has a reason; every variable used across scenarios has a producer or source-supported fixture and a consumer; produced variables consumed by a node come from predecessor nodes named in `Depends on`, not from later or unrelated nodes; the DAG is acyclic; execution order can be derived from `Depends on` without rereading the prose.
+
+## 7. Closure
 
 End with:
 
 - Level-2 `Coverage Matrix` / `覆盖矩阵` mapping requirements, business-flow edges, journey graph edges, and risk families to scenario IDs.
 - Level-2 `Gaps, Assumptions, Questions` / `缺口、假设与问题` naming doc/code conflicts, assumptions, and questions that could change the plan.
-- Level-2 `Execution Order` / `执行顺序` as an agent-ready dependency sequence when scenarios share setup or produced state.
+- Level-2 `Execution Order` / `执行顺序` as a recommended dependency sequence derived from the Execution DAG, not a replacement for the DAG.
 - Level-2 `Agent-ready Gates` / `Agent 就绪门禁`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution.
 - Level-2 `Minimal First Automation Slice` / `最小自动化切片` if the user asks how to start, with the scenario IDs and source-backed target surfaces to implement first.
 

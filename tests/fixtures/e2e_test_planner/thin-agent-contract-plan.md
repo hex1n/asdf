@@ -44,6 +44,12 @@ flowchart TD
 - Automation: E2E API integration.
 - Isolation/Cleanup: Delete by `orderId`.
 
+## Execution DAG
+
+| Node | Scenario | Depends on | Consumes | Produces | Required capabilities | Side-effect scope | Isolation key | Parallel safety | Cleanup dependency | Disruptive marker |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| N1 | CHECKOUT-E2E-001 | J1-J2 | `cartId` | `orderId` | API, DB, stub | order table | `orderId` prefix | unsafe: order creation consumes checkout output | after order API probe, cleanup by `orderId` | none |
+
 ## Coverage Matrix
 
 | Risk | Scenario |

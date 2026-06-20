@@ -13,6 +13,11 @@ if (process.env.ANTHROPIC_API_KEY) {
   process.exit(81);
 }
 
+if (process.env.OPENAI_API_KEY) {
+  console.error("fake-claude: OPENAI_API_KEY leaked into child process");
+  process.exit(82);
+}
+
 const input = await readStdin();
 const delayMs = Number(process.env.FAKE_CLAUDE_DELAY_MS || 0);
 if (delayMs > 0) {

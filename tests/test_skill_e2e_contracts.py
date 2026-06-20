@@ -144,49 +144,6 @@ SCENARIOS = (
         ),
     ),
     SkillScenario(
-        name="resume_best_version_pruning",
-        prompt_without_skill="Turn a Git author's history into the strongest resume bullets.",
-        skill_files=[
-            "skills/git-resume-miner/SKILL.md",
-            "skills/git-resume-miner/BEST_PRACTICES.md",
-        ],
-        target_files=(
-            "skills/git-resume-miner/SKILL.md",
-            "skills/git-resume-miner/BEST_PRACTICES.md",
-        ),
-        required_markers=(
-            "best-version tournament",
-            "compare them pairwise",
-            "adversarial post-output self-review",
-            "strongest evidence-based argument",
-            "do not include code paths",
-            "candidate rankings",
-            "resume-ready defense check",
-            "defensible claim",
-            "defense card",
-            "overstatement risk",
-            "interview challenge",
-            "interview-ready",
-            "evidence anchors",
-            "trade-off defense",
-            "ownership boundaries",
-        ),
-        scoped_markers=(
-            "best-version tournament",
-            "adversarial post-output self-review",
-            "strongest evidence-based argument",
-            "resume-ready defense check",
-            "defensible claim",
-            "defense card",
-            "overstatement risk",
-            "interview challenge",
-            "interview-ready",
-            "evidence anchors",
-            "trade-off defense",
-            "ownership boundaries",
-        ),
-    ),
-    SkillScenario(
         name="deep_research_codebase_investigation",
         prompt_without_skill="Explain why the artifact behavior in this repository happens.",
         skill_files=[
@@ -383,7 +340,6 @@ SCENARIOS = (
 
 RUNTIME_SKILL_FILES = (
     "skills/java-stack-craft/SKILL.md",
-    "skills/git-resume-miner/SKILL.md",
     "skills/deep-research/SKILL.md",
     "skills/first-principles-planner/SKILL.md",
 )
@@ -392,7 +348,6 @@ MAIN_CONTEXT_FILES = (
     "AGENTS.md",
     *RUNTIME_SKILL_FILES,
     "skills/java-stack-craft/RISK_ROUTER.md",
-    "skills/git-resume-miner/BEST_PRACTICES.md",
 )
 
 
@@ -423,28 +378,9 @@ class SkillE2EContractsTest(unittest.TestCase):
     def test_entrypoints_route_to_improved_detail_files(self) -> None:
         java_skill = read_text("skills/java-stack-craft/SKILL.md")
         java_router = read_text("skills/java-stack-craft/RISK_ROUTER.md")
-        resume_skill = read_text("skills/git-resume-miner/SKILL.md")
-        resume_practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md")
 
         self.assertIn("[RISK_ROUTER.md](RISK_ROUTER.md)", java_skill)
         self.assertIn("candidate tournament", java_router)
-        self.assertIn("Best-Version Tournament", resume_skill)
-        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#best-version-tournament-funnel)", resume_skill)
-        self.assertIn("Best-Version Tournament Funnel", resume_practices)
-        self.assertIn("Adversarial Post-Output Self-Review", resume_practices)
-
-    def test_git_resume_entrypoint_stays_runtime_skeleton(self) -> None:
-        resume_skill = read_text("skills/git-resume-miner/SKILL.md")
-
-        self.assertIn("## Run Contract", resume_skill)
-        self.assertIn("## Reference Pointers", resume_skill)
-        self.assertIn("Completion criterion", resume_skill)
-        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#evidence-sampling-script)", resume_skill)
-        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#resume-ready-defense-check)", resume_skill)
-        self.assertIn("[BEST_PRACTICES.md](BEST_PRACTICES.md#interview-ready-defense-pack)", resume_skill)
-        self.assertIn("Defense Card", resume_skill)
-        self.assertNotIn("## Output Contract", resume_skill)
-        self.assertNotIn("## Quality Bar", resume_skill)
 
     def test_deep_research_saved_header_uses_core_conclusion_not_header_tldr(self) -> None:
         skill = read_text("skills/deep-research/SKILL.md").lower()
@@ -544,47 +480,6 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("which independent evidence lanes support it", section)
         self.assertIn("what specific evidence would change", section)
         self.assertIn("why should the investigation stop now", section)
-
-    def test_tournament_does_not_leak_resume_candidate_rankings_to_final_output(self) -> None:
-        resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()
-        practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md").lower()
-
-        self.assertIn("best-version tournament", resume_skill)
-        self.assertIn("candidate rankings", resume_skill)
-        self.assertIn("do not include code paths", resume_skill)
-        self.assertIn("no evidence table, commit list, code path, confidence label, or candidate ranking", practices)
-
-    def test_resume_ready_defense_check_keeps_final_bullets_defensible(self) -> None:
-        resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()
-        practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md")
-        section = practices.split("## Resume-Ready Defense Check", 1)[1].split(
-            "## Final Acceptance Checklist", 1
-        )[0].lower()
-
-        self.assertIn("[best_practices.md](best_practices.md#resume-ready-defense-check)", resume_skill)
-        self.assertIn("defensible claim", resume_skill)
-        self.assertIn("defense card", section)
-        self.assertIn("which kept workstream won", section)
-        self.assertIn("which representative diff, current code, test, doc, or user-provided fact", section)
-        self.assertIn("why the chosen verb is justified", section)
-        self.assertIn("what would be exaggerated under interview challenge", section)
-        self.assertIn("what focused metric question remains", section)
-
-    def test_interview_mode_keeps_defensible_evidence_without_full_analysis_dump(self) -> None:
-        resume_skill = read_text("skills/git-resume-miner/SKILL.md").lower()
-        practices = read_text("skills/git-resume-miner/BEST_PRACTICES.md")
-        section = practices.split("## Interview-Ready Defense Pack", 1)[1].split(
-            "## Final Acceptance Checklist", 1
-        )[0].lower()
-
-        self.assertIn("interview-ready", resume_skill)
-        self.assertIn("evidence anchors", resume_skill)
-        self.assertIn("trade-off defense", resume_skill)
-        self.assertIn("ownership boundaries", resume_skill)
-        self.assertIn("one concise evidence anchor per major claim", section)
-        self.assertIn("what exactly did you own", section)
-        self.assertIn("likely interviewer follow-ups and direct answers", section)
-        self.assertIn("do not print the full contribution ledger or candidate ranking", section)
 
     def test_rule_harvest_stays_in_maintenance_guidance(self) -> None:
         agents = read_text("AGENTS.md").lower()

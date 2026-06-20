@@ -1,8 +1,0 @@
-{
-  "name": "cx",
-  "version": "0.5.0",
-  "description": "Delegate consult and review to Codex, and manage trackable work/resume jobs with a Node companion",
-  "author": {
-    "name": "hexin"
-  }
-}

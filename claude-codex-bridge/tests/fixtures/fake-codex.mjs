@@ -36,7 +36,7 @@ if (process.env.FAKE_CODEX_EMPTY !== "1") {
   const mode = args[0] === "exec" && args[1] === "resume" ? "resume" : "work";
   const sessionLine = JSON.stringify({ type: "session", session_id: sessionId });
   process.stdout.write(`${sessionLine}\n`);
-  await fs.writeFile(outputPath, renderResult(mode, args, input), "utf8");
+  await fs.writeFile(outputPath, process.env.FAKE_CODEX_RESULT || renderResult(mode, args, input), "utf8");
 }
 
 process.exit(0);

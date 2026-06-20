@@ -41,6 +41,9 @@ test("foreground cx work writes state, result, log, prompt, and session registry
   const job = jobs[0];
   assert.equal(job.action, "work");
   assert.equal(job.mode, "work");
+  assert.equal(job.originAgent, "claude");
+  assert.equal(job.targetAgent, "cx");
+  assert.equal(job.workflow, "work");
   assert.equal(job.status, "completed");
   assert.equal(job.model, "codex-test-model");
   assert.equal(job.effort, "low");
@@ -616,6 +619,9 @@ test("foreground claude work writes result, cost footer, and Claude session regi
   assert.equal(job.side, "claude");
   assert.equal(job.action, "work");
   assert.equal(job.mode, "work");
+  assert.equal(job.originAgent, "cx");
+  assert.equal(job.targetAgent, "claude");
+  assert.equal(job.workflow, "work");
   assert.equal(job.status, "completed");
   assert.equal(job.sessionId, "22222222-2222-4222-8222-222222222222");
 
@@ -674,6 +680,65 @@ test("claude direct consult uses prompt file and registers consult session", asy
   assert.equal(lastSession.source, "consult");
 });
 
+test("default state root prefers CLAUDE_PLUGIN_DATA before user home", async (t) => {
+  const ctx = await makeContext(t);
+  const pluginData = path.join(ctx.cwd, "plugin-data");
+  const promptFile = path.join(ctx.cwd, "plugin-data-prompt.txt");
+  await fs.writeFile(promptFile, "state root check", "utf8");
+
+  const result = runCompanionWithoutExplicitState(ctx, [
+    "claude",
+    "direct",
+    "--mode",
+    "consult",
+    "--prompt-file",
+    promptFile,
+  ], {
+    CLAUDE_PLUGIN_DATA: pluginData,
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /fake claude work result/);
+  const jobs = await readJobs(path.join(pluginData, "claude-codex-bridge"));
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].side, "claude");
+});
+
+test("setup reports local diagnostics without invoking the native agent", async (t) => {
+  const ctx = await makeContext(t);
+
+  const result = runCompanion(ctx, ["claude", "setup", "--json"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.side, "claude");
+  assert.equal(parsed.stateWritable, true);
+  assert.equal(parsed.nativeCommandFound, true);
+  assert.equal(parsed.directBilling.blocked, false);
+  assert.equal(parsed.recursiveBlocked, false);
+  assert.equal(parsed.reviewVerification, "enabled");
+
+  const jobsRoot = path.join(ctx.stateRoot, "jobs");
+  assert.equal(await pathExists(jobsRoot), false);
+});
+
+test("setup surfaces billing and recursive bridge risks as diagnostics", async (t) => {
+  const ctx = await makeContext(t);
+
+  const result = runCompanion(ctx, ["cx", "setup", "--json"], {
+    OPENAI_API_KEY: "would-block-real-run",
+    CLAUDE_CODEX_BRIDGE_AGENT_STACK: "claude,cx",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.side, "cx");
+  assert.equal(parsed.directBilling.blocked, true);
+  assert.deepEqual(parsed.directBilling.present, ["OPENAI_API_KEY"]);
+  assert.equal(parsed.recursiveBlocked, true);
+  assert.deepEqual(parsed.agentStack, ["claude", "cx"]);
+});
+
 test("cx direct consult uses the shared native runner and prompt file", async (t) => {
   const ctx = await makeContext(t);
   const promptText = [
@@ -717,6 +782,28 @@ test("cx direct consult uses the shared native runner and prompt file", async (t
   assert.match(prompt, /<compact_output_contract>/);
   assert.match(prompt, /<grounding_rules>/);
   assert.ok(prompt.includes(promptText), prompt);
+});
+
+test("catalog direct entrypoint supplies the fixed consult profile", async (t) => {
+  const ctx = await makeContext(t);
+  const promptFile = path.join(ctx.cwd, "catalog-consult-prompt.txt");
+  await fs.writeFile(promptFile, "catalog direct consult", "utf8");
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "consult",
+    "--prompt-file",
+    promptFile,
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /fake codex work result/);
+  assert.match(result.stdout, /"--sandbox","read-only"/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs.length, 1);
+  assert.equal(jobs[0].mode, "consult");
+  assert.equal(jobs[0].workflow, "consult");
 });
 
 test("cx review passes only custom focus to native codex review", async (t) => {
@@ -1118,6 +1205,344 @@ test("§3 review focus stays in the trusted instruction region above the fence",
   assert.ok(focusAt < fenceOpenAt, result.stdout);
 });
 
+test("review focus can be supplied through stdin without a focus temp file", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+
+  const result = runCompanionWithInput(ctx, [
+    "claude",
+    "review",
+    "--dry-run",
+    "--path",
+    ".",
+    "--focus-stdin",
+  ], "STDIN_FOCUS_MARKER\nsecond focus line\n");
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /STDIN_FOCUS_MARKER/);
+  assert.match(result.stdout, /second focus line/);
+});
+
+test("claude review appends local verification for reviewer findings", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\nbuggy call\n", "utf8");
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--path",
+    "tracked.txt",
+  ], {
+    FAKE_CLAUDE_RESULT: [
+      "P1 | tracked.txt:2 | changed line may be wrong | buggy call",
+      "P2 | missing.txt:1 | impossible location | missing evidence",
+      "P3 | tracked.txt:2 | plausible but weak | evidence not present locally",
+    ].join("\n"),
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /bridge verification:/);
+  assert.match(result.stdout, /verified: 1/);
+  assert.match(result.stdout, /plausible-unverified: 1/);
+  assert.match(result.stdout, /rejected: 1/);
+  assert.match(result.stdout, /P1 \| tracked\.txt:2 \| changed line may be wrong/);
+  assert.match(result.stdout, /P2 \| missing\.txt:1 \| impossible location/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(jobs[0].reviewVerification.counts, {
+    verified: 1,
+    "plausible-unverified": 1,
+    rejected: 1,
+  });
+
+  const fetched = runCompanion(ctx, ["claude", "result", jobs[0].id, "--json"]);
+  assert.equal(fetched.status, 0, fetched.stderr);
+  const parsed = JSON.parse(fetched.stdout);
+  assert.equal(parsed.reviewVerification.counts.verified, 1);
+  assert.match(parsed.resultText, /bridge verification:/);
+});
+
+test("verify-review re-checks a completed review job without mutating result text", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\nsecond pass bug\n", "utf8");
+
+  const review = runCompanion(ctx, [
+    "claude",
+    "review",
+    "--path",
+    "tracked.txt",
+  ], {
+    FAKE_CLAUDE_RESULT: "P1 | tracked.txt:2 | second pass finding | second pass bug\n",
+  });
+
+  assert.equal(review.status, 0, review.stderr);
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs.length, 1);
+  const before = await fs.readFile(jobs[0].resultFile, "utf8");
+
+  const verified = runCompanion(ctx, ["claude", "verify-review", jobs[0].id, "--json"]);
+
+  assert.equal(verified.status, 0, verified.stderr);
+  const parsed = JSON.parse(verified.stdout);
+  assert.equal(parsed.source.type, "job");
+  assert.equal(parsed.source.jobId, jobs[0].id);
+  assert.equal(parsed.verification.counts.verified, 1);
+  assert.equal(await fs.readFile(jobs[0].resultFile, "utf8"), before);
+});
+
+test("verify-review refuses non-completed review jobs without reconciling state", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  const job = await writeFakeJob(ctx, {
+    side: "claude",
+    action: "direct",
+    mode: "review",
+    status: "running",
+    heartbeatAt: null,
+    resultText: "P1 | tracked.txt:1 | pending finding | base\n",
+  });
+
+  const result = runCompanion(ctx, ["claude", "verify-review", job.id]);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /is running, not completed/);
+  const after = await readJobRecord(ctx, job.id);
+  assert.equal(after.status, "running");
+});
+
+test("verify-review can check a workspace review output file", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\nfile mode bug\n", "utf8");
+  await fs.writeFile(
+    path.join(ctx.cwd, "review-output.md"),
+    "P2 | tracked.txt:2 | file mode finding | file mode bug\n",
+    "utf8",
+  );
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "verify-review",
+    "--file",
+    "review-output.md",
+    "--json",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const parsed = JSON.parse(result.stdout);
+  assert.equal(parsed.side, "cx");
+  assert.equal(parsed.source.type, "file");
+  assert.match(parsed.source.reviewFile, /review-output\.md$/);
+  assert.equal(parsed.verification.counts.verified, 1);
+});
+
+test("verify-review file mode refuses paths outside the workspace", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  const outside = path.join(path.dirname(ctx.cwd), "outside-review.md");
+  await fs.writeFile(outside, "P1 | tracked.txt:1 | outside | base\n", "utf8");
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "verify-review",
+    "--file",
+    "../outside-review.md",
+  ]);
+
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /review file escapes the working directory/);
+});
+
+test("verify-review rejects finding locations that are symlinks", {
+  skip: process.platform === "win32" ? "symlink privileges vary on Windows" : false,
+}, async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  const outside = path.join(path.dirname(ctx.cwd), "outside-secret.txt");
+  await fs.writeFile(outside, "outside-only-evidence\n", "utf8");
+  await fs.symlink(outside, path.join(ctx.cwd, "leak.txt"));
+  await fs.writeFile(
+    path.join(ctx.cwd, "review-output.md"),
+    "P1 | leak.txt:1 | symlink finding | outside-only-evidence\n",
+    "utf8",
+  );
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "verify-review",
+    "--file",
+    "review-output.md",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /verified: 0/);
+  assert.match(result.stdout, /rejected: 1/);
+  assert.match(result.stdout, /location is a symlink and will not be read/);
+});
+
+test("claude adversarial-review uses adversarial bundle instructions and verification", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\nhidden regression\n", "utf8");
+
+  const dryRun = runCompanion(ctx, [
+    "claude",
+    "adversarial-review",
+    "--dry-run",
+    "--path",
+    "tracked.txt",
+    "--focus",
+    "challenge the apparent fix",
+  ]);
+
+  assert.equal(dryRun.status, 0, dryRun.stderr);
+  assert.match(dryRun.stdout, /Adversarially review the local changes/);
+  assert.match(dryRun.stdout, /Review kind: adversarial-review/);
+  assert.match(dryRun.stdout, /Finding admission gate: before reporting any finding/);
+  assert.match(dryRun.stdout, /stateful workflows whose later actions depend on earlier results/);
+  assert.match(dryRun.stdout, /problem field must state the concrete failure mechanism/);
+  assert.match(dryRun.stdout, /challenge the apparent fix/);
+
+  const result = runCompanion(ctx, [
+    "claude",
+    "adversarial-review",
+    "--path",
+    "tracked.txt",
+  ], {
+    FAKE_CLAUDE_RESULT: "P1 | tracked.txt:2 | retry reuses the stale previous result, so hidden regression survives | hidden regression\n",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /retry reuses the stale previous result/);
+  assert.match(result.stdout, /bridge verification:/);
+  assert.match(result.stdout, /verified: 1/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  const job = jobs.find((entry) => entry.reviewKind === "adversarial-review");
+  assert.ok(job);
+  assert.equal(job.mode, "review");
+  assert.equal(job.originAgent, "cx");
+  assert.equal(job.targetAgent, "claude");
+  assert.equal(job.workflow, "adversarial-review");
+  assert.equal(job.reviewVerification.counts.verified, 1);
+});
+
+test("cx review also appends local verification before Claude receives the result", async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\n", "utf8");
+  git(ctx, ["add", "tracked.txt"]);
+  git(ctx, ["commit", "-m", "seed"]);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\ncodex bug\n", "utf8");
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "review",
+    "--path",
+    "tracked.txt",
+    "--focus",
+    "check changed line",
+  ], {
+    FAKE_CODEX_RESULT: "P1 | tracked.txt:2 | codex finding | codex bug\n",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /P1 \| tracked\.txt:2 \| codex finding \| codex bug/);
+  assert.match(result.stdout, /bridge verification:/);
+  assert.match(result.stdout, /verified: 1/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs[0].side, "cx");
+  assert.equal(jobs[0].mode, "review");
+  assert.equal(jobs[0].reviewVerification.counts.verified, 1);
+});
+
+test("cx adversarial-review forwards adversarial focus to native codex review", async (t) => {
+  const ctx = await makeContext(t);
+  await initGitRepo(ctx);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\n", "utf8");
+  git(ctx, ["add", "tracked.txt"]);
+  git(ctx, ["commit", "-m", "seed"]);
+  await fs.writeFile(path.join(ctx.cwd, "tracked.txt"), "base\ncodex adversarial bug\n", "utf8");
+
+  const dryRun = runCompanion(ctx, [
+    "cx",
+    "adversarial-review",
+    "--dry-run",
+    "--path",
+    "tracked.txt",
+    "--focus",
+    "attack edge cases",
+  ]);
+
+  assert.equal(dryRun.status, 0, dryRun.stderr);
+  assert.match(dryRun.stdout, /Adversarial review: actively try to falsify/);
+  assert.match(dryRun.stdout, /Finding admission gate: before reporting any finding/);
+  assert.match(dryRun.stdout, /previous-step result/);
+  assert.match(dryRun.stdout, /Prefer one high-confidence finding over several weak objections/);
+  assert.match(dryRun.stdout, /problem field must state the concrete failure mechanism/);
+  assert.match(dryRun.stdout, /attack edge cases/);
+
+  const result = runCompanion(ctx, [
+    "cx",
+    "adversarial-review",
+    "--path",
+    "tracked.txt",
+    "--focus",
+    "attack edge cases",
+  ], {
+    FAKE_CODEX_RESULT: "P1 | tracked.txt:2 | concurrent retry observes stale state and exposes codex adversarial bug | codex adversarial bug\n",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /P1 \| tracked\.txt:2 \| concurrent retry observes stale state/);
+  assert.match(result.stdout, /bridge verification:/);
+  assert.match(result.stdout, /verified: 1/);
+
+  const jobs = await readJobs(ctx.stateRoot);
+  assert.equal(jobs[0].side, "cx");
+  assert.equal(jobs[0].reviewKind, "adversarial-review");
+  assert.equal(jobs[0].originAgent, "claude");
+  assert.equal(jobs[0].targetAgent, "cx");
+  assert.equal(jobs[0].workflow, "adversarial-review");
+  assert.equal(jobs[0].reviewVerification.counts.verified, 1);
+});
+
+test("a new review workflow can be routed by catalog without a companion branch", async (t) => {
+  const ctx = await makeContext(t);
+  await seedReviewRepo(ctx);
+  const toolDir = path.join(ctx.cwd, "tool");
+  await fs.mkdir(toolDir, { recursive: true });
+  const script = path.join(toolDir, "bridge-companion.mjs");
+  const catalogFile = path.join(toolDir, "bridge-catalog.json");
+  await fs.copyFile(companionImpl, script);
+  const catalogJson = JSON.parse(await fs.readFile(catalog, "utf8"));
+  catalogJson.entrypoints.claude["challenge-review"] = {
+    type: "direct",
+    profile: "review",
+    action: "adversarial-review",
+  };
+  await fs.writeFile(catalogFile, `${JSON.stringify(catalogJson, null, 2)}\n`, "utf8");
+
+  const result = runCompanionScript(ctx, script, [
+    "claude",
+    "challenge-review",
+    "--dry-run",
+    "--path",
+    ".",
+    "--focus",
+    "catalog routed challenge",
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /Adversarially review the local changes/);
+  assert.match(result.stdout, /Review kind: adversarial-review/);
+  assert.match(result.stdout, /catalog routed challenge/);
+});
+
 test("§3 forged close delimiter cannot escape the untrusted fence", async (t) => {
   const ctx = await makeContext(t);
   await seedReviewRepo(ctx);
@@ -1471,6 +1896,36 @@ async function writeArgsFile(ctx, text) {
 
 function runCompanion(ctx, args, env = {}) {
   return runCompanionScript(ctx, companion, args, env);
+}
+
+function runCompanionWithInput(ctx, args, input, env = {}) {
+  return spawnSync(process.execPath, [companion, ...args], {
+    cwd: ctx.cwd,
+    env: {
+      ...testEnv(),
+      CLAUDE_CODEX_BRIDGE_STATE_HOME: ctx.stateRoot,
+      CLAUDE_CODEX_BRIDGE_CODEX_BIN: ctx.fakeCodexBin,
+      CLAUDE_CODEX_BRIDGE_CLAUDE_BIN: ctx.fakeClaudeBin,
+      ...env,
+    },
+    input,
+    encoding: "utf8",
+    timeout: 30000,
+  });
+}
+
+function runCompanionWithoutExplicitState(ctx, args, env = {}) {
+  return spawnSync(process.execPath, [companion, ...args], {
+    cwd: ctx.cwd,
+    env: {
+      ...testEnv(),
+      CLAUDE_CODEX_BRIDGE_CODEX_BIN: ctx.fakeCodexBin,
+      CLAUDE_CODEX_BRIDGE_CLAUDE_BIN: ctx.fakeClaudeBin,
+      ...env,
+    },
+    encoding: "utf8",
+    timeout: 30000,
+  });
 }
 
 function runCompanionScript(ctx, script, args, env = {}) {

@@ -165,6 +165,7 @@ for name, spec in claude_entrypoints.items():
     if not isinstance(spec, dict) or spec.get("type") not in {"direct", "task", "lookup"}:
         raise SystemExit(f"invalid Claude entrypoint spec: {name}")
     profile_name = spec.get("profile")
+    companion_action = spec.get("action", name)
     skill_name = f"claude-{name}"
     skill = skills_root / skill_name / "SKILL.md"
     if not skill.exists():
@@ -181,8 +182,8 @@ for name, spec in claude_entrypoints.items():
         if "bridge-companion.mjs" not in text:
             raise SystemExit(f"skill {skill_name} must call bridge-companion.mjs")
         if profile_name == "review":
-            if "claude review" not in text:
-                raise SystemExit(f"skill {skill_name} must call companion review")
+            if f"claude {companion_action}" not in text:
+                raise SystemExit(f"skill {skill_name} must call companion {companion_action}")
             if "--focus-file" not in text:
                 raise SystemExit(f"skill {skill_name} must pass review focus through --focus-file")
         else:
@@ -199,6 +200,7 @@ for name, spec in cx_entrypoints.items():
     if not isinstance(spec, dict) or spec.get("type") not in {"direct", "task", "lookup"}:
         raise SystemExit(f"invalid Codex entrypoint spec: {name}")
     profile_name = spec.get("profile")
+    companion_action = spec.get("action", name)
     command = commands_root / f"{name}.md"
     if not command.exists():
         raise SystemExit(f"missing Claude command: {command}")
@@ -215,8 +217,8 @@ for name, spec in cx_entrypoints.items():
         if 'scripts/bridge-companion.mjs" cx ' not in text:
             raise SystemExit(f"Claude command {name} must call bridge-companion.mjs")
         if profile_name == "review":
-            if "cx review" not in text:
-                raise SystemExit(f"Claude command {name} must call companion review")
+            if f"cx {companion_action}" not in text:
+                raise SystemExit(f"Claude command {name} must call companion {companion_action}")
             if "--focus-file" not in text:
                 raise SystemExit(f"Claude command {name} must pass review focus through --focus-file")
         else:

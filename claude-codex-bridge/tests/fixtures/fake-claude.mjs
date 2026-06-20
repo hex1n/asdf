@@ -45,6 +45,10 @@ process.stdout.write(`${JSON.stringify(result)}\n`);
 process.exit(result.is_error ? 0 : 0);
 
 function renderResult(mode, values, input) {
+  if (process.env.FAKE_CLAUDE_RESULT) {
+    return process.env.FAKE_CLAUDE_RESULT;
+  }
+
   if (mode === "resume") {
     return [
       "fake claude resume result",

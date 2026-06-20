@@ -162,6 +162,13 @@
       "review": {
         "type": "direct",
         "profile": "review",
+        "action": "review",
+        "registerSession": true
+      },
+      "adversarial-review": {
+        "type": "direct",
+        "profile": "review",
+        "action": "adversarial-review",
         "registerSession": true
       },
       "work": {
@@ -184,6 +191,14 @@
       "cancel": {
         "type": "lookup",
         "action": "cancel"
+      },
+      "setup": {
+        "type": "lookup",
+        "action": "setup"
+      },
+      "verify-review": {
+        "type": "lookup",
+        "action": "verify-review"
       }
     },
     "cx": {
@@ -193,7 +208,13 @@
       },
       "review": {
         "type": "direct",
-        "profile": "review"
+        "profile": "review",
+        "action": "review"
+      },
+      "adversarial-review": {
+        "type": "direct",
+        "profile": "review",
+        "action": "adversarial-review"
       },
       "work": {
         "type": "task",
@@ -215,6 +236,14 @@
       "cancel": {
         "type": "lookup",
         "action": "cancel"
+      },
+      "setup": {
+        "type": "lookup",
+        "action": "setup"
+      },
+      "verify-review": {
+        "type": "lookup",
+        "action": "verify-review"
       }
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "claude-codex-bridge",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "Delegate consult and review to headless Claude Code, and manage trackable Claude work/resume jobs.",
   "author": {
     "name": "hexin"
@@ -32,7 +32,10 @@
     "defaultPrompt": [
       "/claude-consult ask Claude Code a read-only question",
       "/claude-review ask Claude Code to review local changes",
+      "/claude-adversarial-review ask Claude Code to challenge local changes",
+      "/claude-verify-review verify a Claude review result locally",
       "/claude-work delegate trackable work to Claude Code",
+      "/claude-setup diagnose Claude bridge configuration",
       "/claude-status inspect bridge-owned Claude jobs",
       "/claude-result fetch a Claude job result",
       "/claude-cancel cancel a running Claude job",

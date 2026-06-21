@@ -195,7 +195,10 @@ JDK_FEATURE_RULES = (
     ),
     JdkFeatureRule(
         14,
-        re.compile(r"\bcase\b.*->"),
+        # Match the switch-arm arrow (`case L ->`), not a classic `case L:` line
+        # that merely contains a lambda `->`; a colon before the arrow means the
+        # arrow belongs to a lambda/body, not a switch expression.
+        re.compile(r"\bcase\b[^:]*->"),
         "switch expressions require JDK 14",
         "use classic switch syntax or raise the target JDK",
     ),

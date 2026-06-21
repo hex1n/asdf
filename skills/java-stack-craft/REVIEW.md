@@ -16,7 +16,7 @@ Do not turn every review into a repo audit. For repo audits, default to the top 
 
 ## Step R2: Gather evidence
 
-Use the main skill gates first: read [WORK_CONTEXT.md](WORK_CONTEXT.md), reuse or refresh the Java Work Context according to its lifecycle rule, read Spring rules for Spring projects, inspect conventions, and read [RISK_ROUTER.md](RISK_ROUTER.md). Read [PROFILE.md](PROFILE.md); the context command creates or updates `docs/agents/java-stack-profile.md` by default. For repeated, broad, or noisy reviews, also read `docs/agents/java-stack-review-memory.md` when present. Then gather only evidence that can change priority.
+Use the main skill gates first: read [WORK_CONTEXT.md](WORK_CONTEXT.md), reuse or refresh the Java Work Context according to its lifecycle rule, read Spring rules for Spring projects, inspect conventions, read the language-level [Common pitfalls](REFERENCE.md#common-pitfalls) and [Review checklist](REFERENCE.md#review-checklist) (these catch defects the scanner does not flag, e.g. `Collectors.toMap` duplicate-key/null-value), and read [RISK_ROUTER.md](RISK_ROUTER.md). Read [PROFILE.md](PROFILE.md); the context command creates or updates `docs/agents/java-stack-profile.md` by default. For repeated, broad, or noisy reviews, also read `docs/agents/java-stack-review-memory.md` when present. Then gather only evidence that can change priority.
 
 Useful evidence:
 

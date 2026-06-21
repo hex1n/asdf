@@ -487,6 +487,10 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("rule harvest gate", agents)
         self.assertIn("skill evolution loop", agents)
         self.assertIn("load and apply `writing-great-skills`", agents)
+        # the "unavailable" fallback must be backed by a failed lookup, not asserted bare
+        # (closes the hole that let a prior round record the frame unavailable unchecked)
+        self.assertIn("cite the failed lookup", agents)
+        self.assertIn('"unavailable" is a load-bearing claim', agents)
         self.assertIn("information hierarchy", agents)
         self.assertIn("context pointers", agents)
         self.assertIn("leading words", agents)
@@ -575,6 +579,13 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("flip the recommendation", skill)
         self.assertIn("what would change the recommendation", skill)
         self.assertIn("first answer", skill)
+        # Load-bearing claims must be verified or marked (real-repo Round 2 finding, generalized
+        # in Round 3 from numbers to any load-bearing claim using the skill's own leading word);
+        # the enforcement hook lives in the always-loaded Acceptance Gate, the detail stays in
+        # REFERENCE Evidence Conventions (single source).
+        self.assertIn("never state a load-bearing claim as fact unchecked", skill)
+        self.assertIn("[REFERENCE.md](REFERENCE.md#evidence-conventions)", skill)
+        self.assertIn("## Evidence Conventions", reference)
         self.assertIn("first response", reference)
         self.assertIn("even when the user only asks for a plan", " ".join(reference.split()))
         self.assertIn("Defeat condition", reference)
@@ -980,6 +991,262 @@ class PerspectiveScanContractTest(unittest.TestCase):
             for marker in markers:
                 with self.subTest(path=path, marker=marker):
                     self.assertNotIn(marker, text, f"{marker!r} leaked into {path}")
+
+
+class FirstPrinciplesPlannerContractTest(unittest.TestCase):
+    """Contract + case wellformedness for the first-principles-planner eval set.
+
+    These checks verify the *contract*, not live model behavior: the routing
+    clauses and the load-bearing gates each eval case rests on exist in the skill,
+    and every case in cases.jsonl is wellformed and bound to a clause/route that
+    actually exists. Output quality (root reframe, real Bestness Check,
+    default-over-clarify, anti-contrarian stability) is graded by the
+    model-in-the-loop layer in evals/first-principles-planner/RUBRIC.md.
+    """
+
+    REQUIRED_LABELS = {
+        "should_trigger",
+        "should_not_trigger",
+        "output_quality",
+        "anti_regression",
+        "anti_regression_stability",
+    }
+    CASE_FIELDS = {
+        "id",
+        "label",
+        "route",
+        "depth",
+        "prompt",
+        "expected_decision",
+        "gate_reason",
+        "checks",
+    }
+    TRIGGER_ROUTES = {"decision", "plan"}
+    NO_TRIGGER_ROUTES = {"research-first", "review", "implementation"}
+    # The eval fixtures live in the recoverable eval workspace. When it is absent
+    # (clean checkout) the eval-data tests skip rather than error; the skill-contract
+    # tests do not depend on it.
+    CASES_PATH = ROOT / "evals" / "first-principles-planner" / "cases.jsonl"
+    CASES_AVAILABLE = CASES_PATH.exists()
+
+    def setUp(self) -> None:
+        self.skill = read_text("skills/first-principles-planner/SKILL.md")
+        self.reference_norm = " ".join(
+            read_text("skills/first-principles-planner/REFERENCE.md").split()
+        )
+        self.routing = (
+            self.skill.split("## Routing Gate", 1)[1].split("## Hard Gates", 1)[0].lower()
+        )
+        self.cases = (
+            [
+                json.loads(line)
+                for line in self.CASES_PATH.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            if self.CASES_AVAILABLE
+            else []
+        )
+
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/first-principles-planner/cases.jsonl not committed"
+    )
+    def test_eval_cases_are_wellformed(self) -> None:
+        self.assertEqual(7, len(self.cases))
+        labels = [c["label"] for c in self.cases]
+        self.assertEqual(self.REQUIRED_LABELS, set(labels))
+        self.assertEqual(2, labels.count("should_trigger"))
+        self.assertEqual(2, labels.count("should_not_trigger"))
+        for case in self.cases:
+            with self.subTest(case=case.get("id")):
+                self.assertEqual(self.CASE_FIELDS, set(case))
+                self.assertIn(case["expected_decision"], {"trigger", "no_trigger"})
+                self.assertTrue(case["checks"], "each case needs grading checks")
+                self.assertTrue(case["gate_reason"].strip())
+
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/first-principles-planner/cases.jsonl not committed"
+    )
+    def test_trigger_cases_map_to_a_real_route(self) -> None:
+        for case in self.cases:
+            if case["expected_decision"] != "trigger":
+                continue
+            with self.subTest(case=case["id"]):
+                self.assertIn(case["route"], self.TRIGGER_ROUTES)
+
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/first-principles-planner/cases.jsonl not committed"
+    )
+    def test_cases_bind_to_a_clause_that_exists(self) -> None:
+        # Every case must rest on a routing clause or load-bearing gate that
+        # actually exists in the skill, not on a label the fixture invented.
+        for case in self.cases:
+            with self.subTest(case=case["id"]):
+                if case["expected_decision"] == "no_trigger":
+                    self.assertIn(case["route"], self.NO_TRIGGER_ROUTES)
+                    if case["route"] == "research-first":
+                        self.assertIn("research-first", self.routing)
+                        self.assertIn("深度分析", self.routing)
+                    elif case["route"] == "review":
+                        self.assertIn("belongs to a review skill", self.routing)
+                elif case["label"] == "output_quality":
+                    # Solution-shaped prompts rest on the mandatory root reframe.
+                    self.assertIn("mandatory root reframe", self.skill)
+                    self.assertIn("Five Whys", self.skill)
+                elif case["label"] == "anti_regression":
+                    # The default-over-clarify gate.
+                    self.assertIn("do not stop at clarification", self.skill)
+                    self.assertIn("flip the recommendation", self.skill)
+                elif case["label"] == "anti_regression_stability":
+                    # Bestness stability + the anti-contrarian rule. Neither phrase
+                    # is pinned by any other test, so this binding is their protector.
+                    self.assertIn(
+                        "current best under these constraints", self.reference_norm
+                    )
+                    self.assertIn(
+                        "grounding, not automatic disagreement", self.skill
+                    )
+
+
+class JavaStackCraftEvalContractTest(unittest.TestCase):
+    """Contract + case wellformedness for the java-stack-craft eval set.
+
+    These checks verify the *contract*, not live model behavior: the routing
+    exclusions and the load-bearing gates each eval case rests on exist in the
+    skill, every case in cases.jsonl is wellformed, each should_not_trigger case
+    names an exclusion that actually exists, and each trigger case maps to a real
+    write lane or review mode. Output quality (Work Context first,
+    version-appropriate idiom, pattern restraint, convention-vs-correctness,
+    scanner-as-signal, honest verification) is graded by the model-in-the-loop
+    layer in evals/java-stack-craft/RUBRIC.md. The deterministic detectors are
+    covered by the skill's own tests in skills/java-stack-craft/tests/.
+    """
+
+    REQUIRED_LABELS = {
+        "should_trigger",
+        "should_not_trigger",
+        "output_quality",
+        "anti_regression",
+    }
+    CASE_FIELDS = {
+        "id",
+        "label",
+        "mode",
+        "lane",
+        "prompt",
+        "expected_decision",
+        "gate_reason",
+        "checks",
+    }
+    TRIGGER_MODES = {"write", "review"}
+    NO_TRIGGER_MODES = {"planning", "research"}
+    # Lane -> the human-readable label that must exist in the lane's mode file,
+    # so a trigger case cannot name a lane the skill does not define.
+    WRITE_LANES = {
+        "smoke": "Smoke patch",
+        "production-fix": "Production fix",
+        "architecture": "Architecture fix",
+    }
+    REVIEW_MODES = {
+        "diff": "Diff review",
+        "focused": "Focused review",
+        "audit": "Repo audit",
+    }
+    # The eval fixtures live in the recoverable eval workspace. When it is absent
+    # (clean checkout) the eval-data tests skip rather than error; the skill-contract
+    # tests do not depend on it.
+    CASES_PATH = ROOT / "evals" / "java-stack-craft" / "cases.jsonl"
+    CASES_AVAILABLE = CASES_PATH.exists()
+
+    def setUp(self) -> None:
+        self.skill = read_text("skills/java-stack-craft/SKILL.md")
+        self.writing = read_text("skills/java-stack-craft/WRITING.md")
+        self.review = read_text("skills/java-stack-craft/REVIEW.md")
+        self.cases = (
+            [
+                json.loads(line)
+                for line in self.CASES_PATH.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            if self.CASES_AVAILABLE
+            else []
+        )
+
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/java-stack-craft/cases.jsonl not committed"
+    )
+    def test_eval_cases_are_wellformed(self) -> None:
+        self.assertEqual(7, len(self.cases))
+        labels = [c["label"] for c in self.cases]
+        self.assertEqual(self.REQUIRED_LABELS, set(labels))
+        self.assertEqual(2, labels.count("should_trigger"))
+        self.assertEqual(2, labels.count("should_not_trigger"))
+        self.assertEqual(2, labels.count("anti_regression"))
+        for case in self.cases:
+            with self.subTest(case=case.get("id")):
+                self.assertEqual(self.CASE_FIELDS, set(case))
+                self.assertIn(case["expected_decision"], {"trigger", "no_trigger"})
+                self.assertTrue(case["checks"], "each case needs grading checks")
+                self.assertTrue(case["gate_reason"].strip())
+
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/java-stack-craft/cases.jsonl not committed"
+    )
+    def test_trigger_cases_map_to_a_real_lane_or_mode(self) -> None:
+        for case in self.cases:
+            if case["expected_decision"] != "trigger":
+                continue
+            with self.subTest(case=case["id"]):
+                self.assertIn(case["mode"], self.TRIGGER_MODES)
+                if case["mode"] == "write":
+                    self.assertIn(case["lane"], self.WRITE_LANES)
+                    self.assertIn(self.WRITE_LANES[case["lane"]], self.writing)
+                elif case["mode"] == "review":
+                    self.assertIn(case["lane"], self.REVIEW_MODES)
+                    self.assertIn(self.REVIEW_MODES[case["lane"]], self.review)
+
+    @unittest.skipUnless(
+        CASES_AVAILABLE, "evals/java-stack-craft/cases.jsonl not committed"
+    )
+    def test_cases_bind_to_a_clause_that_exists(self) -> None:
+        # Every case must rest on a routing exclusion or load-bearing gate that
+        # actually exists in the skill, not on a label the fixture invented.
+        for case in self.cases:
+            with self.subTest(case=case["id"]):
+                if case["expected_decision"] == "no_trigger":
+                    self.assertIn(case["mode"], self.NO_TRIGGER_MODES)
+                    if case["mode"] == "planning":
+                        self.assertIn(
+                            "pure planning, architecture/design discussion", self.skill
+                        )
+                    elif case["mode"] == "research":
+                        self.assertIn(
+                            "pure what-is-true system investigation use deep-research",
+                            self.skill,
+                        )
+                elif case["label"] == "output_quality":
+                    # Pattern restraint: abstraction needs >= 2 present variation points.
+                    self.assertIn(">= 2 real, present variation points", self.skill)
+                    self.assertIn("strategy for a single algorithm", self.skill)
+                elif case["id"] == "antiregression_convention_vs_correctness":
+                    # Match style convention, never propagate a correctness defect.
+                    self.assertIn(
+                        "propagate a convention that is itself such a defect",
+                        self.skill,
+                    )
+                    self.assertIn(
+                        "never hold per-request/per-call state in mutable instance fields",
+                        self.skill,
+                    )
+                elif case["id"] == "antiregression_scanner_signal_not_action":
+                    # Scanner hits are signals, not a fix list to execute wholesale.
+                    self.assertIn(
+                        "scanner hits and generic best practices are signals, not actions",
+                        self.skill,
+                    )
+                    self.assertIn(
+                        "broad field-injection findings are usually backlog signal",
+                        self.review,
+                    )
 
 
 if __name__ == "__main__":

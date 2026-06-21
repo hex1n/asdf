@@ -47,6 +47,7 @@ Deterministic bug-preventers — high-frequency defects in agent-written Java. T
 - Do not add/remove elements inside a `for-each` loop — use `Iterator.remove()` or `removeIf`, else `ConcurrentModificationException`.
 - `Arrays.asList(...)` is fixed-size: `add`/`remove` throw `UnsupportedOperationException`; wrap in `new ArrayList<>(...)` if you must mutate.
 - `collection.toArray()` (no arg) returns `Object[]` — use `toArray(new T[0])`.
+- `Collectors.toMap(keyFn, valFn)` throws `IllegalStateException` on duplicate keys and NPE on a null value — pass a merge function (`(a, b) -> b`) when keys can collide, and do not map to null values.
 - **Never discard a stream result.** `list.stream().sorted()/filter()/map()...collect(...)` returns a *new* value and never mutates the source — a `sorted().collect()` whose result is ignored is a silent no-op (e.g. you keep using the original unsorted list). Assign and use it.
 - Do not `.get(0)` / `iterator().next()` a list that can be empty (`IndexOutOfBoundsException`/`NoSuchElementException`); guard with `isEmpty()` or use `stream().findFirst()`. A later `== null` check is dead code if `.get(0)` already threw.
 

@@ -80,7 +80,7 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 
 ## Acceptance Gate
 
-Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation.
+Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation. When a recommendation rests on a load-bearing claim — a count, a cited file or API, an available capability, or an effort estimate — verify it in this session when the source is reachable, else mark it `? unverified`; never state a load-bearing claim as fact unchecked (see [REFERENCE.md](REFERENCE.md#evidence-conventions)).
 
 ## Anti-Patterns
 

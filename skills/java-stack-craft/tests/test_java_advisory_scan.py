@@ -122,6 +122,38 @@ class JavaAdvisoryScanTest(unittest.TestCase):
 
             self.assertFalse(any("Stream.toList" in item["rule"] for item in result["findings"]))
 
+    def test_classic_colon_case_with_lambda_is_not_switch_expression(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write(root / "pom.xml", "<project><properties><java.version>1.8</java.version></properties></project>")
+            write(
+                root / "src/main/java/example/Demo.java",
+                "package example;\nimport java.util.List;\n"
+                "class Demo { void x(int n, List<String> items) {\n"
+                "  switch (n) { case 1: items.forEach(s -> run(s)); break; default: break; }\n"
+                "} void run(String s) {} }\n",
+            )
+
+            result = scan.scan_project(str(root))
+
+            self.assertFalse(any("switch expressions require JDK 14" in item["rule"] for item in result["findings"]))
+
+    def test_switch_expression_arrow_is_flagged_below_jdk14(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write(root / "pom.xml", "<project><properties><java.version>1.8</java.version></properties></project>")
+            write(
+                root / "src/main/java/example/Demo.java",
+                "package example;\n"
+                "class Demo { int x(int n) {\n"
+                "  return switch (n) { case 1 -> 10; default -> 0; };\n"
+                "} }\n",
+            )
+
+            result = scan.scan_project(str(root))
+
+            self.assertTrue(any("switch expressions require JDK 14" in item["rule"] for item in result["findings"]))
+
     def test_spring_boot_namespace_mismatch(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

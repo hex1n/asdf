@@ -12,7 +12,7 @@ Supported environments: local and test only. If the target is preprod, staging w
 
 ## 1. Intake
 
-Read the plan before touching the system. Parse `Agent-ready Gates`, `Agent Execution Contract`, `Execution DAG`, `Execution Order`, scenario fields, waits, cleanup, and issue or gap sections. If the plan lacks a needed locator, variable, command, table, or environment fact, explore the codebase, docs, config, scripts, tests, and safe read-only probes before asking the user.
+Read the plan before touching the system. Parse `Agent-ready Gates`, `Agent Execution Contract`, `Execution DAG`, `Executor Handoff Index` when present, `Execution Order`, scenario fields, waits, cleanup, and issue or gap sections. If the plan lacks a needed locator, variable, command, table, or environment fact, explore the codebase, docs, config, scripts, tests, and safe read-only probes before asking the user.
 
 Completion criterion: every selected scenario is mapped to plan IDs, edge IDs, expected variables, required capabilities, waits, cleanup, and blockers; missing or conflicting plan facts are recorded before execution starts.
 
@@ -52,24 +52,33 @@ After changing config, profiles, feature flags, stubs, service state, seed data,
 
 Classify every mismatch before filing it: `product defect`, `plan defect`, `environment defect`, `tooling defect`, or `unknown`. A scenario passes only when its expected probes, waits, invariants, side effects, and cleanup evidence are satisfied. A missing probe is blocked, not passed.
 
+When a required third-party service, database, message queue, Redis, or callback endpoint is unreachable or unavailable at run time, prefer the plan's declared stub or 挡板; if none exists and the scenario needs the live dependency, mark the scenario `blocked` or suspend per the plan's gates, capture the unreachable evidence (endpoint, error, timestamp, retry), and classify it as an `environment defect` — never `passed`, and not a `product defect` unless product code actually executed and returned the fault. The only exception is a scenario whose declared purpose and `Automation` level is the dependency-down, timeout, or recovery path: there the outage is an expected input, and the scenario still passes only when its expected degraded behavior — fallback, retry, compensation, or error contract — is observed and asserted; an outage alone is never a pass.
+
 Completion criterion: each selected scenario is `passed`, `failed`, `blocked`, or `skipped`, with evidence paths, preserved-scene paths or an explicit reason they are unavailable, and a diagnosis for every failure or blocker.
 
 ## 6. Report Artifacts
 
-Create a run directory unless the user specifies an output path:
+Create a run directory unless the user specifies an output path. Produce the core artifacts by default; produce machine-readable or rendered artifacts only when a programmatic consumer, rerun/comparison tooling, or the user asks for them.
 
 ```text
 e2e-run-<plan-name>-<timestamp>/
-  execution-report.md
-  execution-report.html
-  issue-backlog.md
-  evidence/
+  execution-report.md        # core: agent handoff source of truth
+  evidence/                  # core: raw, non-reconstructable evidence
+    index.md
+  preserved-scenes/          # core: kept whenever a scenario failed or is unknown
+  # optional, on demand:
+  run-metadata.json          # when a programmatic consumer needs machine metadata
+  scenario-results.jsonl     # when rerun/comparison tooling consumes per-node rows
+  execution-report.html      # when a human stakeholder asks for a rendered report
+  issue-backlog.md           # when defects are too many to inline in the report
 ```
 
-`execution-report.md` is the agent handoff source of truth. Include `Execution Summary`, `Environment & Capability Map`, `DAG Schedule`, `Scenario Results`, `Evidence Index`, `Failures / Defects / Plan Gaps`, `Data Created & Cleanup`, `Re-run Instructions`, and `Next Actions for Agent`.
+Use [REFERENCE.md](REFERENCE.md#run-artifact-contract) for the run file fields.
 
-`execution-report.html` is the human-readable view generated from the same facts. It may add summary cards, filters, tables, and collapsible evidence, but it must not introduce facts absent from the Markdown report or evidence.
+`execution-report.md` is the agent handoff source of truth and the default home for run and scenario facts. Include `Execution Summary`, `Run Metadata`, `Environment & Capability Map`, `DAG Schedule`, `Scenario Results`, `Evidence Index`, `Failures / Defects / Plan Gaps`, `Data Created & Cleanup`, `Re-run Instructions`, and `Next Actions for Agent`. Inline the issue backlog here unless it is large enough to need its own file.
 
-`issue-backlog.md` is a separate agent-ready backlog, not a remote issue tracker by default. Create one issue per actionable root cause with `Issue ID`, `Type`, `Severity`, `Affected scenarios / edges`, `Expected`, `Actual`, `Evidence`, `Preserved scene`, `Suspected code area`, `Reproduction steps`, `Fix constraints`, `Verification command or scenario`, and `Cleanup / data impact`. Product defects are fix candidates; plan defects revise the plan; environment and tooling defects repair execution.
+`evidence/` and `preserved-scenes/` hold non-reconstructable raw evidence and failure-scene snapshots; never downgrade them to optional.
 
-Completion criterion: the final response links or names the report directory, summarizes pass/fail/blocked counts, and calls out whether cleanup completed.
+Optional artifacts must not introduce facts absent from `execution-report.md` or `evidence/`. `run-metadata.json` and `scenario-results.jsonl` are machine projections of the report's `Run Metadata` and `Scenario Results`; `execution-report.html` is a human-readable rendering that may add summary cards, filters, tables, and collapsible evidence. `issue-backlog.md`, when split out, is a separate agent-ready backlog, not a remote issue tracker by default. Create one issue per actionable root cause with `Issue ID`, `Type`, `Severity`, `Affected scenarios / edges`, `Expected`, `Actual`, `Evidence`, `Preserved scene`, `Suspected code area`, `Reproduction steps`, `Fix constraints`, `Verification command or scenario`, and `Cleanup / data impact`. Product defects are fix candidates; plan defects revise the plan; environment and tooling defects repair execution.
+
+Completion criterion: the final response links or names the report directory, summarizes pass/fail/blocked counts, and calls out whether cleanup completed; core artifacts exist and optional artifacts are produced only when a consumer needs them.

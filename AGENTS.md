@@ -19,7 +19,7 @@ Keep `SKILL.md` files concise and task-facing. Put maintenance guidance here ins
 
 When the user asks to improve a skill, treat it as an evidence loop rather than a wording edit:
 
-Before changing any skill, load and apply `writing-great-skills` as the authoring frame for predictability, information hierarchy, context pointers, leading words, progressive disclosure, and pruning. If `writing-great-skills` is unavailable, record the fallback in the round notes before editing.
+Before changing any skill, load and apply `writing-great-skills` as the authoring frame for predictability, information hierarchy, context pointers, leading words, progressive disclosure, and pruning. If `writing-great-skills` is unavailable, apply the authoring criteria listed above directly and record the fallback in the round notes before editing.
 
 1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include success criteria, failure modes, and negative or non-trigger examples, not just the happy path, so the baseline is not an optimistic softball.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.
@@ -68,9 +68,14 @@ Because the author is the grader, every magnitude, confidence, and trigger judgm
 - The edit changes a skill's runtime behavior in a way a passing sample could mask — script logic, or removing or loosening a rule.
 - The edit touches two or more skills, or a shared rule in this file.
 - The edit changes a hard gate or the decision rule itself.
+- The edit changes eval cases, graders, acceptance assertions, eval fixtures, or test logic used in the evidence path for a skill acceptance decision.
 - The accept decision rests on a single sample.
 
-In the pass, work in a fresh context and try to show the edit is not better or introduces a regression; accept only when that attempt fails. If the runtime cannot supply an independent context, record that in the round notes and mark the accept provisional until a second reviewer or a later session runs the pass — never treat the author's own re-read as the independent check.
+In the pass, work in a fresh context and try to show the edit is not better or introduces a regression; accept only when that attempt fails. If the runtime cannot supply an independent context, record that in the round notes and mark the accept as provisional until a second reviewer or a later session runs the pass — never treat the author's own re-read as the independent check.
+
+### Evolving toward a better skill, not just a safe change
+
+The gates above keep an incremental edit from regressing. A *redesign* — a structurally different candidate meant to be better, not merely safe — needs more, because the author's judgment that it wins is the weakest evidence available: author and grader are the same person. Do not accept a redesign on an author-side comparison. Pre-register what "better" means and pick a discriminating probe *before* generating the candidate, then validate with the same independent falsification pass the section above defines (fresh context, or a second reviewer or later session). Expect that pass to usually reject the author-judged "improvement" — the redesign is selected by the same optimism the pass exists to catch — and treat generate-and-independently-falsify mainly as a filter that blocks false improvements, not a reliable source of them. Accept a redesign only on a clear, repeated win from that pass; otherwise keep the current design.
 
 ### Optional trend log
 
@@ -99,6 +104,9 @@ Expected-behavior spec (net-new only):
 - success criteria:
 - failure modes / negative or non-trigger examples:
 
+Redesign pre-registration (redesign only):
+- "better" definition + discriminating probe (fixed before the candidate):
+
 Wins:
 - ...
 
@@ -109,5 +117,5 @@ Weakest gate or lowest-confidence claim:
 - ...
 
 Decision:
-- continue / accept / accept provisional / reject
+- continue / accept / reject
 ```

@@ -97,7 +97,7 @@ SCENARIOS = (
             "validation artifact / diff",
             "relative delta",
             "regressions",
-            "continue / accept / accept provisional / reject",
+            "continue / accept / reject",
             "marginal gain",
         ),
         scoped_markers=(

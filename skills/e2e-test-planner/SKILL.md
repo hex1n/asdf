@@ -10,7 +10,7 @@ Build a source-backed, dependency-aware test plan. The core move is the **busine
 
 Output language: use the language the user explicitly requests; otherwise infer from the user's latest prompt, then the dominant source-document language. For mixed-language input, write prose in the user's conversational language and preserve code identifiers, paths, API names, enum values, logs, and quoted source text as-is. If the language choice remains ambiguous, state the assumed output language once.
 
-Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, dependency DAG facts, and blockers. Avoid approval-only template sections unless the user asks for a formal QA document.
+Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, dependency DAG facts, and blockers. When execution will be delegated, also emit the compact Executor Handoff Index described after the Execution DAG. Avoid approval-only template sections unless the user asks for a formal QA document.
 
 ## 1. Source Inventory
 
@@ -95,13 +95,15 @@ Use stable table headers. For English output, use `Node`, `Scenario`, `Depends o
 
 Completion criterion: every scenario appears in the DAG or is listed as intentionally manual/blocked; every `unsafe` or `unknown` node has a reason; every variable used across scenarios has a producer or source-supported fixture and a consumer; produced variables consumed by a node come from predecessor nodes named in `Depends on`, not from later or unrelated nodes; the DAG is acyclic; execution order can be derived from `Depends on` without rereading the prose.
 
+Delegated execution branch: add Level-2 `Executor Handoff Index` / `执行器交接索引` immediately after the DAG when execution will be delegated to `e2e-test-executor`, a separate agent session, or automation. Use [REFERENCE.md](REFERENCE.md#executor-handoff-index) for the fields.
+
 ## 7. Closure
 
 End with:
 
 - Level-2 `Coverage Matrix` / `覆盖矩阵` mapping requirements, business-flow edges, journey graph edges, and risk families to scenario IDs.
 - Level-2 `Gaps, Assumptions, Questions` / `缺口、假设与问题` naming doc/code conflicts, assumptions, and questions that could change the plan.
-- Level-2 `Execution Order` / `执行顺序` as a recommended dependency sequence derived from the Execution DAG, not a replacement for the DAG.
+- Optional Level-2 `Execution Order` / `执行顺序`, only when a human reader wants a ready-made sequence: a recommended dependency order derived from the Execution DAG, not a replacement for it. The executor derives order from the DAG `Depends on`, so this section is not required for agent handoff.
 - Level-2 `Agent-ready Gates` / `Agent 就绪门禁`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution.
 - Level-2 `Minimal First Automation Slice` / `最小自动化切片` if the user asks how to start, with the scenario IDs and source-backed target surfaces to implement first.
 

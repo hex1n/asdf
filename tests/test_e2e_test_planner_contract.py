@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests/fixtures/e2e_test_planner"
+PLANNER_REFERENCE = ROOT / "skills/e2e-test-planner/REFERENCE.md"
 PLACEHOLDER_PATTERN = re.compile(
     r"\b(tbd|todo|placeholder)\b|to\s+(?:be\s+)?(?:define|defined|fill|filled)\s+later|待定|未定|占位|暂无|待(?:补充|定义|确定|完善)|稍后(?:补充|定义|确定|完善)|后续(?:补充|定义|确定|完善)",
     re.IGNORECASE,
@@ -17,6 +18,28 @@ IDENTIFIER_VAR_PATTERN = re.compile(
 )
 SCENARIO_PATTERN = re.compile(r"\b[-\w]*e2e-\d+[a-z]?\b", re.IGNORECASE)
 NODE_PATTERN = re.compile(r"\bn\d+\b", re.IGNORECASE)
+
+WELLFORMED_EXECUTOR_HANDOFF = """## Executor Handoff Index
+
+| Field | Value |
+| --- | --- |
+| Artifact ID | checkout-e2e-plan 2026-06-21 |
+| Contract version | `e2e-plan/v1` |
+| Plan source | `docs/checkout-prd.md`, `src/orders`, `src/payments`; payment SLA unsourced |
+| Scenario set | CHECKOUT-E2E-001 default node N1; no manual or blocked scenarios |
+| DAG nodes | N1 -> CHECKOUT-E2E-001, dependency roots J1-J4, disruptive none |
+| Variable ledger | `orderId` and `invoiceId` produced by N1, consumed by cleanup by `orderId` |
+| Required capabilities | API, DB, job, stub; no missing gates |
+| Cleanup anchors | `orderId` batch prefix, cleanup after invoice probe, low retention risk |
+| Execution blockers | payment-provider timeout SLA unsourced |
+"""
+
+
+def delegated_plan(handoff_block: str) -> str:
+    """Insert a delegated-execution handoff index after the DAG, before closure."""
+    text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+    before, after = text.split("\n## 7. Coverage Matrix", 1)
+    return before + "\n" + handoff_block + "\n## 7. Coverage Matrix" + after
 
 
 def extract_variables(cell: str) -> set[str]:
@@ -98,17 +121,47 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
     closure_indexes = [
         heading_index("coverage matrix", "覆盖矩阵"),
         heading_index("gaps, assumptions, questions", "缺口、假设与问题", "缺口、假设、问题"),
-        heading_index("execution order", "执行顺序"),
         heading_index("agent-ready gates", "agent 就绪门禁"),
     ]
+    # Execution Order is an optional, human-facing projection of the DAG; the
+    # executor derives order from `Depends on`, so it is not a required section.
+    execution_order_index = optional_heading_index("execution order", "执行顺序")
     minimal_slice_index = optional_heading_index(
         "minimal first automation slice", "最小首个自动化切片", "最小自动化切片"
     )
+    # Executor Handoff Index is an optional delegated-execution projection placed
+    # after the DAG and before closure. When present it must carry the locator
+    # fields an executor needs; its slice boundary is also used below so its own
+    # table does not bleed into DAG table parsing.
+    executor_handoff_index = optional_heading_index("executor handoff index", "执行器交接索引")
     test_case.assertEqual(indexes, sorted(indexes))
     test_case.assertEqual(closure_indexes, sorted(closure_indexes))
     test_case.assertGreater(min(closure_indexes), indexes[-1])
+    if execution_order_index is not None:
+        test_case.assertGreater(execution_order_index, indexes[-1])
     if minimal_slice_index is not None:
         test_case.assertGreater(minimal_slice_index, closure_indexes[-1])
+    if executor_handoff_index is not None:
+        test_case.assertGreater(executor_handoff_index, indexes[-1])
+        test_case.assertLess(executor_handoff_index, min(closure_indexes))
+        handoff_section = lower[executor_handoff_index : min(closure_indexes)]
+        for handoff_field in (
+            "artifact id",
+            "contract version",
+            "e2e-plan/v1",
+            "plan source",
+            "scenario set",
+            "dag nodes",
+            "variable ledger",
+            "required capabilities",
+            "cleanup anchors",
+            "execution blockers",
+        ):
+            test_case.assertIn(
+                handoff_field,
+                handoff_section,
+                f"executor handoff index missing field: {handoff_field}",
+            )
 
     gates_end = minimal_slice_index if minimal_slice_index is not None else len(lower)
     agent_ready_gates = lower[closure_indexes[-1] : gates_end]
@@ -226,7 +279,8 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
         test_case.assertRegex(scenario_lower, r"\b[a-z]*j\d+\b", "scenario must cite business-flow edge IDs")
         test_case.assertRegex(scenario_lower, r"(consumes|produces|capture|captures|取|依赖)")
 
-    execution_dag_original = text[indexes[5] : min(closure_indexes)]
+    dag_end = executor_handoff_index if executor_handoff_index is not None else min(closure_indexes)
+    execution_dag_original = text[indexes[5] : dag_end]
     execution_dag = execution_dag_original.lower()
     dag_header_lines = [line for line in execution_dag.splitlines() if line.strip().startswith("|")]
     test_case.assertTrue(dag_header_lines, "execution DAG must include a table")
@@ -399,68 +453,51 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
 
 class E2ETestPlannerContractTest(unittest.TestCase):
     def test_skill_keeps_dependency_aware_planning_core(self) -> None:
+        # This guard protects only the defining soul of the skill plus the
+        # safety/honesty clauses that no other structured test covers. Section
+        # ordering, output-language policy, the agent-contract / scenario / DAG
+        # field schemas, closure sections, and routing keywords are each asserted
+        # by their own dedicated tests below and by assert_valid_generated_plan,
+        # so they are intentionally not re-pinned here as literal prose. Reword
+        # instructional text freely; only these load-bearing anchors are fixed.
         skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
 
         for marker in (
-            "journey graph",
-            "business flow",
-            "mermaid",
-            "stable edge ids",
             "source-backed",
-            "design, requirements, plan documents",
-            "codebase behavior",
-            "output language",
-            "use the language the user explicitly requests",
-            "infer from the user's latest prompt",
-            "dominant source-document language",
-            "mixed-language input",
-            "user's conversational language",
-            "preserve code identifiers",
-            "state the assumed output language once",
-            "primary consumer",
+            "dependency-aware",
+            "business flow",
+            "journey graph",
             "downstream agent",
             "executable handoff",
-            "stable field labels",
-            "keep these labels exact",
-            "machine-scannable",
-            "dependency dag facts",
-            "agent execution contract",
-            "execution dag",
-            "executor-consumable dag",
-            "target surfaces",
-            "data fixtures",
-            "named variables",
-            "probes/oracles",
-            "waits and budgets",
-            "blockers or gaps",
-            "every claimed behavior has a source receipt",
-            "if a later scenario cites a new source",
-            "every later scenario cites the edge ids it covers",
-            "api variant",
-            "required-input branch",
-            "business-flow edge",
-            "dependency edge",
-            "cross-step consistency",
-            "concurrency",
-            "idempotency and recovery",
-            "performance and scale",
-            "parallel safety",
-            "required capabilities",
-            "side-effect scope",
-            "isolation key",
-            "cleanup dependency",
-            "disruptive marker",
-            "predecessor nodes named in `depends on`",
-            "source-only suspected defects",
-            "coverage matrix",
-            "level-2 `coverage matrix`",
-            "level-2 `gaps, assumptions, questions`",
-            "match cleanup to real transaction boundaries",
-            "label unverified source-derived defect claims as hypotheses",
             "do not write test code unless the user asks",
+            "label unverified source-derived defect claims as hypotheses",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, skill)
+
+    def test_reference_defines_executor_handoff_index(self) -> None:
+        reference = PLANNER_REFERENCE.read_text(encoding="utf-8").lower()
+
+        for marker in (
+            "## executor handoff index",
+            "e2e-test-executor",
+            "separate agent session",
+            "automation",
+            "## 执行器交接索引",
+            "artifact id",
+            "contract version",
+            "e2e-plan/v1",
+            "plan source",
+            "scenario set",
+            "dag nodes",
+            "variable ledger",
+            "required capabilities",
+            "cleanup anchors",
+            "execution blockers",
+            "without reading every scenario body first",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
 
     def test_description_routes_e2e_plan_requests(self) -> None:
         text = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8")
@@ -846,6 +883,30 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         without_minimal_slice = text.split("\n## 11. Minimal First Automation Slice", 1)[0].rstrip()
 
         assert_valid_generated_plan(self, without_minimal_slice)
+
+    def test_generated_plan_output_contract_accepts_without_optional_execution_order(self) -> None:
+        text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
+        before, rest = text.split("\n## 9. Execution Order", 1)
+        _, after_gates = rest.split("\n## 10. Agent-ready Gates", 1)
+        without_execution_order = before + "\n## 10. Agent-ready Gates" + after_gates
+
+        assert_valid_generated_plan(self, without_execution_order)
+
+    def test_generated_plan_output_contract_accepts_delegated_executor_handoff_index(self) -> None:
+        # A delegated plan adds the handoff index after the DAG. Its own table must
+        # not bleed into DAG parsing, and the plan must still satisfy the full contract.
+        text = delegated_plan(WELLFORMED_EXECUTOR_HANDOFF)
+
+        assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_thin_executor_handoff_index(self) -> None:
+        # When the handoff index is present it must carry the executor's locator
+        # fields; a stub with only an Artifact ID is not an executable handoff.
+        thin_handoff = "## Executor Handoff Index\n\n- Artifact ID: checkout-e2e-plan 2026-06-21.\n"
+        text = delegated_plan(thin_handoff)
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
 
     def test_generated_plan_output_contract_rejects_thin_agent_ready_gates(self) -> None:
         text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")

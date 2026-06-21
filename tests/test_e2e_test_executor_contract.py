@@ -7,6 +7,81 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills/e2e-test-executor/SKILL.md"
+REFERENCE = ROOT / "skills/e2e-test-executor/REFERENCE.md"
+FIXTURES = ROOT / "tests/fixtures/e2e_test_executor"
+
+
+# The 10 sections `execution-report.md` must carry (executor SKILL.md §6) and the four
+# legal terminal scenario statuses (executor SKILL.md §5). Symmetric to the planner's
+# `assert_valid_generated_plan`: a static, paraphrase-robust structural contract over a
+# run-artifact *instance* — it reads the report text, never executes a live run.
+EXECUTION_REPORT_SECTIONS = (
+    "Execution Summary",
+    "Run Metadata",
+    "Environment & Capability Map",
+    "DAG Schedule",
+    "Scenario Results",
+    "Evidence Index",
+    "Failures / Defects / Plan Gaps",
+    "Data Created & Cleanup",
+    "Re-run Instructions",
+    "Next Actions for Agent",
+)
+SCENARIO_STATUSES = ("passed", "failed", "blocked", "skipped")
+
+
+def assert_valid_execution_report(test_case: unittest.TestCase, text: str) -> None:
+    def section_span(title: str):
+        head = re.search(rf"^##\s+{re.escape(title)}\s*$", text, re.MULTILINE)
+        if head is None:
+            return None
+        begin = head.end()
+        nxt = re.search(r"^##\s+", text[begin:], re.MULTILINE)
+        return begin, (begin + nxt.start() if nxt else len(text))
+
+    # R1 + R2: every required section is present and Execution Summary leads.
+    starts = []
+    for title in EXECUTION_REPORT_SECTIONS:
+        span = section_span(title)
+        test_case.assertIsNotNone(span, f"execution-report missing section: {title}")
+        starts.append(span[0])
+    test_case.assertEqual(
+        starts[0], min(starts), "Execution Summary must be the first report section"
+    )
+
+    s_begin, s_end = section_span("Scenario Results")
+    scenario_results = text[s_begin:s_end]
+
+    # R3a: at least one scenario carries a legal terminal status. A report with no
+    # passed/failed/blocked/skipped marker is not an executed run.
+    statuses = re.findall(r"`(" + "|".join(SCENARIO_STATUSES) + r")`", scenario_results)
+    test_case.assertTrue(
+        statuses,
+        "Scenario Results must record a status in passed/failed/blocked/skipped",
+    )
+
+    # R3b (soul clause): every `failed` row must reference a kept failure scene on the
+    # same row — a failure without a preserved scene is an evidence-loss contract breach.
+    for line in scenario_results.splitlines():
+        if "`failed`" in line:
+            test_case.assertIn(
+                "preserved-scenes/",
+                line,
+                "a `failed` scenario must reference preserved-scenes/ on its row",
+            )
+
+    # R4: evidence/index.md is the core handoff index; the report must point at it.
+    test_case.assertIn(
+        "evidence/index.md", text, "execution-report must reference evidence/index.md"
+    )
+
+    # R5: Re-run Instructions must carry an executable command, not just prose.
+    r_begin, r_end = section_span("Re-run Instructions")
+    test_case.assertRegex(
+        text[r_begin:r_end],
+        r"```|`[^`]{6,}`",
+        "Re-run Instructions must include an executable rerun command",
+    )
 
 
 EXECUTOR_CONTRADICTIONS = (
@@ -176,6 +251,7 @@ class E2ETestExecutorContractTest(unittest.TestCase):
             "agent-ready gates",
             "agent execution contract",
             "execution dag",
+            "executor handoff index",
             "execution order",
             "scenario fields",
             "waits",
@@ -325,27 +401,49 @@ class E2ETestExecutorContractTest(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
 
-    def test_report_artifacts_are_markdown_html_issues_and_evidence(self) -> None:
+    def test_dependency_availability_gate(self) -> None:
+        # Load-bearing protector for the dependency-availability rule. A presence test
+        # (the canonical §5 tokens are intact) is robust where a regex contradiction
+        # tripwire is not: two independent falsification passes broke a regex guard
+        # for this invariant — it leaked endless paraphrases and, worse, false-positived
+        # on correct negated phrasings like "never mark passed when unreachable". Pin the
+        # rule here; do not reintroduce a contradiction regex for this semantic invariant.
+        skill = SKILL.read_text(encoding="utf-8").lower()
+        section = skill.split("## 5. execute and diagnose", 1)[1].split("## 6. report artifacts", 1)[0]
+
+        for marker in (
+            "unreachable or unavailable at run time",
+            "declared stub or 挡板",
+            "mark the scenario `blocked` or suspend",
+            "capture the unreachable evidence",
+            "never `passed`",
+            "not a `product defect` unless product code actually executed",
+            "expected degraded behavior",
+            "an outage alone is never a pass",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, section)
+
+    def test_report_artifacts_are_tiered_core_and_optional(self) -> None:
         skill = SKILL.read_text(encoding="utf-8").lower()
         section = skill.split("## 6. report artifacts", 1)[1]
 
-        for marker in (
+        core_markers = (
             "e2e-run-<plan-name>-<timestamp>/",
             "execution-report.md",
-            "execution-report.html",
-            "issue-backlog.md",
             "evidence/",
+            "index.md",
+            "preserved-scenes/",
+            "reference.md#run-artifact-contract",
             "agent handoff source of truth",
             "execution summary",
+            "run metadata",
             "environment & capability map",
             "dag schedule",
             "scenario results",
             "evidence index",
             "data created & cleanup",
             "re-run instructions",
-            "human-readable view",
-            "must not introduce facts absent from the markdown report or evidence",
-            "separate agent-ready backlog",
             "not a remote issue tracker by default",
             "one issue per actionable root cause",
             "issue id",
@@ -354,9 +452,66 @@ class E2ETestExecutorContractTest(unittest.TestCase):
             "suspected code area",
             "verification command or scenario",
             "product defects are fix candidates",
+        )
+        for marker in core_markers:
+            with self.subTest(core=marker):
+                self.assertIn(marker, section)
+
+        # Core artifacts are produced by default; derived artifacts are gated on a consumer.
+        self.assertRegex(section, r"\bcore\b")
+        self.assertRegex(section, r"\bby default\b")
+        self.assertRegex(section, r"optional|on demand|on-demand")
+        self.assertIn("must not introduce facts absent from", section)
+        # Non-reconstructable evidence must never be downgraded to optional.
+        self.assertIn("never downgrade them to optional", section)
+
+        # Machine-readable and rendered artifacts stay named but read as optional, not required.
+        for optional_marker in (
+            "run-metadata.json",
+            "scenario-results.jsonl",
+            "execution-report.html",
+            "issue-backlog.md",
+        ):
+            with self.subTest(optional=optional_marker):
+                self.assertIn(optional_marker, section)
+
+    def test_reference_defines_run_artifact_contract(self) -> None:
+        reference = REFERENCE.read_text(encoding="utf-8").lower()
+
+        for marker in (
+            "## run artifact contract",
+            "core files",
+            "optional files",
+            "only when a programmatic consumer",
+            "must not introduce facts absent from",
+            "run-metadata.json",
+            "plan path or id",
+            "plan contract version",
+            "environment kind",
+            "repo commit",
+            "status counts",
+            "toolchain versions",
+            "cache/dependency sources",
+            "scenario-results.jsonl",
+            "one json object per dag node or scenario",
+            "evidence paths",
+            "preserved-scene paths",
+            "issue ids",
+            "cleanup status",
+            "evidence/index.md",
+            "preserved-scenes/",
+            "owner, ttl, cleanup command, risk",
+            "redaction notes",
+            "run directory alone",
+            # execution-report.md structural contract — single source for assert_valid_execution_report
+            "structural contract",
+            "with `execution summary` first",
+            "no other word stands in for a status",
+            "a failure with no preserved scene is a contract breach",
+            "at least one executable command",
         ):
             with self.subTest(marker=marker):
-                self.assertIn(marker, section)
+                self.assertIn(marker, reference)
 
     def test_no_template_placeholders_remain(self) -> None:
         skill = SKILL.read_text(encoding="utf-8").lower()
@@ -396,6 +551,46 @@ class E2ETestExecutorContractTest(unittest.TestCase):
             with self.subTest():
                 with self.assertRaises(AssertionError):
                     assert_no_executor_contradictions(self, text)
+
+    def test_valid_execution_report_passes_structural_contract(self) -> None:
+        report = (FIXTURES / "valid-execution-report.md").read_text(encoding="utf-8")
+        assert_valid_execution_report(self, report)
+
+    def test_execution_report_contract_rejects_structural_defects(self) -> None:
+        # Bidirectional half: each mutation breaks exactly one run-artifact invariant and
+        # must be caught. Mirrors the planner's missing-closure fixture, kept inline so the
+        # mutation and the broken rule are co-located.
+        good = (FIXTURES / "valid-execution-report.md").read_text(encoding="utf-8")
+
+        mutations = {
+            # R1: a required section is dropped (heading renamed).
+            "missing Re-run Instructions section": good.replace(
+                "## Re-run Instructions", "## Rerun Steps"
+            ),
+            # R3b: a `failed` row loses its preserved scene.
+            "failed row without preserved scene": good.replace(
+                "`failed` | evidence/index.md#wn-s2 | preserved-scenes/wn-s2/ |",
+                "`failed` | evidence/index.md#wn-s2 | — |",
+            ),
+            # R3a: no legal terminal status remains in Scenario Results.
+            "no legal scenario status": good.replace("`passed`", "`done`")
+            .replace("`failed`", "`broken`")
+            .replace("`blocked`", "`stuck`"),
+            # R4: the core evidence index is no longer referenced.
+            "no evidence index reference": good.replace("evidence/index.md", "evidence-summary"),
+            # R5: Re-run Instructions degrades to prose with no command.
+            "rerun section without a command": good.replace(
+                "```bash\n./gradlew :hfax_loan_service:test --tests '*WithHoldNotice*' -Denv=test\n```\n\n"
+                "WN-S2 alone reruns via `curl -X POST http://localhost:18080/fund/loan/withhold/notice -d @evidence/wn-s2/request.json`.",
+                "Re-run by re-executing the withhold-notice selection in the test environment.",
+            ),
+        }
+
+        for label, mutated in mutations.items():
+            with self.subTest(mutation=label):
+                self.assertNotEqual(mutated, good, f"mutation was a no-op: {label}")
+                with self.assertRaises(AssertionError):
+                    assert_valid_execution_report(self, mutated)
 
 
 if __name__ == "__main__":

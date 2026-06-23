@@ -19,8 +19,11 @@ Read the smallest authority set that can prove behavior:
 - Named design, requirement, and plan documents, plus nearby indexes.
 - Relevant code entry points, domain models, state machines, persistence, async jobs, external clients, and existing tests.
 - Config, feature flags, permissions, queues, schedulers, and transaction or idempotency hooks that affect end-to-end behavior.
+- Prior executor run reports, when iterating on an already-executed plan: fold their `Emergent Scenarios` into the Risk Map and Coverage Matrix so out-of-plan findings are not lost.
 
-Completion criterion: every named source is accounted for; every claimed behavior has a source receipt or is marked unverified; out-of-scope surfaces are named. If a later scenario cites a new source, add it to the inventory before finalizing.
+Document-code semantic diff: where a source document states a behavioral contract — such as a rule, default, mapping, ordering, or invariant — extract it and compare it against the code's actual behavior. The highest-value defects often live in this gap. Emit a `Document-Code Semantic Diff` / `文档-代码语义差异` ([REFERENCE.md](REFERENCE.md#document-code-semantic-diff)) capturing each contract, the code behavior, the delta, its risk, and the scenario or decision that resolves it.
+
+Completion criterion: every named source is accounted for; every claimed behavior has a source receipt or is marked unverified; out-of-scope surfaces are named. Documented contracts that diverge from code behavior are captured in the Document-Code Semantic Diff, and every P0/P1 divergence maps to a verification scenario or an explicit closed/blocked decision rather than a line buried in risk or assumptions. If a later scenario cites a new source, add it to the inventory before finalizing.
 
 ## 2. Business Flow Diagram + Journey Graph
 
@@ -46,7 +49,9 @@ Before risk mapping, define what a follow-on agent can execute without rediscove
 
 Use stable field labels so another agent can parse the handoff. For English output, use `Target surfaces`, `Fixtures`, `Named variables`, `Probes/Oracles`, `Waits`, `Cleanup`, and `Blockers/Gaps`. For Chinese output, use `目标面`, `测试数据`, `变量传递`, `探针/Oracle`, `等待/预算`, `隔离/清理`, and `阻塞/缺口`. Keep these labels exact; put longer wording in the field body, not the label.
 
-Completion criterion: every scenario can be assigned to an execution agent with no hidden setup, hidden prior result, or ambiguous oracle; unknown locators, unavailable test hooks, unsafe cleanup, and unowned dependencies are blockers or gaps.
+Tag the provenance of every runtime fact, not only its value. A target surface, trigger channel, datasource, schema or DDL state, credential, permission, feature flag, or external dependency is `confirmed by source` / `已确认` only when a read source proves it now; otherwise it is `assumed until executor probe` / `待验证`, and a known-unavailable prerequisite is `blocked` / `阻塞`. Any runtime state a static read cannot prove live — reachability, connectivity, service registration, readiness, and the like — is an assumption until the executor probes it; do not assert it as established because the plan happens to name it.
+
+Completion criterion: every scenario can be assigned to an execution agent with no hidden setup, hidden prior result, or ambiguous oracle; unknown locators, unavailable test hooks, unsafe cleanup, and unowned dependencies are blockers or gaps; every runtime fact carries one of `confirmed by source`, `assumed until executor probe`, or `blocked`.
 
 ## 4. Risk Map
 
@@ -55,12 +60,15 @@ Derive scenarios from the journey graph, not from a generic checklist. Cover eac
 - Main path and alternate valid paths.
 - Boundary values, empty or large inputs, invalid state transitions, validation errors, and permission failures.
 - Cross-step consistency: DB records, external side effects, events, caches, search indexes, invoices, emails, or reports agree after each committed state.
+- Read-path equivalence (most commonly a DB migration; the same holds for any shared read surface an existing reader consumes): when a change alters the shape or contents of that surface, every existing downstream reader of it — especially readers that predate the change and do not filter on the new discriminator — still returns equivalent results or is explicitly changed.
 - Concurrency: duplicate submissions, simultaneous updates, callback races, lock contention, optimistic or pessimistic conflicts, and lost updates.
 - Idempotency and recovery: retries, duplicate callbacks, partial failure, rollback or compensation, and resume after async failure.
 - Performance and scale: latency budgets, throughput, queue lag, item counts, fan-out, pagination, memory pressure, or connection pressure.
 - Observability and operability: logs, metrics, traces, alerts, audit trails, and support diagnostics for critical failures.
 
-Completion criterion: each requirement, API variant, required-input branch, state transition, business-flow edge, dependency edge, and high-risk failure mode is covered by at least one scenario or listed as a gap. Treat source-only suspected defects as verification targets unless runtime evidence or tests reproduce them.
+Migration read-path branch: when that family applies, do not stop at writer correctness. Enumerate the readers of each changed table or column and emit a `Migration Read-Path Risk Matrix` / `迁移读路径风险矩阵` ([REFERENCE.md](REFERENCE.md#migration-read-path-risk-matrix)); map each changed shape that has an existing reader to a read-path equivalence scenario or a blocker, not only a write-success scenario.
+
+Completion criterion: each requirement, API variant, required-input branch, state transition, business-flow edge, dependency edge, and high-risk failure mode is covered by at least one scenario or listed as a gap. When the migration read-path branch applies, every changed table or column with an existing reader maps to a read-path equivalence scenario or a blocker. Treat source-only suspected defects as verification targets unless runtime evidence or tests reproduce them.
 
 ## 5. Test Scenarios
 
@@ -104,7 +112,8 @@ End with:
 - Level-2 `Coverage Matrix` / `覆盖矩阵` mapping requirements, business-flow edges, journey graph edges, and risk families to scenario IDs.
 - Level-2 `Gaps, Assumptions, Questions` / `缺口、假设与问题` naming doc/code conflicts, assumptions, and questions that could change the plan.
 - Optional Level-2 `Execution Order` / `执行顺序`, only when a human reader wants a ready-made sequence: a recommended dependency order derived from the Execution DAG, not a replacement for it. The executor derives order from the DAG `Depends on`, so this section is not required for agent handoff.
-- Level-2 `Agent-ready Gates` / `Agent 就绪门禁`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution.
+- Level-2 `Agent-ready Gates` / `Agent 就绪门禁`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution. Keep these gates consistent with the run facts asserted elsewhere in the plan: a fact stated as `confirmed by source` must not also appear here as an unmet prerequisite or blocker, and any runtime fact the executor must still probe — trigger-channel reachability, datasource or DDL readiness, credentials, or dependency availability — is `assumed until executor probe`, not presented as established.
+- Level-2 `Scenario Slices` / `场景切片`: identify the `Core Slice` — the smallest set of scenarios that closes the main risk in a single executor run — so an executor can start there without re-triaging priority. When the full scenario set is larger than that Core Slice, also classify the rest as `Extended Slice` (valuable follow-on coverage) or `Hazardous/Defer` (disruptive, costly, or blocked scenarios to isolate or postpone), naming why each non-core scenario is deferred. The `Minimal First Automation Slice`, when the user asks for it, names the Core Slice's concrete starting scenarios.
 - Level-2 `Minimal First Automation Slice` / `最小自动化切片` if the user asks how to start, with the scenario IDs and source-backed target surfaces to implement first.
 
 Do not write test code unless the user asks. Label unverified source-derived defect claims as hypotheses.

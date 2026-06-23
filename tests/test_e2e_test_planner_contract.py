@@ -56,6 +56,10 @@ def parse_markdown_table(test_case: unittest.TestCase, section: str) -> list[dic
     headers = [cell.strip().lower() for cell in table_lines[0].strip("|").split("|")]
     separator_cells = [cell.strip() for cell in table_lines[1].strip("|").split("|")]
     test_case.assertEqual(len(headers), len(separator_cells), "DAG table separator must match header width")
+    test_case.assertTrue(
+        all(re.fullmatch(r":?-+:?", cell) for cell in separator_cells),
+        f"markdown table is missing its separator row: {table_lines[1]}",
+    )
     rows: list[dict[str, str]] = []
     for line in table_lines[2:]:
         cells = [cell.strip() for cell in line.strip("|").split("|")]
@@ -278,6 +282,154 @@ def assert_valid_generated_plan(test_case: unittest.TestCase, text: str) -> None
         test_case.assertTrue(any(alias in scenario_lower for alias in ("probe", "oracle", "wait", "timeout", "assert", "断言", "探针", "等待", "超时")))
         test_case.assertRegex(scenario_lower, r"\b[a-z]*j\d+\b", "scenario must cite business-flow edge IDs")
         test_case.assertRegex(scenario_lower, r"(consumes|produces|capture|captures|取|依赖)")
+
+    # Migration read-path matrix (conditional projection): a migration that backfills a
+    # shared column, changes a table/column shape, or copies/dedups rows can make every
+    # writer succeed yet break an existing reader. When a `Migration Read-Path Risk Matrix`
+    # is present it must be well-formed, correctly placed (after Risk Map, before Test
+    # Scenarios), and SYMMETRIC — every row maps to a real read-path scenario id or a
+    # declared blocker. The validator does NOT infer migration intent from prose: a keyword
+    # trigger both false-positives on words like "backfill" and is evadable by synonyms, so
+    # "a migration plan must include the matrix" is carried by the SKILL instruction and the
+    # migration fixture, not forced onto every plan here.
+    migration_matrix_index = optional_heading_index(
+        "migration read-path risk matrix", "迁移读路径风险矩阵"
+    )
+    if migration_matrix_index is not None:
+        test_case.assertGreater(
+            migration_matrix_index, indexes[3], "migration matrix must follow the Risk Map"
+        )
+        test_case.assertLess(
+            migration_matrix_index, indexes[4], "migration matrix must precede the Test Scenarios"
+        )
+        next_heading = re.search(r"\n##\s", text[migration_matrix_index + 1 :])
+        matrix_end = (
+            migration_matrix_index + 1 + next_heading.start() if next_heading else len(text)
+        )
+        matrix_section = text[migration_matrix_index:matrix_end]
+        test_case.assertIsNone(
+            PLACEHOLDER_PATTERN.search(matrix_section.lower()),
+            "migration read-path matrix must not contain placeholders",
+        )
+        matrix_rows = parse_markdown_table(test_case, matrix_section)
+        test_case.assertGreaterEqual(
+            len(matrix_rows), 1, "migration read-path matrix must include reader rows"
+        )
+        header_keys = " | ".join(matrix_rows[0].keys())
+        english_columns = ("changed", "reader", "old", "new", "scenario", "decision")
+        chinese_columns = ("变更", "读取", "旧", "新", "场景", "决策")
+        test_case.assertTrue(
+            all(column in header_keys for column in english_columns)
+            or all(column in header_keys for column in chinese_columns),
+            "migration read-path matrix must use stable columns",
+        )
+        test_case.assertGreaterEqual(
+            len(matrix_rows[0]), 6,
+            "migration read-path matrix needs distinct columns, not a merged header",
+        )
+        for row in matrix_rows:
+            scenario_cell = next(
+                (value for key, value in row.items() if "scenario" in key or "场景" in key), ""
+            )
+            decision_cell = next(
+                (value for key, value in row.items() if "decision" in key or "决策" in key), ""
+            )
+            referenced = {
+                match.group(0).lower()
+                for match in SCENARIO_PATTERN.finditer(scenario_cell.lower())
+            }
+            # A genuine blocker is the declared value of the scenario or decision cell
+            # (`blocker` / `blocker: reason` / 阻塞 / 缺口), not a substring of a compound
+            # word like "non-blocker" or "blocker-free" sitting in incidental prose.
+            is_blocker = any(
+                re.match(r"(?:blocker|阻塞|缺口)\s*(?::|：|$)", value.strip().strip("`").strip().lower())
+                is not None
+                for value in (scenario_cell, decision_cell)
+            )
+            test_case.assertTrue(
+                referenced or is_blocker,
+                "each migration matrix row needs a read-path scenario id or a declared blocker",
+            )
+            test_case.assertTrue(
+                referenced <= scenario_ids,
+                f"migration matrix row references unknown scenario: {scenario_cell}",
+            )
+
+    # Document-code semantic diff (conditional projection): a documented contract that
+    # diverges from code behavior is often the highest-value defect. When a
+    # `Document-Code Semantic Diff` is present it must be well-formed, placed after the
+    # Source Inventory and before the Test Scenarios, and SYMMETRIC — every non-`match`
+    # P0/P1 row resolves to a real scenario id or an explicit closed/blocked decision.
+    # Presence is carried by the SKILL instruction, not a prose trigger.
+    diff_index = optional_heading_index("document-code semantic diff", "文档-代码语义差异")
+    if diff_index is not None:
+        test_case.assertGreater(
+            diff_index, indexes[0], "doc-code diff must follow the Source Inventory"
+        )
+        test_case.assertLess(
+            diff_index, indexes[4], "doc-code diff must precede the Test Scenarios"
+        )
+        next_diff_heading = re.search(r"\n##\s", text[diff_index + 1 :])
+        diff_end = diff_index + 1 + next_diff_heading.start() if next_diff_heading else len(text)
+        diff_section = text[diff_index:diff_end]
+        test_case.assertIsNone(
+            PLACEHOLDER_PATTERN.search(diff_section.lower()),
+            "document-code semantic diff must not contain placeholders",
+        )
+        diff_rows = parse_markdown_table(test_case, diff_section)
+        test_case.assertGreaterEqual(
+            len(diff_rows), 1, "document-code semantic diff must include contract rows"
+        )
+        diff_headers = " | ".join(diff_rows[0].keys())
+        english_diff_columns = ("contract", "code", "delta", "risk", "resolution")
+        chinese_diff_columns = ("契约", "代码", "差异", "风险", "处置")
+        test_case.assertTrue(
+            all(column in diff_headers for column in english_diff_columns)
+            or all(column in diff_headers for column in chinese_diff_columns),
+            "document-code semantic diff must use stable columns",
+        )
+        test_case.assertGreaterEqual(
+            len(diff_rows[0]), 5,
+            "document-code semantic diff needs distinct columns, not a merged header",
+        )
+        for row in diff_rows:
+            delta_cell = next(
+                (value for key, value in row.items() if "delta" in key or "差异" in key), ""
+            )
+            risk_cell = next(
+                (value for key, value in row.items() if "risk" in key or "风险" in key), ""
+            )
+            resolution_cell = next(
+                (value for key, value in row.items() if "resolution" in key or "处置" in key), ""
+            )
+            # Only an unresolved P0/P1 divergence must map to a scenario; a verified `match`
+            # or a P2 row is informational and skipped.
+            delta_value = delta_cell.replace("`", "").strip().lower()
+            is_high_risk = re.search(r"\bp[01]\b", risk_cell.lower())
+            # `match` is an EXACT value, not a prefix: "match (mostly)" is a hedged
+            # divergence, not a verified match, and must not skip the symmetry check.
+            if delta_value in ("match", "一致") or is_high_risk is None:
+                continue
+            referenced = {
+                m.group(0).lower() for m in SCENARIO_PATTERN.finditer(resolution_cell.lower())
+            }
+            # A resolution is a real scenario id or an explicit closed/blocked value, not a
+            # substring of incidental prose.
+            is_closed = (
+                re.match(
+                    r"(?:closed|blocked|关闭|阻塞)\s*(?::|：|$)",
+                    resolution_cell.replace("`", "").strip().lower(),
+                )
+                is not None
+            )
+            test_case.assertTrue(
+                referenced or is_closed,
+                "each P0/P1 doc-code delta needs a scenario id or a closed/blocked resolution",
+            )
+            test_case.assertTrue(
+                referenced <= scenario_ids,
+                f"doc-code diff row references unknown scenario: {resolution_cell}",
+            )
 
     dag_end = executor_handoff_index if executor_handoff_index is not None else min(closure_indexes)
     execution_dag_original = text[indexes[5] : dag_end]
@@ -639,6 +791,58 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
 
+    def test_agent_contract_and_gates_require_runtime_fact_provenance(self) -> None:
+        # PLANNER-FACT-CONSISTENCY-GATE: §3 tags every runtime fact with a
+        # three-way provenance status, and §7 forbids the same fact being both
+        # `confirmed by source` and an unmet gate/blocker. Detecting an actual
+        # cross-section contradiction inside a produced plan is semantic, not
+        # structural (the same fact is reworded between header and gates), so it
+        # stays an instruction rather than a plan validator; this test pins only
+        # that the discipline and its closed vocabulary live in the skill.
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+
+        contract = skill.split("## 3. agent execution contract", 1)[1].split("## 4. risk map", 1)[0]
+        # Pin the three statuses as their exact bilingual paired forms so the
+        # check has teeth: a bare "blocked"/"阻塞" would pass via the pre-existing
+        # "blockers or gaps" prose and the `阻塞/缺口` label even if the new
+        # provenance status were deleted, so only the paired enumeration binds.
+        for marker in (
+            "provenance",
+            "`confirmed by source` / `已确认`",
+            "`assumed until executor probe` / `待验证`",
+            "`blocked` / `阻塞`",
+        ):
+            with self.subTest(section="agent-contract", marker=marker):
+                self.assertIn(marker, contract)
+
+        closure = skill.split("## 7. closure", 1)[1]
+        for marker in (
+            "consistent with the run facts",
+            "confirmed by source",
+            "assumed until executor probe",
+        ):
+            with self.subTest(section="closure", marker=marker):
+                self.assertIn(marker, closure)
+
+    def test_closure_supports_core_slice_triage(self) -> None:
+        # PLANNER-CORE-SLICE: when the scenario set exceeds one executor run, the
+        # plan triages scenarios into three named slices so the executor can run
+        # the Core Slice without re-judging priority. Conditional section + n=1
+        # evidence, so it is an instruction protected by a presence test, not a
+        # required-section validator. Tokens are the full slice names (bare
+        # "slice" would collide with the Minimal First Automation Slice bullet).
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+        closure = skill.split("## 7. closure", 1)[1]
+        for marker in (
+            "scenario slices",
+            "场景切片",
+            "core slice",
+            "extended slice",
+            "hazardous/defer",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, closure)
+
     def test_scenario_contract_requires_implementation_ready_fields(self) -> None:
         skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8")
         section = skill.split("For each scenario include:", 1)[1].split(
@@ -682,6 +886,182 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         text = (FIXTURES / "valid-generated-plan-zh.md").read_text(encoding="utf-8")
 
         assert_valid_generated_plan(self, text)
+
+    def test_reference_defines_migration_read_path_matrix(self) -> None:
+        reference = PLANNER_REFERENCE.read_text(encoding="utf-8").lower()
+
+        for marker in (
+            "## migration read-path risk matrix",
+            "迁移读路径风险矩阵",
+            "changed table/column",
+            "change kind",
+            "reader",
+            "old assumption",
+            "new shape",
+            "equivalence scenario",
+            "expected decision",
+            "predate this change",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
+
+    def test_risk_map_requires_migration_read_path_branch(self) -> None:
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+        section = skill.split("## 4. risk map", 1)[1].split("## 5. test scenarios", 1)[0]
+
+        for marker in (
+            "migration read-path",
+            "downstream reader",
+            "do not filter on the new discriminator",
+            "migration read-path risk matrix",
+            "(reference.md#migration-read-path-risk-matrix)",
+            "迁移读路径风险矩阵",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, section)
+
+    def test_generated_plan_output_contract_accepts_migration_read_path_matrix(self) -> None:
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8")
+
+        assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_migration_matrix_unknown_scenario(self) -> None:
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
+            "`RANK-E2E-002` | must-change",
+            "`RANK-E2E-999` | must-change",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_migration_matrix_row_without_scenario_or_blocker(self) -> None:
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
+            "| `RANK-E2E-002` | must-change: reader needs `playId` filter |",
+            "| documented | equivalent |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_migration_matrix_blocker_compound_word(self) -> None:
+        # Round-2 defect: a hyphenated compound ("non-blocker", "blocker-free") in the
+        # decision cell must not satisfy the blocker requirement for a no-scenario row.
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
+            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` (filters `seasonId`, not `playId`) | one template set per season | N duplicated sets per season | `RANK-E2E-002` | must-change: reader needs `playId` filter |",
+            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` | one template set per season | N duplicated sets per season | not covered | non-blocker finding |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_accepts_document_code_diff(self) -> None:
+        text = (FIXTURES / "valid-doc-code-diff-plan.md").read_text(encoding="utf-8")
+
+        assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_doc_code_diff_unknown_scenario(self) -> None:
+        text = (FIXTURES / "valid-doc-code-diff-plan.md").read_text(encoding="utf-8").replace(
+            "`DC-E2E-002`", "`DC-E2E-999`",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_doc_code_diff_high_risk_without_resolution(self) -> None:
+        text = (FIXTURES / "valid-doc-code-diff-plan.md").read_text(encoding="utf-8").replace(
+            "| P1 | `DC-E2E-002` |", "| P1 | noted |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_reference_defines_document_code_diff(self) -> None:
+        reference = PLANNER_REFERENCE.read_text(encoding="utf-8").lower()
+
+        for marker in (
+            "## document-code semantic diff",
+            "文档-代码语义差异",
+            "contract",
+            "code behavior",
+            "delta",
+            "risk",
+            "resolution",
+            "file:line",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
+
+    def test_source_inventory_requires_document_code_diff(self) -> None:
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+        section = skill.split("## 1. source inventory", 1)[1].split("## 2. business flow", 1)[0]
+
+        for marker in (
+            "document-code semantic diff",
+            "behavioral contract",
+            "(reference.md#document-code-semantic-diff)",
+            "文档-代码语义差异",
+            "closed/blocked decision",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, section)
+
+    def test_source_inventory_ingests_emergent_scenarios(self) -> None:
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+        section = skill.split("## 1. source inventory", 1)[1].split("## 2. business flow", 1)[0]
+
+        for marker in (
+            "prior executor run reports",
+            "emergent scenarios",
+            "risk map and coverage matrix",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, section)
+
+    def test_generated_plan_output_contract_rejects_doc_code_diff_hedged_match(self) -> None:
+        # Falsification F1: a hedged "match (mostly)" is a real divergence, not a verified
+        # match, so a P1 row labeled that way must still resolve to a scenario or blocker.
+        text = (FIXTURES / "valid-doc-code-diff-plan.md").read_text(encoding="utf-8").replace(
+            "| documented default never applied | P1 | `DC-E2E-002` |",
+            "| match (mostly) | P1 | noted |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_table_without_separator_row(self) -> None:
+        # Falsification F2: a table whose `| --- |` separator is omitted must not pass with
+        # its first data row silently consumed as the separator.
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
+            "| --- | --- | --- | --- | --- | --- | --- |\n", "", 1
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_merged_header_matrix(self) -> None:
+        # Falsification F3: a single mega-header concatenating the required substrings must
+        # not pass the column check as a degenerate one-column table.
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
+            "| Changed table/column | Change kind | Reader | Old assumption | New shape | Equivalence scenario | Expected decision |\n"
+            "| --- | --- | --- | --- | --- | --- | --- |\n"
+            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` (filters `seasonId`, not `playId`) | one template set per season | N duplicated sets per season | `RANK-E2E-002` | must-change: reader needs `playId` filter |\n"
+            "| `summary.variantKey` column | backfill | `ReportExporter.dailyBySeason` (aggregates without the variant key) | one aggregate per season | aggregate splits per variant | `blocker` | blocker: report owner must confirm intended shape |",
+            "| changed reader old new scenario decision merged |\n| --- |\n| `RANK-E2E-002` |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
+
+    def test_generated_plan_output_contract_rejects_migration_matrix_incidental_block_substring(self) -> None:
+        # Falsification defect 3: an incidental "non-blocking" / "gap" substring outside the
+        # scenario/decision cells must not launder a row that has no scenario id.
+        text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
+            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` (filters `seasonId`, not `playId`) | one template set per season | N duplicated sets per season | `RANK-E2E-002` | must-change: reader needs `playId` filter |",
+            "| `ranking` rows | row copy (non-blocking read path) | `RankingMapper.selectBySeason` | one template set per season | N duplicated sets per season | no coverage yet | equivalent |",
+        )
+
+        with self.assertRaises(AssertionError):
+            assert_valid_generated_plan(self, text)
 
     def test_generated_plan_output_contract_rejects_missing_closure(self) -> None:
         text = (FIXTURES / "missing-closure-plan.md").read_text(encoding="utf-8")

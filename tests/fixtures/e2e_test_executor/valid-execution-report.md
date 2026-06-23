@@ -11,6 +11,31 @@ withhold-notice path produced a consistent repay-plan state and one emitted even
 the amount-mismatch callback surfaced a suspected product defect; the duplicate-callback
 idempotency scenario was blocked by an unreachable settlement stub.
 
+## Run Lineage & Emergent Scenarios
+
+Lineage:
+- Upstream plan: `evals/e2e-skills/real-repo/2026-06-21-withhold-notice-plan-zh.md` (e2e-plan/v1)
+- Upstream run: none (first run)
+- Downstream: WN-S2 defect investigation pending
+- Status: open
+
+Emergent scenarios discovered during this run (out of plan):
+
+| Emergent scenario | Source trigger | Risk family | Plan section to update | Status |
+|---|---|---|---|---|
+| WN-E1 partial-success amount reconciliation | WN-S2 amount mismatch still advanced `result_status` | cross-step consistency | Risk Map: amount-validation consistency | proposed |
+
+## Environment State Ledger
+
+- Target: `POST /fund/loan/withhold/notice` @ `http://localhost:18080` (test)
+- Datasource: schema `asset_loan_test` — tables `repay_plan`, `repay_apply`
+- Deployment/freshness evidence: commit `0e03ed0`, build `2026-06-21T09:50`, service start `2026-06-21T10:05`; readiness `GET /actuator/health` = UP before the first scenario
+- Isolation namespace: batch prefix `E2EWN-` on every created row
+- Created data: 3 `repay_plan` rows under `E2EWN-`
+- Cleanup policy: clean by `batch_no LIKE 'E2EWN-%'`; WN-S2 rows must not be cleaned until the defect is confirmed
+- Remaining traces: `E2EWN-S2%` rows retained (owner `E2EWN-S2`, TTL 72h); 2 of 3 rows cleaned
+- Tool permissions: test service token (`config/test-token`); invoke allowlist passes; no target override; direct-URL fallback available
+
 ## Run Metadata
 
 - Plan source: evals/e2e-skills/real-repo/2026-06-21-withhold-notice-plan-zh.md

@@ -10,21 +10,25 @@ Execute an existing E2E plan and produce an evidence-backed handoff. The default
 
 Supported environments: local and test only. If the target is preprod, staging with production-like restrictions, or production, stop and ask for a narrower read-only task or explicit safety instructions.
 
+Output language: use the language the user explicitly requests; otherwise infer from the user's latest prompt, then the plan's dominant language. Write the report and all run artifacts in that language; preserve code identifiers, paths, API names, enum values, logs, and quoted source text as-is. If the language choice remains ambiguous, state the assumed output language once.
+
 ## 1. Intake
 
 Read the plan before touching the system. Parse `Agent-ready Gates`, `Agent Execution Contract`, `Execution DAG`, `Executor Handoff Index` when present, `Execution Order`, scenario fields, waits, cleanup, and issue or gap sections. If the plan lacks a needed locator, variable, command, table, or environment fact, explore the codebase, docs, config, scripts, tests, and safe read-only probes before asking the user.
 
-Completion criterion: every selected scenario is mapped to plan IDs, edge IDs, expected variables, required capabilities, waits, cleanup, and blockers; missing or conflicting plan facts are recorded before execution starts.
+When this run continues a prior run — a re-run to verify fixes — first read the prior run's `execution-report.md`: take its `failed` and `blocked` scenarios plus open defects as the selection set, carry its `Environment State Ledger` as the resume snapshot (what persists, what must not be cleaned), and record it as `Upstream run`. Re-run those scenarios and their DAG dependents — whatever consumed the fixed behavior — not only the single fixed scenario and not the whole plan, so a fix-induced downstream regression is caught. The Environment Contract preflight must prove the fix is the loaded build (deployment fingerprint) before re-validating, never the pre-fix process. A previously `failed` scenario that now meets its probes flips to `passed`; update its defect status and back-link the lineage.
+
+Completion criterion: every selected scenario is mapped to plan IDs, edge IDs, expected variables, required capabilities, waits, cleanup, and blockers; missing or conflicting plan facts are recorded before execution starts. For a re-run, the selection set is the prior run's failed and blocked scenarios plus their dependents, and the upstream run is recorded.
 
 ## 2. Environment Discovery
 
 Identify whether the run is local or test. Build an `Execution Capability Map` covering available API/RPC/SDK/CLI/UI tools, DB access, MQ/Redis/job/callback controls, logs/metrics/traces, auth, base URLs, test accounts, feature flags, service start commands, stubs, build/test toolchains, dependency caches, and cleanup mechanisms. Treat the trigger channel itself as a first-class gate, not just endpoint reachability: the permission, allowlist, routing-override, and fallback-route controls that authorize a trigger on whatever surface applies — for RPC/SDK these are invoke and service allowlists, target overrides, and direct-URL fallbacks; for HTTP, API-key/origin allowlists, gateway routes, and CORS — together with the runtime env that unlocks them; surface these as a named `Trigger Channel Gates` facet of the capability map. Before a real trigger, be able to localize a block to a specific layer such as tool permission, network connectivity, service registration, or business handler rather than reporting a generic failure.
 
-For local runs, actively fix reversible environment problems: start declared services, workers, schedulers, stubs, or docker compose; free or change ports; install declared dependencies; create temporary config; run migrations or seeds; and inspect logs until health checks pass or the blocker is proven. Log every file, command, port, profile, service, toolchain version, cache or dependency source, and temporary change. Classify cache misses, dependency downloads, and dependency-resolution timeouts as environment or tooling setup unless product code actually executed and failed. Do not silently change business logic, bypass auth or validation, or edit production templates to make a scenario pass.
+For local runs, actively fix reversible environment problems: start declared services, workers, schedulers, stubs, or docker compose; free or change ports; install declared dependencies; create temporary config; run migrations or seeds; and inspect logs until health checks pass or the blocker is proven. The agent's non-interactive shell resolves PATH and the active toolchain differently from a human interactive shell; resolve and record the actual tool paths and versions the run will use before building or starting services, and never rely on inherited PATH or a runtime's default toolchain. Log every file, command, port, profile, service, toolchain version, cache or dependency source, and temporary change. Classify cache misses, dependency downloads, and dependency-resolution timeouts as environment or tooling setup unless product code actually executed and failed. Do not silently change business logic, bypass auth or validation, or edit production templates to make a scenario pass.
 
 For test runs, automatic data creation, cleanup, job triggering, and callback triggering are allowed once the environment is confirmed as test. Prefer business APIs, existing tools, and self-owned data; direct DB mutation is allowed when it is the practical test hook, but every write/delete must be logged with ownership and cleanup evidence.
 
-Completion criterion: scenario execution does not begin until the capability map satisfies the relevant entry gates — including trigger-channel permissions — or names exact blockers.
+Completion criterion: scenario execution does not begin until the capability map satisfies the relevant entry gates — including trigger-channel permissions — or names exact blockers. Before the first real trigger, run an `Environment Contract` preflight — resolve and record concrete values, not profile-name inferences or `reachable`, for the effective datasource (and the schema the code expects), the build/run toolchain identity, and the running process's deployment fingerprint the selected scenarios actually reach; an unresolved in-scope contract field is a blocker, not an assumption carried into execution. See [REFERENCE.md](REFERENCE.md#environment-contract-preflight).
 
 ## 3. Data Policy
 
@@ -60,7 +64,7 @@ Completion criterion: each selected scenario is `passed`, `failed`, `blocked`, o
 
 ## 6. Report Artifacts
 
-Create a run directory unless the user specifies an output path. Produce the core artifacts by default; produce machine-readable or rendered artifacts only when a programmatic consumer, rerun/comparison tooling, or the user asks for them.
+Create a run directory unless the user specifies an output path; default it beside the plan being executed — under the plan's `docs/e2e-test/<feature>/` folder — so the plan and its runs stay paired, otherwise a stated working path whose full location the final response names. Produce the core artifacts by default; produce machine-readable or rendered artifacts only when a programmatic consumer, rerun/comparison tooling, or the user asks for them.
 
 ```text
 e2e-run-<plan-name>-<timestamp>/

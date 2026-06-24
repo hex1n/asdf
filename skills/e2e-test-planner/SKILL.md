@@ -12,6 +12,8 @@ Output language: use the language the user explicitly requests; otherwise infer 
 
 Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, dependency DAG facts, and blockers. When execution will be delegated, also emit the compact Executor Handoff Index described after the Execution DAG. Avoid approval-only template sections unless the user asks for a formal QA document.
 
+When saving the plan, default to a per-feature folder `docs/e2e-test/<feature>/` inside a repo (otherwise a stated path whose full location the response names), as `<date>-<feature>-e2e-test-plan.md`, so the plan and its later execution runs sit together under one feature directory.
+
 ## 1. Source Inventory
 
 Read the smallest authority set that can prove behavior:

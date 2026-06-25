@@ -68,5 +68,5 @@ Worked example (illustrative; names are generic):
 
 | Contract | Code behavior | Delta | Risk | Resolution |
 |---|---|---|---|---|
-| Doc: display name uses the team-type alias (`spec §7`) | code emits the raw team-type name (`Service.java:120`) | alias never applied | P1 | `EX-E2E-021` |
-| Doc: members removed on withdrawal (`spec §7.2`) | code keeps stale membership rows | unconfirmed product call | P1 | blocked: product owner to confirm intended semantics |
+| Doc: display name uses a code→label alias (`spec §7`) | code emits the raw code value (`Service.java:120`) | alias never applied | P1 | `EX-E2E-021` |
+| Doc: child records deleted when the parent is removed (`spec §7.2`) | code keeps orphaned child records | unconfirmed product call | P1 | blocked: product owner to confirm intended semantics |

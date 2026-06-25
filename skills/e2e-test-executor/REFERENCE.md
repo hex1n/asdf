@@ -35,6 +35,26 @@ A delegated executor's report is machine-checkable. A valid `execution-report.md
 
 Completion criterion: a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using the core files; optional files are added only when a named consumer needs them.
 
+## Scenario Results & Evidence Legibility
+
+A delegated report is read scenario-first. The recurring failure it prevents: a reader — human or follow-up agent — forced to join three places (the status table, the `Failures` prose, and a flat evidence dump) to reconstruct one scenario's story. Co-locate the story instead.
+
+**Self-contained `Scenario Results` row.** Beside its terminal status, each row carries the expected outcome, the actual outcome, a diagnosis-classification token, and direct links to its evidence anchor and preserved scene:
+
+| Scenario | Status | Expected | Actual | Diagnosis | Evidence | Preserved scene |
+|---|---|---|---|---|---|---|
+| {scenario-id} | `failed` | {what the probe asserts} | {what was observed} | `ENUM_VALUE` | evidence/index.md#{anchor} | preserved-scenes/{anchor}/ |
+
+- `Expected`/`Actual` are one-line deltas, not full prose — depth lives in the evidence block the row links to. Keep cells terse so the table stays scannable when scenarios are many.
+- `Diagnosis` is the §5 classification *token only* (`product`/`plan`/`environment`/`tooling`/`unknown`) — a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
+- This is healthy denormalization: a status or enum token restated on the index row is near-zero drift; a paragraph restated is not. Never copy the failure-reason prose onto the row.
+
+**Scenario and defect are different units.** `Scenario Results` is keyed by scenario; `Failures / Defects / Plan Gaps` is keyed by defect/root-cause, which can fan out to several scenarios. When one defect spans multiple scenarios, write it once in `Failures` with a defect id and an affected-scenario list, and link every affected row to that one entry — do not restate it per row. This is why the two sections cannot be merged: they project the same data on different axes.
+
+**Per-scenario `Evidence Index`.** Organize the evidence index as one short proof chain per scenario — probe → expected → actual → raw-artifact paths — so a `Scenario Results` evidence link lands on the proof, not an undifferentiated dump. The chain is domain-neutral: a `failed` payment-validation scenario reads `probe: result field after the callback / expected: rejected / actual: ENUM_VALUE / raw: request, response, row snapshot`; a `failed` content-moderation scenario reads `probe: verdict field after submit / expected: blocked / actual: ENUM_VALUE / raw: request, response, audit record` — the shape is identical, only the {field}/{entity} differ.
+
+Completion criterion: a reader learns a scenario's verdict and why from its row alone, and following the row's evidence link reaches a per-scenario proof chain; no failure-reason prose is duplicated between a row and `Failures`.
+
 ## Run Lineage & Emergent Scenarios
 
 Keep run provenance and out-of-plan backflow in one place near the top of `execution-report.md`, so a follow-up agent or a later rerun can reconstruct the full chain from the report alone, without grepping the feature's `docs/e2e-test/<feature>/` folder.

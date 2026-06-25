@@ -1,5 +1,11 @@
 # Synthetic Checkout E2E Test Plan
 
+## Overview
+
+- Coverage: main chain J1→J2→J3→J4 (checkout → payment → invoice), 1 P0 scenario; Core Slice = CHECKOUT-E2E-001.
+- Top risk: duplicate payment callback causing a duplicate invoice (idempotency).
+- Open gaps: payment-provider timeout deferred `OUT-OF-SCOPE` (outside the first slice); SLA targets unverified `OPEN`.
+
 ## 1. Source Inventory
 
 - `docs/checkout-prd.md`: checkout requirements.
@@ -43,6 +49,7 @@ flowchart TD
 
 ### CHECKOUT-E2E-001 Checkout completes and emits invoice
 
+- Index: node `N1` | priority P0 | Side-effect Class `additive-retained` | readiness gate → §10 Entry (provider stub ready). Scheduling detail in §6 DAG.
 - Purpose/Risk: Cover the main dependent workflow from checkout through async invoice.
 - Priority: P0.
 - Sources: `docs/checkout-prd.md`, `src/orders`, `src/payments`.
@@ -68,8 +75,8 @@ flowchart TD
 
 ## 8. Gaps, Assumptions, Questions
 
-- Payment-provider timeout behavior is not covered in this first slice.
-- SLA targets are unverified.
+- Payment-provider timeout behavior is not covered in this first slice `OUT-OF-SCOPE`.
+- SLA targets are unverified `OPEN`.
 
 ## 9. Execution Order
 

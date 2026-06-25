@@ -877,6 +877,40 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
 
+    def test_skill_documents_plan_readability_overview_and_self_contained_scenarios(self) -> None:
+        # Load-bearing protector for the readability rule (Overview digest + self-contained
+        # scenario index). A presence test over the SKILL instruction, NOT a structural
+        # assertion forced onto every plan instance: the Overview/index are demonstrated by
+        # the two golden fixtures, while the rule itself is pinned here so it cannot be
+        # silently dropped. Same boundary the executor legibility protector uses.
+        skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
+        for marker in (
+            "overview",
+            "概览",
+            "navigation digest",
+            "index/handle",
+            "side-effect class",
+            "single source of scheduling facts",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, skill)
+
+    def test_reference_defines_plan_readability(self) -> None:
+        reference = PLANNER_REFERENCE.read_text(encoding="utf-8").lower()
+        for marker in (
+            "## plan readability: overview & self-contained scenarios",
+            "overview digest (leads the plan)",
+            "self-contained scenario index line",
+            "closed-set tokens",
+            "single source of scheduling facts",
+            "never copy a field's prose onto the index",
+            # the second, divergent domain that satisfies the Generalization Gate must
+            # stay present, so the rule cannot collapse back to one domain.
+            "device-provisioning",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
+
     def test_generated_plan_fixture_satisfies_output_contract(self) -> None:
         text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
 
@@ -927,8 +961,8 @@ class E2ETestPlannerContractTest(unittest.TestCase):
 
     def test_generated_plan_output_contract_rejects_migration_matrix_unknown_scenario(self) -> None:
         text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
-            "`RANK-E2E-002` | must-change",
-            "`RANK-E2E-999` | must-change",
+            "`PRICE-E2E-002` | must-change",
+            "`PRICE-E2E-999` | must-change",
         )
 
         with self.assertRaises(AssertionError):
@@ -936,7 +970,7 @@ class E2ETestPlannerContractTest(unittest.TestCase):
 
     def test_generated_plan_output_contract_rejects_migration_matrix_row_without_scenario_or_blocker(self) -> None:
         text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
-            "| `RANK-E2E-002` | must-change: reader needs `playId` filter |",
+            "| `PRICE-E2E-002` | must-change: reader needs `regionId` filter |",
             "| documented | equivalent |",
         )
 
@@ -947,8 +981,8 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         # Round-2 defect: a hyphenated compound ("non-blocker", "blocker-free") in the
         # decision cell must not satisfy the blocker requirement for a no-scenario row.
         text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
-            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` (filters `seasonId`, not `playId`) | one template set per season | N duplicated sets per season | `RANK-E2E-002` | must-change: reader needs `playId` filter |",
-            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` | one template set per season | N duplicated sets per season | not covered | non-blocker finding |",
+            "| `price` rows | row copy: 1 set -> N per-region sets | `PriceMapper.selectByCatalog` (filters `catalogId`, not `regionId`) | one template set per catalog | N duplicated sets per catalog | `PRICE-E2E-002` | must-change: reader needs `regionId` filter |",
+            "| `price` rows | row copy: 1 set -> N per-region sets | `PriceMapper.selectByCatalog` | one template set per catalog | N duplicated sets per catalog | not covered | non-blocker finding |",
         )
 
         with self.assertRaises(AssertionError):
@@ -1044,9 +1078,9 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
             "| Changed table/column | Change kind | Reader | Old assumption | New shape | Equivalence scenario | Expected decision |\n"
             "| --- | --- | --- | --- | --- | --- | --- |\n"
-            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` (filters `seasonId`, not `playId`) | one template set per season | N duplicated sets per season | `RANK-E2E-002` | must-change: reader needs `playId` filter |\n"
-            "| `summary.variantKey` column | backfill | `ReportExporter.dailyBySeason` (aggregates without the variant key) | one aggregate per season | aggregate splits per variant | `blocker` | blocker: report owner must confirm intended shape |",
-            "| changed reader old new scenario decision merged |\n| --- |\n| `RANK-E2E-002` |",
+            "| `price` rows | row copy: 1 set -> N per-region sets | `PriceMapper.selectByCatalog` (filters `catalogId`, not `regionId`) | one template set per catalog | N duplicated sets per catalog | `PRICE-E2E-002` | must-change: reader needs `regionId` filter |\n"
+            "| `summary.regionKey` column | backfill | `ReportExporter.dailyByCatalog` (aggregates without the region key) | one aggregate per catalog | aggregate splits per region | `blocker` | blocker: report owner must confirm intended shape |",
+            "| changed reader old new scenario decision merged |\n| --- |\n| `PRICE-E2E-002` |",
         )
 
         with self.assertRaises(AssertionError):
@@ -1056,8 +1090,8 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         # Falsification defect 3: an incidental "non-blocking" / "gap" substring outside the
         # scenario/decision cells must not launder a row that has no scenario id.
         text = (FIXTURES / "valid-migration-plan.md").read_text(encoding="utf-8").replace(
-            "| `ranking` rows | row copy: 1 set -> N per-play sets | `RankingMapper.selectBySeason` (filters `seasonId`, not `playId`) | one template set per season | N duplicated sets per season | `RANK-E2E-002` | must-change: reader needs `playId` filter |",
-            "| `ranking` rows | row copy (non-blocking read path) | `RankingMapper.selectBySeason` | one template set per season | N duplicated sets per season | no coverage yet | equivalent |",
+            "| `price` rows | row copy: 1 set -> N per-region sets | `PriceMapper.selectByCatalog` (filters `catalogId`, not `regionId`) | one template set per catalog | N duplicated sets per catalog | `PRICE-E2E-002` | must-change: reader needs `regionId` filter |",
+            "| `price` rows | row copy (non-blocking read path) | `PriceMapper.selectByCatalog` | one template set per catalog | N duplicated sets per catalog | no coverage yet | equivalent |",
         )
 
         with self.assertRaises(AssertionError):

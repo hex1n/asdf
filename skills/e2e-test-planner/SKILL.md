@@ -12,6 +12,8 @@ Output language: use the language the user explicitly requests; otherwise infer 
 
 Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, dependency DAG facts, and blockers. When execution will be delegated, also emit the compact Executor Handoff Index described after the Execution DAG. Avoid approval-only template sections unless the user asks for a formal QA document.
 
+Lead the plan with a short `Overview` / `概览` digest so a reader sees the shape before the section-by-section detail: the coverage in brief (journey edges and scenario count, plus the Core Slice), the top risks, and the open gaps with their disposition. The Overview restates facts sourced in the sections below — a navigation digest, never a new source of truth — so it stays a few lines, not an approval template.
+
 When saving the plan, default to a per-feature folder `docs/e2e-test/<feature>/` inside a repo (otherwise a stated path whose full location the response names), as `<date>-<feature>-e2e-test-plan.md`, so the plan and its later execution runs sit together under one feature directory.
 
 ## 1. Source Inventory
@@ -75,7 +77,7 @@ Completion criterion: each requirement, API variant, required-input branch, stat
 
 ## 5. Test Scenarios
 
-Write scenarios at the level a downstream implementation agent can execute without rediscovering the analysis. For each scenario include:
+Write scenarios at the level a downstream implementation agent can execute without rediscovering the analysis. Lead each scenario with a one-line **index/handle** — its DAG node id, priority, `Side-effect Class`, and a readiness-gate reference — so reading a single scenario is self-sufficient for how it schedules and how risky it is, without hopping to the DAG, gates, and slice sections. The index denormalizes only those cheap, closed-set tokens; the Execution DAG (§6) stays the single source of scheduling facts, and each field below stays the home for its own detail. For each scenario include:
 
 - `Purpose/Risk`, `Priority`, `Sources`, `Edges`, `Setup`, `Steps`, `Expected`, `Automation`, and `Isolation/Cleanup` for English output.
 - `目的`, `优先级`, `来源`, `覆盖边`, `准备`, `步骤和依赖`, `期望`, `自动化级别`, and `隔离/清理` for Chinese output.

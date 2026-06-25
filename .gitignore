@@ -4,3 +4,5 @@ __pycache__/
 *.py[cod]
 .codex/
 tmp/
+# Local eval run artifacts can carry real-project identifiers; keep them out of the repo.
+evals/

@@ -735,10 +735,12 @@ class E2ETestExecutorContractTest(unittest.TestCase):
             "missing Re-run Instructions section": good.replace(
                 "## Re-run Instructions", "## Rerun Steps"
             ),
-            # R3b: a `failed` row loses its preserved scene.
+            # R3b: a `failed` row loses its preserved scene. Target the evidence+scene
+            # cell tail so the mutation stays valid regardless of the leading columns
+            # (expected/actual/diagnosis) the self-contained row carries.
             "failed row without preserved scene": good.replace(
-                "`failed` | evidence/index.md#wn-s2 | preserved-scenes/wn-s2/ |",
-                "`failed` | evidence/index.md#wn-s2 | — |",
+                "| evidence/index.md#wn-s2 | preserved-scenes/wn-s2/ |",
+                "| evidence/index.md#wn-s2 | — |",
             ),
             # R3a: no legal terminal status remains in Scenario Results.
             "no legal scenario status": good.replace("`passed`", "`done`")
@@ -972,6 +974,46 @@ class E2ETestExecutorContractTest(unittest.TestCase):
         mutated = good.replace("- Cleanup policy:", "- Clean-up policy:")
         self.assertNotEqual(mutated, good)
         assert_valid_execution_report(self, mutated)
+
+    def test_report_documents_scenario_results_legibility(self) -> None:
+        # Load-bearing protector for the self-contained-row + per-scenario-evidence rule.
+        # A presence test over the §6 instruction (like the ledger/lineage protectors),
+        # NOT a structural assertion over report instances: the column NAMES are paraphrase-
+        # and language-variable, so pinning the RULE in the SKILL is the robust boundary,
+        # the same one the dependency-availability and "reachable is not freshness" semantics
+        # use. The worked instance is protected separately by the fixture.
+        skill = SKILL.read_text(encoding="utf-8").lower()
+        section = skill.split("## 6. report artifacts", 1)[1]
+        for marker in (
+            "self-contained per row",
+            "expected",
+            "actual",
+            "diagnosis",
+            "single-sourced",
+            "per scenario",
+            "probe → expected → actual",
+            "(reference.md#scenario-results--evidence-legibility)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, section)
+
+    def test_reference_defines_scenario_results_legibility(self) -> None:
+        reference = REFERENCE.read_text(encoding="utf-8").lower()
+        for marker in (
+            "## scenario results & evidence legibility",
+            "self-contained",
+            "diagnosis-classification token",
+            "closed-set enum",
+            "denormalization",
+            "keyed by defect/root-cause",
+            "affected-scenario list",
+            "proof chain per scenario",
+            # the second, divergent domain that satisfies the Generalization Gate must
+            # stay present, so the rule cannot silently collapse back to one domain.
+            "content-moderation",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
 
     def test_report_documents_environment_state_ledger(self) -> None:
         skill = SKILL.read_text(encoding="utf-8").lower()

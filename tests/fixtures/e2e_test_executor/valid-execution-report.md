@@ -65,17 +65,40 @@ Emergent scenarios discovered during this run (out of plan):
 
 ## Scenario Results
 
-| Scenario | Node | Status | Evidence | Preserved scene |
-|---|---|---|---|---|
-| WN-S1 主路径代扣成功通知 | N1 | `passed` | evidence/index.md#wn-s1 | — |
-| WN-S2 回调金额与计划不一致 | N2 | `failed` | evidence/index.md#wn-s2 | preserved-scenes/wn-s2/ |
-| WN-S3 重复回调幂等 | N3 | `blocked` | evidence/index.md#wn-s3 | preserved-scenes/wn-s3/ |
+每行自洽：状态旁直接带 期望 / 实际 / 诊断分类（`product`/`plan`/`environment`/`tooling`/`unknown`，仅 token，
+完整原因见 `Failures / Defects / Plan Gaps`）+ 直达证据链与现场，看一行即知"为什么"，无需跳段拼装。
+
+| Scenario | Node | Status | Expected | Actual | Diagnosis | Evidence | Preserved scene |
+|---|---|---|---|---|---|---|---|
+| WN-S1 主路径代扣成功通知 | N1 | `passed` | repay_plan 落 1 行 + 1 事件 | 一致，事件已消费 | — | evidence/index.md#wn-s1 | — |
+| WN-S2 回调金额与计划不一致 | N2 | `failed` | 金额不符应拒绝、result_status 不前进 | result_status=SUCCESS | `product` | evidence/index.md#wn-s2 | preserved-scenes/wn-s2/ |
+| WN-S3 重复回调幂等 | N3 | `blocked` | 重复回调仅生效一次 | 结算挡板不可达，未触达业务 | `environment` | evidence/index.md#wn-s3 | preserved-scenes/wn-s3/ |
 
 ## Evidence Index
 
-Raw requests, responses, DB query results, MQ payloads, and rerun commands are bounded
-in `evidence/index.md`. Each scenario block links its request/response and the committed
-`repay_plan` row snapshot.
+完整原始产物（请求/响应、DB 查询结果、MQ payload、rerun 命令）有界收录在 `evidence/index.md`，按场景分块。
+下面每块是一条证据链 探针 → 期望 → 实际 → 原始产物；Scenario Results 行的 Evidence 链接即落到对应锚点。
+
+### wn-s1 — 主路径代扣成功通知
+
+- 探针：`POST /fund/loan/withhold/notice` 后查 `repay_plan` 落库与 withhold-result 事件
+- 期望：新增 1 行 `repay_plan`（`NOTIFIED`），发出 1 条 withhold-result 事件
+- 实际：一致 — 1 行落库、事件已消费
+- 原始产物：`evidence/wn-s1/request.json` · `evidence/wn-s1/response.json` · `evidence/wn-s1/repay_plan.row.json` · `evidence/wn-s1/mq.payload.json`
+
+### wn-s2 — 回调金额与计划不一致
+
+- 探针：回调金额 `1200.00`（计划 `1000.00`）后查 `repay_apply.result_status`
+- 期望：`result_status` 停在拒绝态、不前进（字段级断言；根因与机制归 Failures 段，此处不重述）
+- 实际：`result_status` = `SUCCESS`（`evidence/wn-s2/response.json:12`、`evidence/wn-s2/repay_apply.row.json`）
+- 原始产物：`evidence/wn-s2/request.json` · `evidence/wn-s2/response.json` · `evidence/wn-s2/repay_apply.row.json` · `preserved-scenes/wn-s2/`
+
+### wn-s3 — 重复回调幂等
+
+- 探针：连发两次相同回调，查最终状态是否只生效一次
+- 期望：第二次回调幂等，仅一次生效
+- 实际：未触达业务 — 结算挡板 `http://localhost:19090` 不可达（连接超时，`evidence/wn-s3/stub-error.log`）
+- 原始产物：`evidence/wn-s3/request.json` · `evidence/wn-s3/stub-error.log` · `preserved-scenes/wn-s3/`
 
 ## Failures / Defects / Plan Gaps
 

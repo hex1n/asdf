@@ -22,6 +22,32 @@ Include these fields:
 
 Completion criterion: an executor can choose nodes, locate variable producers and consumers, see missing capabilities, and find cleanup blockers without reading every scenario body first.
 
+## Plan Readability: Overview & Self-Contained Scenarios
+
+A plan is read two ways: a reviewer skims top-down to judge coverage and risk before greenlighting, and an executor reads one scenario at a time to run it. Both fail the same way when a scenario's facts are scattered — purpose in the scenario body, scheduling in the DAG, side-effect risk and gates in other sections — forcing a multi-section join. Co-locate just enough to answer the two recurring questions: *what does this plan cover and what is unresolved?* and *for this one scenario, how does it schedule and how risky is it?*
+
+**Overview digest (leads the plan).** A short `Overview` / `概览` block above the first numbered section, restating facts sourced below — never a new source of truth:
+
+- Coverage in brief: journey-edge span, scenario count, and the `Core Slice`.
+- Top risks: the one or two highest risk families the plan exists to close.
+- Open gaps: the unresolved items, each with its disposition token (`OPEN`/`CONDITIONAL`/`OUT-OF-SCOPE`/…), so a reviewer never mistakes a settled item for a pending one.
+
+Keep it a few lines. It is a navigation digest, not an approval template, and it adds no fact absent from the sections below.
+
+**Self-contained scenario index line.** Lead each scenario with a one-line handle carrying its cross-section coordinates as cheap, closed-set tokens:
+
+```text
+### {scenario-id} {one-line title}
+- Index: node `{node-id}` | priority {ENUM} | Side-effect Class `{ENUM}` | readiness gate → {gate ref}
+- Purpose/Risk: …            (the dedicated fields stay; the index only points to them)
+```
+
+- The index denormalizes only tokens that are near-zero drift (a node id, a priority enum, the `Side-effect Class` enum, a section reference). Never copy a field's prose onto the index.
+- The Execution DAG (§6) stays the single source of scheduling facts (depends/consumes/produces/parallel-safety); the index is a pointer to the node, not a second copy of its row. The full reason/detail stays in each dedicated field.
+- The same shape is domain-neutral: a checkout scenario reads `node N1 | priority P0 | Side-effect Class additive-retained | gate → entry stub ready`; a device-provisioning OTA scenario reads `node N3 | priority P1 | Side-effect Class config-change | gate → firmware-mirror reachable` — only the {node}/{ENUM}/{gate} differ, the handle is identical.
+
+Completion criterion: a reviewer learns coverage, top risk, and open gaps from the Overview alone; a reader learns a single scenario's node, priority, side-effect class, and gate from its index line without opening the DAG or gates sections; no scheduling fact is duplicated out of the DAG and no field's prose is copied onto the index.
+
 ## Migration Read-Path Risk Matrix
 
 Use this when a change alters the shape or contents of a table or column that existing code already reads — backfilling a column, changing a table/column shape, or copying/de-duplicating rows are common triggers. It forces read-path coverage: a migration can make every writer succeed yet still break an existing query that predates the change and does not filter on the new discriminator. Use `## Migration Read-Path Risk Matrix` for English output and `## 迁移读路径风险矩阵` for Chinese output. Place it after the Risk Map and before the Test Scenarios and Execution DAG.

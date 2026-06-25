@@ -102,11 +102,12 @@ Emergent scenarios discovered during this run (out of plan):
 
 ## Failures / Defects / Plan Gaps
 
-- WN-S2 (`product defect`, suspected): callback amount `1200.00` did not match plan
+- WN-S2 (`product defect`, suspected; `OPEN`): callback amount `1200.00` did not match plan
   `1000.00`, yet `repay_apply.result_status` advanced to `SUCCESS`. Expected a rejection
   per `ValidatorFilterChain`. Preserved scene: `preserved-scenes/wn-s2/`.
-- WN-S3 (`environment defect`): settlement provider stub unreachable; scenario needs the
-  live duplicate-callback path. Blocked per plan suspend gate; not a product defect.
+- WN-S3 (`environment defect`; `BLOCKED-BY-TOOLING`): settlement provider stub unreachable —
+  missing capability: a reachable settlement stub at `http://localhost:19090`. Precondition to
+  clear: stub restored, then rerun WN-S3. Blocked per plan suspend gate; not a product defect.
 
 ## Data Created & Cleanup
 
@@ -127,5 +128,4 @@ WN-S2 alone reruns via `curl -X POST http://localhost:18080/fund/loan/withhold/n
 ## Next Actions for Agent
 
 - File the WN-S2 amount-mismatch as a product-defect issue against `ValidatorFilterChain`.
-- Restore the settlement stub, then rerun WN-S3 to clear the block.
 - Run cleanup for `E2EWN-S2%` after the defect is confirmed.

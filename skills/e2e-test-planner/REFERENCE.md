@@ -70,3 +70,35 @@ Worked example (illustrative; names are generic):
 |---|---|---|---|---|
 | Doc: display name uses a code→label alias (`spec §7`) | code emits the raw code value (`Service.java:120`) | alias never applied | P1 | `EX-E2E-021` |
 | Doc: child records deleted when the parent is removed (`spec §7.2`) | code keeps orphaned child records | unconfirmed product call | P1 | blocked: product owner to confirm intended semantics |
+
+## Side-effect Class
+
+Tag every scenario with one side-effect class so an executor knows, before running, what the scenario does to shared state and whether it needs authorization. The tag lives on each scenario (the `Side-effect Class` field); use `副作用类型` for Chinese output.
+
+| Class | What it does | Authorization gate |
+|---|---|---|
+| `read-only` | Reads state, writes nothing. | None. |
+| `additive-retained` | Creates self-owned data that is kept. | Owner marker + retention note. |
+| `soft-delete` | Logically hides or removes rows (status flag, tombstone). | Explicit authorization or a dedicated fixture. |
+| `destructive-delete` | Physically deletes rows, files, or queue state. | Explicit authorization or a dedicated fixture. |
+| `config-change` | Mutates shared config, flags, templates, or dictionaries. | Authorization + a restore plan. |
+| `external-file` | Reads or writes an external store / object storage. | Capability + cleanup or retention note. |
+| `async-replay` | Re-triggers a job, message, or callback. | A legitimate trigger plus a dedicated failure-injection fixture; never mutate already-succeeded state. |
+
+Completion criterion: every scenario names a class; every `soft-delete`/`destructive-delete`/`config-change`/scope-mutating scenario names its authorization or fixture, and is flagged for re-risk under a data-retention override.
+
+## Gap & Defect Disposition
+
+One disposition vocabulary, shared by the planner's gaps and the executor's `Failures / Defects / Plan Gaps`, so a reader never mistakes a settled item for a pending failure. The token is a closed set; specifics (which tool is missing, which decision closed it) go in the item's reason, not the token — that keeps the vocabulary portable.
+
+| Disposition | Meaning |
+|---|---|
+| `OPEN` | Real, unresolved, must be acted on. As a plan gap: must be resolved before the run. |
+| `CLOSED` | Verified done, or no longer applicable. |
+| `MITIGATED` | A workaround is in place; residual risk is noted. |
+| `ACCEPTED` | Known and deliberately accepted; no action planned. |
+| `CONDITIONAL` | Actionable only once a stated precondition holds; the precondition is named. |
+| `BLOCKED-BY-TOOLING` | Cannot proceed for lack of a specific capability; the missing capability is named in the reason. |
+| `OUT-OF-SCOPE` | Excluded from this plan or run by scope or user override. |
+
+Plans use the pre-run subset (`OPEN`/`CONDITIONAL`/`OUT-OF-SCOPE`/`ACCEPTED`); executors may use all seven. A `CONDITIONAL`, `BLOCKED-BY-TOOLING`, or `OUT-OF-SCOPE` item never appears as a plain to-do or `Next Action` — only `OPEN` items do.

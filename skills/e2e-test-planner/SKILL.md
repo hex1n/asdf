@@ -48,6 +48,7 @@ Before risk mapping, define what a follow-on agent can execute without rediscove
 - Probes/oracles: where to assert user-visible, API, DB, event, log, metric, audit, cache, and external-system outcomes.
 - Waits and budgets: polling or subscription points, eventual consistency windows, timeout budgets, performance thresholds, and retry limits.
 - Isolation and cleanup: ownership of records, provider stubs, queues, locks, caches, schedulers, and idempotency keys.
+- Required vs optional capability: split the surfaces above into **required capabilities** (the run cannot proceed without them) and **optional probes** (extra signal only). A missing required capability is a pre-run gate recorded in `Agent-ready Gates`, never something the executor only discovers mid-run.
 
 Use stable field labels so another agent can parse the handoff. For English output, use `Target surfaces`, `Fixtures`, `Named variables`, `Probes/Oracles`, `Waits`, `Cleanup`, and `Blockers/Gaps`. For Chinese output, use `目标面`, `测试数据`, `变量传递`, `探针/Oracle`, `等待/预算`, `隔离/清理`, and `阻塞/缺口`. Keep these labels exact; put longer wording in the field body, not the label.
 
@@ -83,6 +84,7 @@ Write scenarios at the level a downstream implementation agent can execute witho
 - In `Expected`, include probes, waits, and invariants at user, API, data, event, external-system, and async levels.
 - In `Automation`, name the level: E2E, API integration, contract, load/performance, chaos/recovery, or manual exploratory.
 - In `Isolation/Cleanup`, name cleanup, determinism, and flake risks; match cleanup to real transaction boundaries rather than assuming outer test rollback works for committed end-to-end calls.
+- `Side-effect Class` / `副作用类型`: classify each scenario by what it does to shared state — `read-only`, `additive-retained`, `soft-delete`, `destructive-delete`, `config-change`, `external-file`, or `async-replay`. A `soft-delete`, `destructive-delete`, or scope-mutating scenario requires explicit user authorization or a dedicated fixture before an executor may run it, and is re-risked whenever a data-retention override is in force ([REFERENCE.md](REFERENCE.md#side-effect-class)).
 
 Completion criterion: no scenario assumes an impossible state, hidden setup, or unavailable previous result.
 
@@ -112,7 +114,9 @@ Delegated execution branch: add Level-2 `Executor Handoff Index` / `执行器交
 End with:
 
 - Level-2 `Coverage Matrix` / `覆盖矩阵` mapping requirements, business-flow edges, journey graph edges, and risk families to scenario IDs.
-- Level-2 `Gaps, Assumptions, Questions` / `缺口、假设与问题` naming doc/code conflicts, assumptions, and questions that could change the plan.
+- Level-2 `Gaps, Assumptions, Questions` / `缺口、假设与问题` naming doc/code conflicts, assumptions, and questions that could change the plan. Each gap carries a **disposition** ([REFERENCE.md](REFERENCE.md#gap--defect-disposition)) so an accepted, conditional, or out-of-scope item is never read as a pending one.
+- Mark plan defaults the user may later override — the cleanup policy and the run's exit/completion criteria — as `default unless overridden`, so an executor can supersede them cleanly rather than report a superseded criterion as unmet.
+- Project-specific technical facts found at run time (wire ID types, real pagination/field names, replay triggers, cache-refresh behavior) are recorded as plan revisions or emergent findings here, never promoted into generic rules.
 - Optional Level-2 `Execution Order` / `执行顺序`, only when a human reader wants a ready-made sequence: a recommended dependency order derived from the Execution DAG, not a replacement for it. The executor derives order from the DAG `Depends on`, so this section is not required for agent handoff.
 - Level-2 `Agent-ready Gates` / `Agent 就绪门禁`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution. Keep these gates consistent with the run facts asserted elsewhere in the plan: a fact stated as `confirmed by source` must not also appear here as an unmet prerequisite or blocker, and any runtime fact the executor must still probe — trigger-channel reachability, datasource or DDL readiness, credentials, or dependency availability — is `assumed until executor probe`, not presented as established.
 - Level-2 `Scenario Slices` / `场景切片`: identify the `Core Slice` — the smallest set of scenarios that closes the main risk in a single executor run — so an executor can start there without re-triaging priority. When the full scenario set is larger than that Core Slice, also classify the rest as `Extended Slice` (valuable follow-on coverage) or `Hazardous/Defer` (disruptive, costly, or blocked scenarios to isolate or postpone), naming why each non-core scenario is deferred. The `Minimal First Automation Slice`, when the user asks for it, names the Core Slice's concrete starting scenarios.

@@ -96,3 +96,36 @@ Scope the contract to what the selected scenarios actually reach — the datasou
 When the effective config resolves to the wrong or ambiguous target, promote the corrected contract to an explicit, reproducible override — env vars or launch parameters — and record it as the canonical launch in `Re-run Instructions`, rather than rediscovering it ad hoc on the next run.
 
 Completion criterion: each in-scope contract fact names a resolved value before the first real trigger; any unresolved in-scope field is a `blocked` reason, not an assumption carried into execution.
+
+## Execution Contract Override
+
+When the user changes the contract after the plan was written, capture it once near the top of `execution-report.md` so every later section and any re-run inherits the corrected contract instead of the stale plan default. Use `## Execution Contract Override` for English output and `## 执行契约覆盖` for Chinese output.
+
+One row per override:
+
+| Column | Required content |
+|---|---|
+| Supersedes | The plan default being overridden — a cleanup/exit criterion, an included scenario, or a tool assumption. |
+| New rule | What now holds: e.g. preserve data, exclude scenarios X/Y, MCP-only (no CLI), a changed exit criterion. |
+| Source | Where the constraint came from — the user turn or instruction. |
+| Affected | Scenarios, gates, or report sections this override changes. |
+
+A superseded plan requirement is marked `superseded` wherever it appears (gates, exit criteria, scenario results) — never `failed`, `incomplete`, or left looking unmet. A data-retention override additionally triggers the §3 re-risk of every destructive, soft-delete, or scope-mutating scenario.
+
+Completion criterion: every constraint the user changed after planning appears as an override row; no plan default an override replaced is reported as an unmet requirement.
+
+## Gap & Defect Disposition
+
+One disposition vocabulary, shared with the planner (its gaps) and used here for `Failures / Defects / Plan Gaps`, so a reader never mistakes a settled item for a pending failure. The token is a closed set; specifics (which tool is missing, which decision closed it) go in the item's reason, not the token — that keeps the vocabulary portable.
+
+| Disposition | Meaning |
+|---|---|
+| `OPEN` | Real, unresolved, must be acted on. |
+| `CLOSED` | Verified done, or no longer applicable. |
+| `MITIGATED` | A workaround is in place; residual risk is noted. |
+| `ACCEPTED` | Known and deliberately accepted; no action planned. |
+| `CONDITIONAL` | Actionable only once a stated precondition holds; the precondition is named. |
+| `BLOCKED-BY-TOOLING` | Cannot proceed for lack of a specific capability; the missing capability is named in the reason. |
+| `OUT-OF-SCOPE` | Excluded from this run by scope or user override. |
+
+Only `OPEN` items belong in `Next Actions for Agent`. A `CONDITIONAL`, `BLOCKED-BY-TOOLING`, or `OUT-OF-SCOPE` item stays in `Failures / Defects / Plan Gaps` with its precondition, missing capability, or scope reason named — never copied into Next Actions as a plain to-do.

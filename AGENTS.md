@@ -15,6 +15,18 @@ When adding or changing skill rules, apply the Rule Harvest Gate:
 
 Keep `SKILL.md` files concise and task-facing. Put maintenance guidance here instead of loading it during normal skill use.
 
+### Generalization Gate (no instance leaks)
+
+A skill compresses many cases into reusable text, but every edit is triggered by one case, so the default draft over-fits that case: its field names, enums, tech, and internal process vocabulary leak into the portable body. A self-applied "this is generic" label does not catch it — branded nouns (`Redis`, `RPC`) trip the eye, but domain vocabulary (`team-type`, `play`, `season`) reads generic and ships anyway. The only reliable filter is a second, divergent domain.
+
+Before any example, rule, or referenced term enters a portable body (`SKILL.md`, `REFERENCE.md`, an adapter, or a template):
+
+- Name a second, different-domain instance the same example or rule must also fit, then rewrite it to fit both. Fitting two divergent domains forces the wording generic — "the team-type alias" collapses to "a display-name alias", "+playId, teamType" collapses to "+fieldA, fieldB".
+- If you cannot name a real second domain, do not promote the rule to a portable body: mark it provisional and scope it to the single skill at the narrowest level. Never invent a fake second domain just to pass the gate.
+- Examples use neutral placeholders (`fieldA`, `{field}`, `ENUM_VALUE`), never identifiers copied from the source project. Every referenced doc or process name must resolve in this repo or be defined inline — no dangling pointers to a source project's internal vocabulary.
+
+This makes the optional "second sample" in the loop below the default for any text claiming cross-project reach, and it applies to ordinary authoring, not only the full evidence loop.
+
 ## Skill Evolution Loop
 
 When the user asks to improve a skill, treat it as an evidence loop rather than a wording edit:
@@ -24,7 +36,7 @@ Before changing any skill, load and apply `writing-great-skills` as the authorin
 1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include success criteria, failure modes, and negative or non-trigger examples, not just the happy path, so the baseline is not an optimistic softball.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.
 3. Apply the narrowest edit: catalog/routing text, reference rule, script logic, or focused test.
-4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful. For branch or scenario claims, choose samples that exercise the branch-specific gates and the protected failure mode; a simple smoke sample can be recorded, but it cannot raise generalization confidence to high.
+4. Re-run the same real task, plus at least one second sample when generalization risk is meaningful. For branch or scenario claims, choose samples that exercise the branch-specific gates and the protected failure mode; a simple smoke sample can be recorded, but it cannot raise generalization confidence to high. Any example or rule entering a portable body additionally passes the Generalization Gate above.
 5. Decide with the two-layer gate below; do not score the edit on an absolute point scale.
 6. Iterate on the weakest failing gate or the lowest-confidence claim until the marginal gain is low or a hard gate fails.
 
@@ -37,7 +49,7 @@ The quality decision has three terminal outcomes — accept, continue, or reject
 - A baseline output exists (or, for a net-new skill, an expected-behavior spec with success criteria, failure modes, and negative or non-trigger examples) and a real validation artifact is present.
 - No unresolved correctness, safety, or privacy regression remains.
 - `SKILL.md` stays task-facing and does not become a maintenance manual.
-- Runtime portability is preserved.
+- Runtime portability is preserved, and the Generalization Gate holds: no source-project instance reached a portable body without passing the second-domain check or being marked provisional and scoped to one skill.
 - The full evidence path is recoverable.
 - The edit is the narrowest effective change.
 - Store temporary comparison outputs outside the skill folder unless they are durable examples or tests.

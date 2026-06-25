@@ -418,7 +418,7 @@ class E2ETestExecutorContractTest(unittest.TestCase):
             "execution capability map",
             "api/rpc/sdk/cli/ui tools",
             "db access",
-            "mq/redis/job/callback controls",
+            "mq/cache/job/callback controls",
             "logs/metrics/traces",
             "auth",
             "base urls",

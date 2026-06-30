@@ -10,10 +10,13 @@
 
 | 技能 | 用途 |
 | --- | --- |
+| [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | 生成或审查项目级 agent 工作流操作文档：启动路由、方向锚点、repo profile、goal loop 与 evidence 结构。 |
 | [`deep-research`](skills/deep-research/) | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | 基于设计、需求与代码生成可溯源的端到端测试计划。 |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 执行端到端测试计划并产出有证据支撑的报告。 |
 | [`first-principles-planner`](skills/first-principles-planner/) | 重构根本问题，给出当前最佳方案及其失效条件。 |
+| [`generating-api-docs`](skills/generating-api-docs/) | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
+| [`generating-test-scope`](skills/generating-test-scope/) | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
 | [`java-stack-craft`](skills/java-stack-craft/) | 在识别 JDK/Spring profile、匹配本地约定的前提下编写与审查 Java/Spring 代码。 |
 
 ## 仓库结构

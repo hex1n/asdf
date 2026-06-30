@@ -213,9 +213,9 @@ def _line_iter(path: Path) -> Iterable[tuple[int, str]]:
 
 def _rel(path: Path, root: Path) -> str:
     try:
-        return str(path.relative_to(root))
+        return path.relative_to(root).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def _finding(spec: FindingSpec, path: Path, line: int, root: Path) -> Dict[str, object]:

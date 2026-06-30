@@ -13,10 +13,13 @@ installed skills* — see [CONTEXT.md](CONTEXT.md) for the distribution model.
 
 | Skill | Purpose |
 | --- | --- |
+| [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | Bootstrap or review project-level agent workflow operating docs: startup route, direction anchor, repo profile, goal loop, and evidence structure. |
 | [`deep-research`](skills/deep-research/) | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | Build source-backed end-to-end test plans from design, requirements, and code. |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | Execute E2E test plans and produce evidence-backed reports. |
 | [`first-principles-planner`](skills/first-principles-planner/) | Reframe the root problem and return the current-best plan with failure conditions. |
+| [`generating-api-docs`](skills/generating-api-docs/) | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
+| [`generating-test-scope`](skills/generating-test-scope/) | Generate QA test-scope documents from branch diffs and traced change impact. |
 | [`java-stack-craft`](skills/java-stack-craft/) | Write and review Java/Spring code with profile detection and quality gates. |
 
 ## Repository layout

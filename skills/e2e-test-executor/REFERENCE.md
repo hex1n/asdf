@@ -134,6 +134,18 @@ A superseded plan requirement is marked `superseded` wherever it appears (gates,
 
 Completion criterion: every constraint the user changed after planning appears as an override row; no plan default an override replaced is reported as an unmet requirement.
 
+## Execution Adapter Boundary
+
+Use this boundary whenever a scenario trigger goes through a project-declared adapter, harness, wrapper, driver, query tool, queue/job control, callback harness, or local service command instead of direct manual observation.
+
+The E2E executor owns orchestration: scenario selection, DAG order, environment and trigger-channel gates, data policy, evidence capture, diagnosis, cleanup, report lineage, and final status. The adapter or tool owns action mechanics: target or locator resolution, operation or selector discovery, describe/preflight/dry-run behavior, request or action construction, input encoding, metadata/options, invocation, navigation, querying, and replay.
+
+Do not copy adapter-specific invocation, navigation, or query rules into this skill or into the report as reusable guidance. Record only the adapter evidence needed for the run: adapter/tool or command name, version or path when available, target or locator, operation or action, selected inputs, metadata/options that affect behavior, describe/preflight/dry-run evidence when available, raw artifact paths, correlation IDs, and the failure layer.
+
+If more than one adapter or tool is available, choose the one declared by the plan, project docs, repository scripts, or environment contract. If none is declared, use a safe read-only describe/list/probe command before any real trigger; when no safe adapter, tool, or command can trigger the scenario, record `BLOCKED-BY-TOOLING` with the missing adapter or tool capability. Do not hand-roll surface payloads or UI actions merely to avoid the blocker.
+
+Completion criterion: the report can separate E2E orchestration evidence from adapter/tool action evidence, names the adapter or tool used or the missing capability, and preserves enough raw artifacts for a follow-up agent to replay through the same declared surface without copying surface-specific rules into this executor.
+
 ## Gap & Defect Disposition
 
 One disposition vocabulary, shared with the planner (its gaps) and used here for `Failures / Defects / Plan Gaps`, so a reader never mistakes a settled item for a pending failure. The token is a closed set; specifics (which tool is missing, which decision closed it) go in the item's reason, not the token — that keeps the vocabulary portable.

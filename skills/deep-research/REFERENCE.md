@@ -37,6 +37,32 @@ Rules:
 - A local observation is not enough to make a general product claim; keep it repo-specific unless the external source supports the general behavior.
 - If local and external evidence conflict, the settled answer should use the local behavior for this repo and mark the external claim's applicability as unresolved or version-bound.
 
+## Localized Request and Output Rules
+
+Use these only when the request language or saved artifact language needs localized handling. Keep runtime decisions in the main skill; this section only maps localized signals and labels.
+
+### Chinese Request Depth Signals
+
+`分析一下 X` is Quick only for a single file, snippet, or local fact. `深度分析`, `结合代码/数据/文档/运行状态`, `整个链路`, `给出高置信度`, `原因分析`, or `为什么` usually means Standard or Deep when the user is not asking to reproduce or fix a live failure.
+
+### Chinese Output Labels
+
+For Chinese requests, use Chinese prose and section labels. Keep code identifiers, commands, paths, status tokens, and quoted source text unchanged.
+
+| English label | Chinese label |
+|---|---|
+| Conclusion | 结论 |
+| Evidence | 证据 |
+| Mechanism | 机制 |
+| Weakest point | 最弱点 |
+| Boundaries / non-goals | 边界 / 非目标 |
+| Open questions | 开放问题 |
+| Verification status | 验证状态 |
+| Source audit | 来源审计 |
+| Settled answer | 已确认答案 |
+| Flip condition | 翻转条件 |
+| Stop reason | 停止原因 |
+
 ## Perspective Scan
 
 An optional investigate strategy for External or Mixed Investigation at Deep depth, when the question is exploratory or strategic — market landscape, technology adoption, stakeholder analysis, multi-party tradeoff, or "why do different groups see this differently" — rather than single-fact verification.

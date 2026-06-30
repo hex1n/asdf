@@ -4,7 +4,7 @@
 
 Use this when the plan will be executed by `e2e-test-executor`, a separate agent session, or automation. The Markdown plan remains the source of truth; the index is a compact locator so an executor can start without scraping every scenario body.
 
-Place the index after `Execution DAG` and before the closure sections. Use `## Executor Handoff Index` for English output and `## 执行器交接索引` for Chinese output.
+Place the index after `Execution DAG` and before the closure sections. Use `## Executor Handoff Index`; use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading.
 
 Include these fields:
 
@@ -26,7 +26,7 @@ Completion criterion: an executor can choose nodes, locate variable producers an
 
 A plan is read two ways: a reviewer skims top-down to judge coverage and risk before greenlighting, and an executor reads one scenario at a time to run it. Both fail the same way when a scenario's facts are scattered — purpose in the scenario body, scheduling in the DAG, side-effect risk and gates in other sections — forcing a multi-section join. Co-locate just enough to answer the two recurring questions: *what does this plan cover and what is unresolved?* and *for this one scenario, how does it schedule and how risky is it?*
 
-**Overview digest (leads the plan).** A short `Overview` / `概览` block above the first numbered section, restating facts sourced below — never a new source of truth:
+**Overview digest (leads the plan).** A short `Overview` block above the first numbered section, using [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading, restating facts sourced below — never a new source of truth:
 
 - Coverage in brief: journey-edge span, scenario count, and the `Core Slice`.
 - Top risks: the one or two highest risk families the plan exists to close.
@@ -48,9 +48,61 @@ Keep it a few lines. It is a navigation digest, not an approval template, and it
 
 Completion criterion: a reviewer learns coverage, top risk, and open gaps from the Overview alone; a reader learns a single scenario's node, priority, side-effect class, and gate from its index line without opening the DAG or gates sections; no scheduling fact is duplicated out of the DAG and no field's prose is copied onto the index.
 
+## Localized Output Labels
+
+Use this when the output language is not English. The planner's contract names the English label; the generated plan should use the matching localized label below while preserving code identifiers, paths, enum values, commands, and literal source text.
+
+Chinese labels:
+
+| Contract item | English label | Chinese label |
+|---|---|---|
+| Overview heading | `Overview` | `概览` |
+| Document-code diff heading | `Document-Code Semantic Diff` | `文档-代码语义差异` |
+| Agent contract field | `Target surfaces` | `目标面` |
+| Agent contract field | `Fixtures` | `测试数据` |
+| Agent contract field | `Named variables` | `变量传递` |
+| Agent contract field | `Probes/Oracles` | `探针/Oracle` |
+| Agent contract field | `Waits` | `等待/预算` |
+| Agent contract field | `Cleanup` | `隔离/清理` |
+| Agent contract field | `Blockers/Gaps` | `阻塞/缺口` |
+| Runtime fact provenance | `confirmed by source` | `已确认` |
+| Runtime fact provenance | `assumed until executor probe` | `待验证` |
+| Runtime fact provenance | `blocked` | `阻塞` |
+| Scenario field | `Purpose/Risk` | `目的` |
+| Scenario field | `Priority` | `优先级` |
+| Scenario field | `Sources` | `来源` |
+| Scenario field | `Edges` | `覆盖边` |
+| Scenario field | `Setup` | `准备` |
+| Scenario field | `Steps` | `步骤和依赖` |
+| Scenario field | `Expected` | `期望` |
+| Scenario field | `Automation` | `自动化级别` |
+| Scenario field | `Isolation/Cleanup` | `隔离/清理` |
+| Scenario field | `Side-effect Class` | `副作用类型` |
+| DAG header | `Node` | `节点` |
+| DAG header | `Scenario` | `场景` |
+| DAG header | `Depends on` | `依赖` |
+| DAG header | `Consumes` | `消费` |
+| DAG header | `Produces` | `产出` |
+| DAG header | `Required capabilities` | `所需能力` |
+| DAG header | `Side-effect scope` | `副作用范围` |
+| DAG header | `Isolation key` | `隔离键` |
+| DAG header | `Parallel safety` | `并行安全` |
+| DAG header | `Cleanup dependency` | `清理依赖` |
+| DAG header | `Disruptive marker` | `扰动标记` |
+| Executor handoff heading | `Executor Handoff Index` | `执行器交接索引` |
+| Coverage heading | `Coverage Matrix` | `覆盖矩阵` |
+| Gap heading | `Gaps, Assumptions, Questions` | `缺口、假设与问题` |
+| Execution order heading | `Execution Order` | `执行顺序` |
+| Agent gate heading | `Agent-ready Gates` | `Agent 就绪门禁` |
+| Scenario slice heading | `Scenario Slices` | `场景切片` |
+| Minimal slice heading | `Minimal First Automation Slice` | `最小自动化切片` |
+| Migration read-path heading | `Migration Read-Path Risk Matrix` | `迁移读路径风险矩阵` |
+
+Completion criterion: generated plans use one label set consistently for their output language; English labels and localized labels are not mixed within the same table or field group except for code tokens such as `Oracle`, identifiers, paths, and enums.
+
 ## Migration Read-Path Risk Matrix
 
-Use this when a change alters the shape or contents of a table or column that existing code already reads — backfilling a column, changing a table/column shape, or copying/de-duplicating rows are common triggers. It forces read-path coverage: a migration can make every writer succeed yet still break an existing query that predates the change and does not filter on the new discriminator. Use `## Migration Read-Path Risk Matrix` for English output and `## 迁移读路径风险矩阵` for Chinese output. Place it after the Risk Map and before the Test Scenarios and Execution DAG.
+Use this when a change alters the shape or contents of a table or column that existing code already reads — backfilling a column, changing a table/column shape, or copying/de-duplicating rows are common triggers. It forces read-path coverage: a migration can make every writer succeed yet still break an existing query that predates the change and does not filter on the new discriminator. Use `## Migration Read-Path Risk Matrix`; use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading. Place it after the Risk Map and before the Test Scenarios and Execution DAG.
 
 Enumerate one row per (changed table or column) × (downstream reader). Include these columns:
 
@@ -76,7 +128,7 @@ Beyond DB migrations: the same risk — writers all succeed yet an existing read
 
 ## Document-Code Semantic Diff
 
-Use this when a source document states a behavioral contract — such as a rule, default, mapping, ordering, or invariant — that the plan can compare against the code's actual behavior. The most valuable defects often live in this gap: the document says one thing, the code does another. Use `## Document-Code Semantic Diff` for English output and `## 文档-代码语义差异` for Chinese output. Place it after the Source Inventory and before the Test Scenarios.
+Use this when a source document states a behavioral contract — such as a rule, default, mapping, ordering, or invariant — that the plan can compare against the code's actual behavior. The most valuable defects often live in this gap: the document says one thing, the code does another. Use `## Document-Code Semantic Diff`; use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading. Place it after the Source Inventory and before the Test Scenarios.
 
 Enumerate one row per documented contract that could diverge. Include these columns:
 
@@ -99,7 +151,7 @@ Worked example (illustrative; names are generic):
 
 ## Side-effect Class
 
-Tag every scenario with one side-effect class so an executor knows, before running, what the scenario does to shared state and whether it needs authorization. The tag lives on each scenario (the `Side-effect Class` field); use `副作用类型` for Chinese output.
+Tag every scenario with one side-effect class so an executor knows, before running, what the scenario does to shared state and whether it needs authorization. The tag lives on each scenario (the `Side-effect Class` field); use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized field label.
 
 | Class | What it does | Authorization gate |
 |---|---|---|

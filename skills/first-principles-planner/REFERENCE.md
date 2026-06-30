@@ -9,9 +9,49 @@ short process in `SKILL.md` is not enough.
 - Solution Reconstruction: option categories, inversion test, recommendation chain
 - Bestness Check: fit criteria, closest alternative, stop point
 - Plan Synthesis: priority table, effort/risk/value, action-first structure
+- Localized Request and Output Rules: localized routing signals, examples, and labels
 - Evidence Conventions: verified vs unverified claims
 - Artifact Location: default path rules for saved Markdown plans
 - Plan File Output: saved plan output shape
+
+## Localized Request and Output Rules
+
+Use this section only when request language, route examples, or saved artifact labels need localized handling. Keep planner mechanics in `SKILL.md`; this section maps language-specific signals and labels.
+
+### Chinese Routing Signals
+
+| Route | Signals |
+|---|---|
+| Planner | `第一性原理`, `最佳方案`, `最佳实现`, `给出方案`, `先写方案`, `先不写代码`, `先不要写代码`, `先不coding`, `不coding`, `不要直接改代码`, `还有更好`, `是否应该`, `最佳了吗`, `取舍`, `架构演进`, `优化方案` |
+| Research-first | `深度分析`, `排查`, `定位`, `为什么`, `根因`, `掌握链路` |
+| Review/critique | `计划评审`, `方案评审`, `审查计划`, `审查方案`, `看看这个计划有没有问题` |
+
+### Chinese Route Examples
+
+- `是否应该替换 X?` / `还有更好的吗?` / `最佳了吗?` -> Decision.
+- `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan.
+- `深度分析为什么失败` -> Research-first; plan only if the user asks for a fix path.
+- `审查这个方案有没有问题` -> use a review skill; re-plan only if asked.
+
+### Chinese Output Labels
+
+For Chinese requests, use Chinese prose and section labels. Keep code identifiers, commands, paths, status tokens, and quoted source text unchanged.
+
+| English label | Chinese label |
+|---|---|
+| Mode | 模式 |
+| Depth | 深度 |
+| Input sources | 输入来源 |
+| Recommendation | 建议 |
+| Current-best path | 当前最佳路径 |
+| Bestness Check | 最佳性检查 |
+| Next verification step | 下一步验证 |
+| Root problem | 根问题 |
+| True constraints | 真实约束 |
+| Assumptions | 假设 |
+| Closest alternative | 最接近替代方案 |
+| Failure mode | 失败条件 |
+| Open questions | 开放问题 |
 
 ## Problem Archaeology
 
@@ -112,7 +152,7 @@ confirms their instinct, validate it with evidence.
 
 Use this for any non-trivial planner recommendation: the default deliverable is
 the current-best option under stated constraints, even when the user only asks
-for a plan. Best/better wording and repeated "还有更好" challenges make the gate
+for a plan. Best/better wording and repeated localized improvement challenges make the gate
 stricter, not newly active. The goal is to prevent a sequence of slightly better
 answers by making the stopping rule explicit in the first response.
 

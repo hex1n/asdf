@@ -34,7 +34,7 @@ Choose depth by decision risk and evidence complexity, not answer length:
 | Several sources/components, behavior trace, comparison, likely bug, docs/code alignment, or current-state check | Standard | Concise answer; saved findings only per Save rules |
 | Durable decision, architecture, high-risk domain, unresolved contradictions, multi-source synthesis, or current-state reconciliation that affects behavior | Deep | Synthesis with risks, open questions, and source audit when useful |
 
-For Chinese requests, "分析一下 X" is Quick only for a single file, snippet, or local fact. "深度分析", "结合代码/数据/文档/运行状态", "整个链路", "给出高置信度", "原因分析", or "为什么" usually means Standard or Deep when the user is not asking to reproduce or fix a live failure.
+For localized request-depth signals, use [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules). Treat localized trigger phrases as routing evidence, not as fixed output text.
 
 Upgrade when contradictions, irreversible impact, or fragile external/current-state evidence would change the decision. Downgrade when one checked source settles the question. Current-state evidence is not automatically Deep.
 
@@ -67,7 +67,7 @@ Use [REFERENCE.md](REFERENCE.md) for diagram examples, a compressed worked examp
 - Compare config/data field-by-field. For version-, environment-, or deployment-dependent claims, check local applicability before applying external docs.
 
 ## 4. Output Modes
-Use the user's language for chat and saved artifacts; for Chinese requests, use Chinese prose and section labels. Lead with the conclusion, then evidence.
+Use the user's language for chat and saved artifacts; for localized headings and fixed labels, use [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules). Lead with the conclusion, then evidence.
 
 Pick the smallest shape that answers the decision boundary:
 - Causal trace: conclusion, mechanism, evidence chain, weakest point.

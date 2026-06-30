@@ -399,6 +399,22 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("header counts match corresponding body sections", skill)
         self.assertIn("exactly N open questions", reference)
 
+    def test_deep_research_body_uses_reference_for_localized_rules(self) -> None:
+        skill = read_text("skills/deep-research/SKILL.md")
+        reference = read_text("skills/deep-research/REFERENCE.md")
+        body = skill.split("---", 2)[2]
+        localized = reference.split("## Localized Request and Output Rules", 1)[1].split(
+            "## Perspective Scan", 1
+        )[0]
+
+        self.assertNotRegex(body, r"[\u4e00-\u9fff]")
+        self.assertIn("[REFERENCE.md](REFERENCE.md#localized-request-and-output-rules)", skill)
+        self.assertIn("Chinese Request Depth Signals", localized)
+        self.assertIn("分析一下 X", localized)
+        self.assertIn("深度分析", localized)
+        self.assertIn("Chinese Output Labels", localized)
+        self.assertIn("Use the user's language for chat and saved artifacts", skill)
+
     def test_deep_research_orientation_diagrams_choose_smallest_effective_form(self) -> None:
         skill = read_text("skills/deep-research/SKILL.md").lower()
         reference = read_text("skills/deep-research/REFERENCE.md")
@@ -561,8 +577,16 @@ class SkillE2EContractsTest(unittest.TestCase):
         self.assertIn("challenges the current best", skill)
         self.assertIn("architecture or design direction", skill)
         self.assertIn("explicitly avoids coding while choosing a path", skill)
-        self.assertIn("`是否应该替换 X?`", skill)
-        self.assertIn("`给一个架构演进方案`", skill)
+        body = skill.split("---", 2)[2]
+        self.assertNotRegex(body, r"[\u4e00-\u9fff]")
+        self.assertIn("[REFERENCE.md](REFERENCE.md#localized-request-and-output-rules)", skill)
+        localized = reference.split("## Localized Request and Output Rules", 1)[1].split(
+            "## Problem Archaeology", 1
+        )[0]
+        self.assertIn("Chinese Routing Signals", localized)
+        self.assertIn("`是否应该替换 X?`", localized)
+        self.assertIn("`给一个架构演进方案`", localized)
+        self.assertIn("Chinese Output Labels", localized)
         self.assertIn("do not create durable artifacts unless explicitly asked", skill.lower())
         self.assertIn("belongs to a review skill", skill)
         self.assertIn("use the user's language for chat and saved artifacts", skill.lower())

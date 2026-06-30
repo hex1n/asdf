@@ -581,7 +581,7 @@ class E2ETestExecutorContractTest(unittest.TestCase):
 
         for marker in (
             "unreachable or unavailable at run time",
-            "declared stub or 挡板",
+            "declared stub or test double",
             "mark the scenario `blocked` or suspend",
             "capture the unreachable evidence",
             "never `passed`",
@@ -591,6 +591,12 @@ class E2ETestExecutorContractTest(unittest.TestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
+
+    def test_runtime_skill_body_stays_english_first(self) -> None:
+        skill = SKILL.read_text(encoding="utf-8")
+        body = skill.split("---", 2)[2]
+
+        self.assertNotRegex(body, r"[\u4e00-\u9fff]")
 
     def test_report_artifacts_are_tiered_core_and_optional(self) -> None:
         skill = SKILL.read_text(encoding="utf-8").lower()
@@ -1066,6 +1072,39 @@ class E2ETestExecutorContractTest(unittest.TestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
+
+    def test_execution_uses_project_declared_adapter_boundary(self) -> None:
+        skill = SKILL.read_text(encoding="utf-8").lower()
+        reference = REFERENCE.read_text(encoding="utf-8").lower()
+        execute_section = skill.split("## 5. execute and diagnose", 1)[1].split("## 6.", 1)[0]
+
+        self.assertNotIn("sofarpc", skill + reference)
+        self.assertNotIn("## rpc/sdk execution adapter boundary", reference)
+        for marker in (
+            "for any trigger surface",
+            "project-declared execution adapter",
+            "test harness",
+            "this executor owns scenario selection",
+            "the adapter or tool owns surface-specific",
+            "request or action encoding",
+            "blocked-by-tooling",
+            "(reference.md#execution-adapter-boundary)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, execute_section)
+
+        for marker in (
+            "## execution adapter boundary",
+            "project-declared adapter",
+            "the e2e executor owns orchestration",
+            "the adapter or tool owns action mechanics",
+            "do not copy adapter-specific invocation, navigation, or query rules",
+            "if more than one adapter or tool is available",
+            "do not hand-roll surface payloads or ui actions",
+            "missing adapter or tool capability",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
 
     def test_report_documents_run_lineage_and_emergent_backflow(self) -> None:
         skill = SKILL.read_text(encoding="utf-8").lower()

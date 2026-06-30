@@ -1,84 +1,83 @@
-# {Interface 或 需求名} API 文档
+# {Interface or Feature} API Documentation
 
-> 一句话范围（覆盖哪些接口 / 哪条业务链路）。
-> 基线：分支 `{branch}`（对比 `{base}`），协议 `{rpc|http}`，契约以代码为准。
-> 图例（变更列）：🆕 新增 ／ ✏️ 修改 ／ 🗑️ 删除 ／（空）不变。
-
----
-
-## 接口约定
-
-> 照 **profile**（`docs/api-doc-profile.md`）的「接口约定/信封」段填——基址、入参信封、响应包装字段都在 profile 里（首轮由 adapter 探法建档）；本段**不硬编码**具体字段，**profile 是本项目单一来源**。该段大致含：
-> - **RPC**：dispatch/网关基址（POST）+ 入参信封 + 响应信封。
-> - **HTTP**：基址 `{baseUrl}{contextPath}` + 各接口自带 method+path + 统一响应包装（若有）+ 鉴权凭证位置。
-> - 需求级公共口径（某入参全局含义/优先级）也在此补一段，避免每个接口重复。
+> Scope: {interfaces or business chain covered}.
+> Baseline: branch `{branch}` compared with `{base}`. Protocol: `{rpc|http}`. Contract source: code.
+> Change legend: added / modified / deleted / unchanged.
 
 ---
 
-## 目录
+## Interface Convention
 
-| # | 接口 | 类/服务 | 类型 | 说明 |
-|---|------|---------|------|------|
-| 1 | [{name}](#{name}) | {类名} | 🆕 新增／✏️ 调整／复用 | {一句话} |
+Fill this section from the project profile at `docs/api-doc-profile.md`.
 
-> 枚举若由字典驱动，目录后补一句指向字典接口，正文不硬编码列举。
++ RPC: dispatch or gateway endpoint, request envelope, and response envelope.
++ HTTP: base URL, context path, response wrapper, and credential position.
++ Shared feature-level terms can live here to avoid repeating them in every interface section.
+
+---
+
+## Table Of Contents
+
+| # | Interface | Class / Service | Type | Summary |
+| --- | --- | --- | --- | --- |
+| 1 | [{name}](#{name}) | {className} | added / modified / reused | {summary} |
+
+If enum values come from a lookup interface, point to that interface instead of hard-coding the values here.
 
 ---
 
 <a name="{name}"></a>
-## 1. {name} · {中文名}
+## 1. {name} - {display name}
 
-+ **API**：RPC → `{操作标识/服务全名.方法}` ／ HTTP → `{METHOD} {完整 path}`
-+ **认证**：{按 profile 鉴权表，如 🔐 需要Token / 🌐 无需认证}
-+ **变更摘要**：{请求 +x、y 必填→兼容；响应 +z}（仅 🆕/✏️ 接口写此行；🆕 写「新增接口」；复用接口省略）
++ **API**: RPC -> `{operation identifier or service.method}` / HTTP -> `{METHOD} {full path}`
++ **Auth**: {from profile and adapter}
++ **Change summary**: {request +fieldA, fieldB required Y->N; response +fieldC}. Omit for reused interfaces.
 
-### 请求参数（{RequestClass}）
+### Request Parameters ({RequestClass})
 
-| 字段 | 说明 | 类型 | 位置 | 必填 | 变更 | 备注 |
-|------|------|------|------|------|------|------|
-| {field} | {说明} | {类型} | {path/query/header/body} | Y/N | 🆕/✏️/（空） | {取值/长度/格式；条件必填写清条件} |
-| {obj}.{sub} | {对象子字段} | {Type} | body | N |  |  |
-| {list}[].{sub} | {列表元素子字段} | {Type} | body | N |  |  |
-| {删除字段} | {旧说明} | {旧Type} | {旧位置} | - | 🗑️ | 已删除（原 …） |
+| Field | Description | Type | Position | Required | Change | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| {field} | {description} | {type} | {path/query/header/body} | Y/N | added / modified / unchanged | {value/length/format; condition for conditional requiredness} |
+| {obj}.{sub} | {nested field} | {Type} | body | N | unchanged |  |
+| {list}[].{sub} | {list element field} | {Type} | body | N | unchanged |  |
+| {deletedField} | {old description} | {old type} | {old position} | - | deleted | Removed from the current contract; old contract was ... |
 
-> 「位置」列仅 HTTP 需要（path/query/header/body）；RPC 字段全在入参对象内，省该列。
-> 必填判定见 profile；业务必传但未声明的标 N 并备注「业务必传」。复用/不变接口可省「变更」列。
-> **✏️ 行备注写清旧→新**（如必填 Y→N、类型 Long→String、必传→兼容）；**🗑️ 删除字段保留一行**，类型/说明取 `git show {base}:file` 旧版本。
+For RPC, omit the Position column unless the project profile defines a transport envelope that needs it.
+For modified rows, write old->new in Notes, such as `required Y->N` or `Long->String`.
+For deleted fields, read the old type and description from `git show {base}:file`.
 
-### 请求示例
-
-```json
-{ "{field}": "{value}" }
-```
-
-### 响应结果（{ResponseClass}）
-
-| 字段 | 说明 | 类型 | 变更 | 备注 |
-|------|------|------|------|------|
-| {field} | {说明} | {Type} | 🆕/✏️/（空） |  |
-| {list}[].{sub} | {说明} | {Type} |  |  |
-
-> 字段路径从响应体根写起；若有统一响应包装（见接口约定），展开包装内的业务对象。
-
-### 响应示例
+### Request Example
 
 ```json
-{ }
+{ "field": "value" }
 ```
-> 按接口约定的响应信封包裹（RPC 如 `{…, "data": {业务对象}}`；HTTP 按其包装或裸对象）。
 
-### 可能的错误码
+### Response Result ({ResponseClass})
 
-| 错误码 / HTTP 状态 | 文案 | 说明 |
-|---|---|---|
-| {错误码} | {校验提示} | 必填校验未通过 |
-| - | {业务异常文案} | {触发条件} |
+| Field | Description | Type | Change | Notes |
+| --- | --- | --- | --- | --- |
+| data.field | {description} | {Type} | added / modified / unchanged |  |
+| data.list[].sub | {description} | {Type} | unchanged |  |
+
+If the project uses a response wrapper, document the wrapper in Interface Convention and expand the business payload here.
+
+### Response Example
+
+```json
+{}
+```
+
+### Error Codes
+
+| Error code / HTTP status | Message | Meaning |
+| --- | --- | --- |
+| {code} | {validation message} | Required validation failed |
+| - | {business exception message} | {condition} |
 
 ---
 
-<!-- 重复「## N. 接口」块，直到清单全部覆盖 -->
+Repeat the interface section until the inventory is complete.
 
-## 附：联调须知（按需）
+## Integration Notes, If Needed
 
-跨接口的迁移期口径 / 兜底降级 / 入参优先级等集中写一段，避免散落到每个接口。
-代码有已确认缺陷，仅在此脚注一句并指向 issue/测试，正文按**目标契约**书写。
+Centralize cross-interface migration rules, fallback behavior, or parameter priority here. Do not add a business-rule section. If a confirmed defect affects integration, mention it briefly and point to the issue or test; keep the main body as the target contract.

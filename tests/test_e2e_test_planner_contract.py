@@ -635,7 +635,8 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "e2e-test-executor",
             "separate agent session",
             "automation",
-            "## 执行器交接索引",
+            "use [localized output labels](#localized-output-labels)",
+            "| executor handoff heading | `executor handoff index` | `执行器交接索引` |",
             "artifact id",
             "contract version",
             "e2e-plan/v1",
@@ -740,17 +741,8 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "`parallel safety`",
             "`cleanup dependency`",
             "`disruptive marker`",
-            "`节点`",
-            "`场景`",
-            "`依赖`",
-            "`消费`",
-            "`产出`",
-            "`所需能力`",
-            "`副作用范围`",
-            "`隔离键`",
-            "`并行安全`",
-            "`清理依赖`",
-            "`扰动标记`",
+            "localized equivalents",
+            "(reference.md#localized-output-labels)",
             "`safe`, `unsafe`, or `unknown`",
             "every variable used across scenarios has a producer or source-supported fixture and a consumer",
             "produced variables consumed by a node come from predecessor nodes named in `depends on`",
@@ -766,27 +758,22 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         for marker in (
             "target surfaces",
             "`target surfaces`",
-            "`目标面`",
             "apis, ui routes/selectors",
             "events, jobs, tables, commands",
             "data fixtures and named variables",
             "`fixtures`",
-            "`测试数据`",
             "`named variables`",
-            "`变量传递`",
             "which ids or tokens each journey edge produces",
             "probes/oracles",
             "`probes/oracles`",
-            "`探针/oracle`",
             "waits and budgets",
             "`waits`",
-            "`等待/预算`",
             "isolation and cleanup",
             "`cleanup`",
-            "`隔离/清理`",
             "blockers or gaps",
+            "localized equivalents",
+            "(reference.md#localized-output-labels)",
             "`blockers/gaps`",
-            "`阻塞/缺口`",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
@@ -802,15 +789,15 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
 
         contract = skill.split("## 3. agent execution contract", 1)[1].split("## 4. risk map", 1)[0]
-        # Pin the three statuses as their exact bilingual paired forms so the
-        # check has teeth: a bare "blocked"/"阻塞" would pass via the pre-existing
-        # "blockers or gaps" prose and the `阻塞/缺口` label even if the new
-        # provenance status were deleted, so only the paired enumeration binds.
+        # Pin the three English status tokens in the SKILL and their localized
+        # equivalents through the reference pointer, so the body stays lean while
+        # the generated-plan labels remain stable.
         for marker in (
             "provenance",
-            "`confirmed by source` / `已确认`",
-            "`assumed until executor probe` / `待验证`",
-            "`blocked` / `阻塞`",
+            "`confirmed by source`",
+            "`assumed until executor probe`",
+            "`blocked`",
+            "(reference.md#localized-output-labels)",
         ):
             with self.subTest(section="agent-contract", marker=marker):
                 self.assertIn(marker, contract)
@@ -835,10 +822,11 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         closure = skill.split("## 7. closure", 1)[1]
         for marker in (
             "scenario slices",
-            "场景切片",
             "core slice",
             "extended slice",
             "hazardous/defer",
+            "localized section labels",
+            "(reference.md#localized-output-labels)",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, closure)
@@ -859,20 +847,13 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "`expected`",
             "`automation`",
             "`isolation/cleanup`",
-            "`目的`",
-            "`优先级`",
-            "`来源`",
-            "`覆盖边`",
-            "`准备`",
-            "`步骤和依赖`",
-            "`期望`",
-            "`自动化级别`",
-            "`隔离/清理`",
             "target surfaces, environment assumptions",
             "named-variable dependency chain",
             "what each step consumes from previous steps and what it produces",
             "probes, waits, and invariants",
             "match cleanup to real transaction boundaries",
+            "localized scenario field labels",
+            "(reference.md#localized-output-labels)",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
@@ -886,8 +867,8 @@ class E2ETestPlannerContractTest(unittest.TestCase):
         skill = (ROOT / "skills/e2e-test-planner/SKILL.md").read_text(encoding="utf-8").lower()
         for marker in (
             "overview",
-            "概览",
             "navigation digest",
+            "(reference.md#localized-output-labels)",
             "index/handle",
             "side-effect class",
             "single source of scheduling facts",
@@ -911,6 +892,52 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, reference)
 
+    def test_reference_defines_localized_output_labels(self) -> None:
+        reference = PLANNER_REFERENCE.read_text(encoding="utf-8").lower()
+
+        self.assertEqual(1, reference.count("## localized output labels"))
+        self.assertNotIn("use `## localized output labels", reference)
+        self.assertEqual(
+            1,
+            len(re.findall(r"(?m)^## migration read-path risk matrix$", reference)),
+        )
+        for localized_label in (
+            "概览",
+            "文档-代码语义差异",
+            "副作用类型",
+            "执行器交接索引",
+            "迁移读路径风险矩阵",
+        ):
+            with self.subTest(label=localized_label):
+                self.assertEqual(1, reference.count(localized_label))
+
+        for marker in (
+            "## localized output labels",
+            "overview",
+            "概览",
+            "document-code semantic diff",
+            "文档-代码语义差异",
+            "target surfaces",
+            "目标面",
+            "confirmed by source",
+            "已确认",
+            "assumed until executor probe",
+            "待验证",
+            "purpose/risk",
+            "目的",
+            "node",
+            "节点",
+            "executor handoff index",
+            "执行器交接索引",
+            "scenario slices",
+            "场景切片",
+            "migration read-path risk matrix",
+            "迁移读路径风险矩阵",
+            "generated plans use one label set consistently",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, reference)
+
     def test_generated_plan_fixture_satisfies_output_contract(self) -> None:
         text = (FIXTURES / "valid-generated-plan.md").read_text(encoding="utf-8")
 
@@ -926,7 +953,6 @@ class E2ETestPlannerContractTest(unittest.TestCase):
 
         for marker in (
             "## migration read-path risk matrix",
-            "迁移读路径风险矩阵",
             "changed table/column",
             "change kind",
             "reader",
@@ -949,7 +975,7 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "do not filter on the new discriminator",
             "migration read-path risk matrix",
             "(reference.md#migration-read-path-risk-matrix)",
-            "迁移读路径风险矩阵",
+            "(reference.md#localized-output-labels)",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, section)
@@ -1014,7 +1040,6 @@ class E2ETestPlannerContractTest(unittest.TestCase):
 
         for marker in (
             "## document-code semantic diff",
-            "文档-代码语义差异",
             "contract",
             "code behavior",
             "delta",
@@ -1033,7 +1058,7 @@ class E2ETestPlannerContractTest(unittest.TestCase):
             "document-code semantic diff",
             "behavioral contract",
             "(reference.md#document-code-semantic-diff)",
-            "文档-代码语义差异",
+            "(reference.md#localized-output-labels)",
             "closed/blocked decision",
         ):
             with self.subTest(marker=marker):

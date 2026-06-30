@@ -26,8 +26,8 @@ Plan from the root problem, not from the user's first proposed solution. A plann
 Choose the route before work:
 
 - **Planner**: strategic plan, design direction, architecture evolution, improvement proposal, technology tradeoff, or "best/better solution" request.
-- **Research-first**: pure fact-finding requests such as `深度分析`, `排查`, `定位`, `为什么`, `根因`, `掌握链路`, "investigate", "trace", or "figure out why". If the prompt also asks for `最佳方案`, `第一性原理`, `给出方案`, or `先不写代码`, gather facts first, then return to planner mode.
-- **Review/critique**: plan review, document review, or "看看这个计划有没有问题" belongs to a review skill. Use this skill only if the user asks to re-plan from first principles.
+- **Research-first**: pure fact-finding requests, including localized investigation phrases in [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules), "investigate", "trace", or "figure out why". If the prompt also includes localized best-plan or no-coding planning signals from that reference, gather facts first, then return to planner mode.
+- **Review/critique**: plan review, document review, or any localized review phrase from [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules) belongs to a review skill. Use this skill only if the user asks to re-plan from first principles.
 - **No full planner**: implementation, testing, approval, durable ADR/CONTEXT capture, or narrow code-change tasks unless the user says to plan first.
 
 If running as a subagent, use the full planner only for delegated planning, architecture, strategy, or proposal synthesis. Implementation, testing, review, approval, and narrow research subagents should use at most a short assumption check.
@@ -42,12 +42,12 @@ If running as a subagent, use the full planner only for delegated planning, arch
 
 ## Output Mode
 
-Use the user's language for chat and saved artifacts. For Standard or deeper work, state `Mode`, `Depth`, and input sources actually read in this session, then front-load the recommendation: current-best path, compressed Bestness Check, and next verification step before archaeology. For Light decisions, keep the first line compact. Do not add external sources just to make a plan look researched.
+Use the user's language for chat and saved artifacts; for localized fixed labels, use [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules). For Standard or deeper work, state `Mode`, `Depth`, and input sources actually read in this session, then front-load the recommendation: current-best path, compressed Bestness Check, and next verification step before archaeology. For Light decisions, keep the first line compact. Do not add external sources just to make a plan look researched.
 
 | Mode | Use when | Shape |
 |---|---|---|
-| Decision | The user asks whether to choose, keep, replace, or improve a path, or challenges the current best: "还有更好?", "是否应该?", "最佳了吗?" | 10-20 lines: recommendation, why, when wrong, next step; include a compressed **Bestness Check** for non-trivial recommendations |
-| Plan | The user asks for a best/better plan, implementation strategy, architecture or design direction, or explicitly avoids coding while choosing a path: "最佳方案", "最佳实现", "给出方案", "先不写代码" | Chat-first plan by default; save only through the Artifact Gate; put the Bestness Check near the top for non-trivial recommendations |
+| Decision | The user asks whether to choose, keep, replace, or improve a path, or challenges the current best. | 10-20 lines: recommendation, why, when wrong, next step; include a compressed **Bestness Check** for non-trivial recommendations |
+| Plan | The user asks for a best/better plan, implementation strategy, architecture or design direction, or explicitly avoids coding while choosing a path. | Chat-first plan by default; save only through the Artifact Gate; put the Bestness Check near the top for non-trivial recommendations |
 
 ## Depth
 
@@ -73,10 +73,11 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 
 ## Route Examples
 
-- `是否应该替换 X?` / `还有更好的吗?` / `最佳了吗?` -> Decision.
-- `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan.
-- `深度分析为什么失败` -> Research-first; plan only if the user asks for a fix path.
-- `审查这个方案有没有问题` -> use a review skill; re-plan only if asked.
+- `Should we replace X?` / `Is there a better path?` -> Decision.
+- `Plan first; do not change code yet` / `Give an implementation strategy` -> Plan.
+- `Deeply analyze why X fails` -> Research-first; plan only if the user asks for a fix path.
+- `Review this plan` -> use a review skill; re-plan only if asked.
+- Localized route examples live in [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules).
 
 ## Acceptance Gate
 

@@ -66,7 +66,10 @@ demand, and optional `scripts/` and `tests/`.
 
 ## Testing
 
-Tests use the Python standard library `unittest` — no third-party dependencies required.
+Tests use the Python standard library `unittest` — no third-party dependencies
+required. The workflow hook is Node, so its contract tests need `node` on PATH
+(they skip if it is absent). CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml))
+runs the full suite on every push and pull request with both runtimes provisioned.
 
 ```bash
 # Repo-level contract tests (installer, contract parity, skill structure)

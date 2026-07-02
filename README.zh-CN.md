@@ -61,7 +61,9 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 ## 测试
 
-测试使用 Python 标准库 `unittest`，无需第三方依赖。
+测试使用 Python 标准库 `unittest`，无需第三方依赖。工作循环 hook 是 Node 实现，
+其契约测试需要 PATH 上有 `node`（缺失则跳过）。CI（[`.github/workflows/tests.yml`](.github/workflows/tests.yml)）
+在每次 push 与 pull request 上以 python3 + node 双运行时跑全量测试。
 
 ```bash
 # 仓库级契约测试（安装器、契约一致性、技能结构）

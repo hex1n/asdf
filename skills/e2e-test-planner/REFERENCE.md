@@ -15,12 +15,49 @@ Include these fields:
 | Plan source | Requirement/design/code sources, commit or document version, and unverified source gaps. |
 | Scenario set | Scenario IDs, selected/default nodes, and intentionally manual or blocked scenarios. |
 | DAG nodes | Node IDs, scenario IDs, dependency roots, and disruptive markers. |
-| Variable ledger | Produced variables, source-supported fixtures, consumers, and cleanup consumers. |
+| Variable ledger | Produced variables, source-supported fixtures, consumers, and cleanup/data-policy consumers. |
 | Required capabilities | API/RPC/CLI/UI/DB/MQ/job/log/metric/stub/local-service capabilities and missing gates. |
-| Cleanup anchors | Owner marker, isolation key, cleanup dependency, and retention risk for each mutable side effect. |
+| Data policy anchors | Default run data policy (`preserve traces` unless explicitly overridden), owner marker, isolation key, TTL, cleanup command, cleanup timing, cleanup dependency, and retention risk for each mutable side effect. |
 | Execution blockers | Missing locators, unsafe data, unavailable hooks, ambiguous oracles, and environment assumptions. |
 
-Completion criterion: an executor can choose nodes, locate variable producers and consumers, see missing capabilities, and find cleanup blockers without reading every scenario body first.
+Completion criterion: an executor can choose nodes, locate variable producers and consumers, see missing capabilities, and find retention or cleanup blockers without reading every scenario body first.
+## Scenario Inventory and Matrix-First Scale
+
+Use this for every generated plan. The `Scenario Inventory` is the scenario dashboard and the single source of scenario IDs: every ID later used in detailed scenario cards, the DAG, coverage matrix, document-code diff, migration matrix, gaps, or executor handoff must appear here exactly once.
+
+Place `## Scenario Inventory` after `Risk Map` and any conditional risk matrix, and before `Test Scenarios`. Use [Localized Output Labels](#localized-output-labels) when the generated plan needs localized headings and columns.
+
+Use these columns:
+
+| Column | Required content |
+|---|---|
+| Scenario | Stable scenario ID and short title. |
+| Group | Functional or risk group, such as setup, main path, import/export, recovery, permission, or performance. |
+| Priority | `P0`, `P1`, `P2`, or an equivalent localized priority. |
+| Slice | `Core Slice`, `Extended Slice`, `Hazardous/Defer`, `manual`, or `blocked`. |
+| Risk/Purpose | The one-line risk or contract the scenario closes. |
+| Edges | Journey edge IDs covered by the scenario. |
+| Channel | API/RPC/UI/DB/MQ/job/log/local-service/manual channel needed to execute it. |
+| Side-effect Class | One value from [Side-effect Class](#side-effect-class). |
+| Data policy | Read-only/no-write, or preserve/retention details: owner marker, TTL, cleanup command, and cleanup timing. |
+| Related issue | Existing issue link, future executor issue placeholder, or `none`; planners do not create bug issue files before runtime evidence exists. |
+
+For large or naturally grouped plans, add `## Scenario Group Summary` immediately before `Scenario Inventory`:
+
+| Column | Required content |
+|---|---|
+| Group | Group name or prefix. |
+| Focus | What risk family or workflow the group covers. |
+| Count | Number of scenarios in the group. |
+| Default slice | Which IDs belong to the first executor run. |
+| Deferred/Hazardous | IDs delayed because of cost, permissions, side effects, or missing tooling. |
+| Execution note | How the executor should sequence or isolate that group. |
+
+The group summary is a reconciled dashboard, not a second source of truth: `Count`, `Default slice`, and `Deferred/Hazardous` must match the rows and IDs in `Scenario Inventory`.
+
+Matrix-first scale rule: when the scenario set is large, keep the Markdown plan single-file and make the inventory table the broad coverage layer. Expand detailed scenario cards only for Core/default rows and rows whose setup, oracle, side effect, or safety decision cannot be safely carried by one inventory row. A checkout plan with two scenarios can expand both; a device-provisioning plan with setup, permission, firmware, recovery, and load groups should expand the core setup/update path and keep deferred load or destructive recovery rows in the matrix until selected for execution.
+
+Completion criterion: a reviewer can see total coverage, groups, first-run slice, deferred risk, data policy, and issue linkage without reading detailed cards; an executor can start with Core/default rows and does not need per-scenario files to understand the plan.
 
 ## Plan Readability: Overview & Self-Contained Scenarios
 
@@ -43,7 +80,7 @@ Keep it a few lines. It is a navigation digest, not an approval template, and it
 ```
 
 - The index denormalizes only tokens that are near-zero drift (a node id, a priority enum, the `Side-effect Class` enum, a section reference). Never copy a field's prose onto the index.
-- The Execution DAG (§6) stays the single source of scheduling facts (depends/consumes/produces/parallel-safety); the index is a pointer to the node, not a second copy of its row. The full reason/detail stays in each dedicated field.
+- The Execution DAG section stays the single source of scheduling facts (depends/consumes/produces/parallel-safety); the index is a pointer to the node, not a second copy of its row. The full reason/detail stays in each dedicated field.
 - The same shape is domain-neutral: a checkout scenario reads `node N1 | priority P0 | Side-effect Class additive-retained | gate → entry stub ready`; a device-provisioning OTA scenario reads `node N3 | priority P1 | Side-effect Class config-change | gate → firmware-mirror reachable` — only the {node}/{ENUM}/{gate} differ, the handle is identical.
 
 Completion criterion: a reviewer learns coverage, top risk, and open gaps from the Overview alone; a reader learns a single scenario's node, priority, side-effect class, and gate from its index line without opening the DAG or gates sections; no scheduling fact is duplicated out of the DAG and no field's prose is copied onto the index.
@@ -57,6 +94,15 @@ Chinese labels:
 | Contract item | English label | Chinese label |
 |---|---|---|
 | Overview heading | `Overview` | `概览` |
+| Scenario group summary heading | `Scenario Group Summary` | `场景分组摘要` |
+| Scenario inventory heading | `Scenario Inventory` | `场景总览` |
+| Scenario inventory header | `Scenario` | `场景` |
+| Scenario inventory header | `Group` | `分组` |
+| Scenario inventory header | `Slice` | `切片` |
+| Scenario inventory header | `Risk/Purpose` | `风险/目的` |
+| Scenario inventory header | `Channel` | `通道` |
+| Scenario inventory header | `Data policy` | `数据策略` |
+| Scenario inventory header | `Related issue` | `关联 Issue` |
 | Document-code diff heading | `Document-Code Semantic Diff` | `文档-代码语义差异` |
 | Agent contract field | `Target surfaces` | `目标面` |
 | Agent contract field | `Fixtures` | `测试数据` |
@@ -156,11 +202,11 @@ Tag every scenario with one side-effect class so an executor knows, before runni
 | Class | What it does | Authorization gate |
 |---|---|---|
 | `read-only` | Reads state, writes nothing. | None. |
-| `additive-retained` | Creates self-owned data that is kept. | Owner marker + retention note. |
+| `additive-retained` | Creates self-owned data that is kept. | Owner marker + retention note + TTL + cleanup command. |
 | `soft-delete` | Logically hides or removes rows (status flag, tombstone). | Explicit authorization or a dedicated fixture. |
 | `destructive-delete` | Physically deletes rows, files, or queue state. | Explicit authorization or a dedicated fixture. |
 | `config-change` | Mutates shared config, flags, templates, or dictionaries. | Authorization + a restore plan. |
-| `external-file` | Reads or writes an external store / object storage. | Capability + cleanup or retention note. |
+| `external-file` | Reads or writes an external store / object storage. | Capability + retention note, TTL, and cleanup command when cleanup is allowed. |
 | `async-replay` | Re-triggers a job, message, or callback. | A legitimate trigger plus a dedicated failure-injection fixture; never mutate already-succeeded state. |
 
 Completion criterion: every scenario names a class; every `soft-delete`/`destructive-delete`/`config-change`/scope-mutating scenario names its authorization or fixture, and is flagged for re-risk under a data-retention override.

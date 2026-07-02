@@ -2,58 +2,68 @@
 
 ## Run Artifact Contract
 
-Use this whenever creating an E2E run directory. The Markdown report remains the agent handoff source of truth and the default home for run and scenario facts. Produce the core files by default; produce the optional files only when a programmatic consumer, rerun/comparison tooling, or the user asks for them.
+Use this whenever creating an E2E run directory. The Markdown report remains the agent handoff source of truth and the default home for run, scenario, evidence, and failure-scene facts. Produce the default file by default. Produce conditional core directories only when their trigger exists. Produce optional files only when a programmatic consumer, rerun/comparison tooling, or the user asks for them.
 
-Core files (always):
+Default core file:
 
 | File | Required content |
 |---|---|
-| `execution-report.md` | Human and agent-readable narrative summary that includes run metadata and per-scenario results inline, backed by the evidence files. |
-| `evidence/index.md` | Bounded index of raw requests, responses, DB/query results, logs, metrics, queue/job state, screenshots, configs, and rerun commands. |
-| `preserved-scenes/` | Failure-scene snapshots or links, each with owner, TTL, cleanup command, risk, and redaction notes. Produced whenever a scenario failed or is unknown. |
+| `execution-report.md` | Human and agent-readable report with run metadata, per-scenario results, inline evidence/scene proof chains, defect dispositions, cleanup state, and rerun instructions. |
+
+Conditional core directories:
+
+| Directory / file | Trigger | Required content |
+|---|---|---|
+| `issues/index.md` | One or more `OPEN` actionable root causes exist. | Local fix-queue table with issue id, disposition, type, severity, affected scenarios, suspected area, and post-fix E2E rerun target. |
+| `issues/ISSUE-*.md` | One per `OPEN` actionable root cause. | Local agent-ready issue document; one root cause, not one scenario. The issue is the unit a repair agent scans, fixes, verifies, and closes. |
+| `attachments/` | Evidence is too large, binary, or noisy to inline in the report. | Overflow raw payloads, screenshots, long logs, or exported data. Use stable scenario-prefixed filenames; do not create per-scenario directories by default. |
 
 Optional files (only when a consumer needs them):
 
 | File | When to produce | Required content |
 |---|---|---|
 | `run-metadata.json` | A programmatic consumer needs machine-readable run metadata. | Plan path or ID, plan contract version when present, environment kind, repo commit, selected scenario IDs, command surface, started/finished timestamps, status counts, toolchain versions, cache/dependency sources, and operator/agent identifier when available. |
-| `scenario-results.jsonl` | Rerun or comparison tooling consumes per-node rows. | One JSON object per DAG node or scenario with node ID, scenario ID, status, dependency status, consumed variables, produced variables, evidence paths, preserved-scene paths, issue IDs, cleanup status, and diagnosis. |
-| `execution-report.html` | A human stakeholder asks for a rendered report. | Human-readable rendering generated from the same facts as the Markdown report and evidence. |
-| `issue-backlog.md` | Defects are too many to inline in `execution-report.md`. | Local agent-ready issues only; do not create remote tracker issues by default. |
+| `scenario-results.jsonl` | Rerun or comparison tooling consumes per-node rows. | One JSON object per DAG node or scenario with node ID, scenario ID, status, dependency status, consumed variables, produced variables, evidence/scene links, issue IDs, cleanup status, and diagnosis. |
+| `execution-report.html` | A human stakeholder asks for a rendered report. | Human-readable rendering generated from the same facts as the Markdown report and attachments. |
 
-Optional files must not introduce facts absent from `execution-report.md` or `evidence/`; they only accelerate programmatic or human consumers.
+Optional and overflow artifacts must not introduce facts absent from `execution-report.md`; they only preserve bulky raw data or accelerate programmatic and human consumers.
 
 ### `execution-report.md` structural contract
 
 A delegated executor's report is machine-checkable. A valid `execution-report.md` must:
 
-- Carry these sections, with `Execution Summary` first: `Execution Summary`, `Run Metadata`, `Environment & Capability Map`, `DAG Schedule`, `Scenario Results`, `Evidence Index`, `Failures / Defects / Plan Gaps`, `Data Created & Cleanup`, `Re-run Instructions`, `Next Actions for Agent`.
-- Give every scenario in `Scenario Results` a terminal status from `passed`, `failed`, `blocked`, `skipped` — no other word stands in for a status.
-- Reference a kept failure scene (`preserved-scenes/…`) on the same row as any `failed` scenario; a failure with no preserved scene is a contract breach, not a pass.
-- Reference the core handoff index `evidence/index.md`.
+- Carry these sections, with `Execution Summary` first: `Execution Summary`, `Run Metadata`, `Environment & Capability Map`, `DAG Schedule`, `Scenario Results`, `Evidence & Failure Scenes`, `Failures / Defects / Plan Gaps`, `Data Created & Cleanup`, `Re-run Instructions`, `Next Actions for Agent`.
+- Give every scenario in `Scenario Results` a terminal status from `passed`, `failed`, `blocked`, `skipped` - no other word stands in for a status.
+- Link any `failed` scenario row directly to an evidence/scene anchor in the same report or to an `attachments/` artifact; a failure with no evidence/scene link is a contract breach, not a pass.
+- Include scenario-keyed proof chains in `Evidence & Failure Scenes`: probe, expected, actual, raw evidence summary or attachment paths, retained scene, cleanup safety, and rerun cue.
+- Link every `OPEN` actionable root cause in `Failures / Defects / Plan Gaps` to a local `issues/ISSUE-*.md` document on the same item, and link the same issue from every affected `Scenario Results` row.
 - Give `Re-run Instructions` at least one executable command, not prose alone.
 
-Completion criterion: a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using the core files; optional files are added only when a named consumer needs them.
+Completion criterion: a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using `execution-report.md` plus any referenced attachments; `OPEN` actionable root causes have local issue documents; optional files are added only when a named consumer needs them.
 
 ## Scenario Results & Evidence Legibility
 
-A delegated report is read scenario-first. The recurring failure it prevents: a reader — human or follow-up agent — forced to join three places (the status table, the `Failures` prose, and a flat evidence dump) to reconstruct one scenario's story. Co-locate the story instead.
+A delegated report is read scenario-first. The recurring failure it prevents: a reader - human or follow-up agent - forced to join three places (the status table, the `Failures` prose, and separate evidence/scene directories) to reconstruct one scenario's story. Co-locate the story instead.
 
-**Self-contained `Scenario Results` row.** Beside its terminal status, each row carries the expected outcome, the actual outcome, a diagnosis-classification token, and direct links to its evidence anchor and preserved scene:
+**Self-contained `Scenario Results` row.** Beside its terminal status, each row carries the expected outcome, the actual outcome, a diagnosis-classification token, an issue link when the row is affected by an actionable root cause, and one evidence/scene link:
 
-| Scenario | Status | Expected | Actual | Diagnosis | Evidence | Preserved scene |
+| Scenario | Status | Expected | Actual | Diagnosis | Issue | Evidence / scene |
 |---|---|---|---|---|---|---|
-| {scenario-id} | `failed` | {what the probe asserts} | {what was observed} | `ENUM_VALUE` | evidence/index.md#{anchor} | preserved-scenes/{anchor}/ |
+| {scenario-id} | `failed` | {what the probe asserts} | {what was observed} | `ENUM_VALUE` | issues/ISSUE-001-{slug}.md | #scenario-evidence-scene |
 
-- `Expected`/`Actual` are one-line deltas, not full prose — depth lives in the evidence block the row links to. Keep cells terse so the table stays scannable when scenarios are many.
-- `Diagnosis` is the §5 classification *token only* (`product`/`plan`/`environment`/`tooling`/`unknown`) — a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
+- `Expected`/`Actual` are one-line deltas, not full prose - depth lives in the evidence/scene block the row links to. Keep cells terse so the table stays scannable when scenarios are many.
+- `Diagnosis` is the section 5 classification token only (`product`/`plan`/`environment`/`tooling`/`unknown`) - a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
+- `Issue` is a local `issues/ISSUE-*.md` link for each affected `OPEN` actionable root cause. Use a dash when the row has no actionable issue. A row affected by an `OPEN` actionable root cause must not omit the issue link.
+- `Evidence / scene` links to a same-report anchor by default; use `attachments/` only for bulky raw data. Do not create `evidence/`, `preserved-scenes/`, or per-scenario directories by default.
 - This is healthy denormalization: a status or enum token restated on the index row is near-zero drift; a paragraph restated is not. Never copy the failure-reason prose onto the row.
 
-**Scenario and defect are different units.** `Scenario Results` is keyed by scenario; `Failures / Defects / Plan Gaps` is keyed by defect/root-cause, which can fan out to several scenarios. When one defect spans multiple scenarios, write it once in `Failures` with a defect id and an affected-scenario list, and link every affected row to that one entry — do not restate it per row. This is why the two sections cannot be merged: they project the same data on different axes.
+**Scenario and defect are different units.** `Scenario Results` is keyed by scenario; `Failures / Defects / Plan Gaps` is keyed by defect/root-cause, which can fan out to several scenarios. When one defect spans multiple scenarios, write it once in `Failures` with a defect id and an affected-scenario list, create one local issue document for that root cause, and link every affected row to the same issue - do not restate it per row. This is why the two sections cannot be merged: they project the same data on different axes.
 
-**Per-scenario `Evidence Index`.** Organize the evidence index as one short proof chain per scenario — probe → expected → actual → raw-artifact paths — so a `Scenario Results` evidence link lands on the proof, not an undifferentiated dump. The chain is domain-neutral: a `failed` payment-validation scenario reads `probe: result field after the callback / expected: rejected / actual: ENUM_VALUE / raw: request, response, row snapshot`; a `failed` content-moderation scenario reads `probe: verdict field after submit / expected: blocked / actual: ENUM_VALUE / raw: request, response, audit record` — the shape is identical, only the {field}/{entity} differ.
+**Local issue documents.** `issues/` is a local fix queue. Repair agents can scan this directory, pick `OPEN` issue documents, implement a targeted fix, and then invoke this executor for the named post-fix E2E rerun. Create one `issues/ISSUE-*.md` document per `OPEN` actionable root cause, not per scenario. Each issue carries `Issue ID`, `Type`, `Severity`, `Disposition`, `Affected scenarios / edges`, `Expected`, `Actual`, `Evidence / scene`, `Suspected code area`, `Reproduction steps`, `Fix constraints`, `Verification command or scenario`, `Post-fix E2E rerun`, `Closure rule`, and `Cleanup / data impact`. An issue can move to `CLOSED` only after the fix is loaded, the named E2E rerun and affected DAG dependents pass, and the rerun report/issue status are updated. These files are local handoff artifacts only; remote tracker creation or sync stays out of scope unless explicitly requested.
 
-Completion criterion: a reader learns a scenario's verdict and why from its row alone, and following the row's evidence link reaches a per-scenario proof chain; no failure-reason prose is duplicated between a row and `Failures`.
+**Evidence & Failure Scenes.** Organize the report section as one short proof chain per scenario: probe, expected, actual, raw evidence summary or attachment paths, retained scene / cleanup safety, and rerun cue. A `Scenario Results` evidence link lands on this proof, not an undifferentiated dump. The chain is domain-neutral: a `failed` payment-validation scenario reads `probe: result field after the callback / expected: rejected / actual: ENUM_VALUE / raw: request, response, row snapshot`; a `failed` content-moderation scenario reads `probe: verdict field after submit / expected: blocked / actual: ENUM_VALUE / raw: request, response, audit record` - the shape is identical, only the field/entity terms differ.
+
+Completion criterion: a reader learns a scenario's verdict and why from its row alone, following the row's issue link reaches the actionable root-cause document, and following the evidence/scene link reaches a per-scenario proof chain; no failure-reason prose is duplicated between a row and `Failures`.
 
 ## Run Lineage & Emergent Scenarios
 
@@ -91,7 +101,7 @@ Carry at least these fields:
 | Deployment/freshness evidence | Proof the run is on the intended code: version, build, commit, or start time, or a behavioral fingerprint whose result differs between old and new code. A reachable endpoint is not evidence. |
 | Isolation namespace | The owner marker scoping this run's writes: batch prefix, tenant, trace ID, or data prefix. |
 | Created data | What this run created, by entity and namespace, with counts where they matter. |
-| Cleanup policy | Whether the run cleans or preserves, the cleanable keys, and the items that must not be cleaned. |
+| Cleanup policy | Preserve traces by default for local/test E2E runs; name the retained keys, TTL, cleanup command, and any explicit cleanup override. |
 | Remaining traces | What is intentionally left after the run: retained rows, files, or queue state, with owner and TTL. |
 | Tool permissions | Trigger-channel access actually held: the auth, allowlist, routing-override, and fallback-route permissions for the trigger surface — for RPC/SDK, auth/token, invoke and service allowlists, target overrides, and direct-URL fallbacks. |
 

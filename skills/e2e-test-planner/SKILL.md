@@ -10,9 +10,9 @@ Build a source-backed, dependency-aware test plan. The core move is the **busine
 
 Output language: use the language the user explicitly requests; otherwise infer from the user's latest prompt, then the dominant source-document language. For mixed-language input, write prose in the user's conversational language and preserve code identifiers, paths, API names, enum values, logs, and quoted source text as-is. If the language choice remains ambiguous, state the assumed output language once.
 
-Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, cleanup, dependency DAG facts, and blockers. When execution will be delegated, also emit the compact Executor Handoff Index described after the Execution DAG. Avoid approval-only template sections unless the user asks for a formal QA document.
+Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff dashboard: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, data-retention policy, cleanup commands, dependency DAG facts, and blockers. When execution will be delegated, also emit the compact Executor Handoff Index described after the Execution DAG. Avoid approval-only template sections unless the user asks for a formal QA document.
 
-Lead the plan with a short `Overview` digest so a reader sees the shape before the section-by-section detail: the coverage in brief (journey edges and scenario count, plus the Core Slice), the top risks, and the open gaps with their disposition. The Overview restates facts sourced in the sections below — a navigation digest, never a new source of truth — so it stays a few lines, not an approval template. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized heading and field labels.
+Lead the plan with a short `Overview` digest so a reader sees the shape before the section-by-section detail: the coverage in brief (journey edges, scenario count, scenario groups when present, plus the Core Slice), the top risks, and the open gaps with their disposition. The Overview restates facts sourced in the sections below — a navigation digest, never a new source of truth — so it stays a few lines, not an approval template. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized heading and field labels.
 
 When saving the plan, default to a per-feature folder `docs/e2e-test/<feature>/` inside a repo (otherwise a stated path whose full location the response names), as `<date>-<feature>-e2e-test-plan.md`, so the plan and its later execution runs sit together under one feature directory.
 
@@ -49,14 +49,14 @@ Before risk mapping, define what a follow-on agent can execute without rediscove
 - Data fixtures and named variables: how required entities are created or found, which IDs or tokens each journey edge produces, and how later steps consume them.
 - Probes/oracles: where to assert user-visible, API, DB, event, log, metric, audit, cache, and external-system outcomes.
 - Waits and budgets: polling or subscription points, eventual consistency windows, timeout budgets, performance thresholds, and retry limits.
-- Isolation and cleanup: ownership of records, provider stubs, queues, locks, caches, schedulers, and idempotency keys.
+- Data policy and cleanup: default to preserve traces for local/test executor runs unless explicitly overridden; name ownership of records, provider stubs, queues, locks, caches, schedulers, idempotency keys, TTL, cleanup command, and what must not be cleaned before issue diagnosis or rerun.
 - Required vs optional capability: split the surfaces above into **required capabilities** (the run cannot proceed without them) and **optional probes** (extra signal only). A missing required capability is a pre-run gate recorded in `Agent-ready Gates`, never something the executor only discovers mid-run.
 
-Use stable field labels so another agent can parse the handoff: `Target surfaces`, `Fixtures`, `Named variables`, `Probes/Oracles`, `Waits`, `Cleanup`, and `Blockers/Gaps`. Keep these labels exact; put longer wording in the field body, not the label. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized equivalents.
+Use stable field labels so another agent can parse the handoff: `Target surfaces`, `Fixtures`, `Named variables`, `Probes/Oracles`, `Waits`, `Cleanup`, and `Blockers/Gaps`; put the data policy inside `Cleanup` rather than inventing a new field label. Keep these labels exact; put longer wording in the field body, not the label. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized equivalents.
 
 Tag the provenance of every runtime fact, not only its value. A target surface, trigger channel, datasource, schema or DDL state, credential, permission, feature flag, or external dependency is `confirmed by source` only when a read source proves it now; otherwise it is `assumed until executor probe`, and a known-unavailable prerequisite is `blocked`. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized status labels. Any runtime state a static read cannot prove live — reachability, connectivity, service registration, readiness, and the like — is an assumption until the executor probes it; do not assert it as established because the plan happens to name it.
 
-Completion criterion: every scenario can be assigned to an execution agent with no hidden setup, hidden prior result, or ambiguous oracle; unknown locators, unavailable test hooks, unsafe cleanup, and unowned dependencies are blockers or gaps; every runtime fact carries one of `confirmed by source`, `assumed until executor probe`, or `blocked`.
+Completion criterion: every scenario can be assigned to an execution agent with no hidden setup, hidden prior result, or ambiguous oracle; unknown locators, unavailable test hooks, unsafe cleanup or retention, and unowned dependencies are blockers or gaps; every runtime fact carries one of `confirmed by source`, `assumed until executor probe`, or `blocked`.
 
 ## 4. Risk Map
 
@@ -75,9 +75,21 @@ Migration read-path branch: when that family applies, do not stop at writer corr
 
 Completion criterion: each requirement, API variant, required-input branch, state transition, business-flow edge, dependency edge, and high-risk failure mode is covered by at least one scenario or listed as a gap. When the migration read-path branch applies, every changed table or column with an existing reader maps to a read-path equivalence scenario or a blocker. Treat source-only suspected defects as verification targets unless runtime evidence or tests reproduce them.
 
-## 5. Test Scenarios
+## 5. Scenario Inventory
 
-Write scenarios at the level a downstream implementation agent can execute without rediscovering the analysis. Lead each scenario with a one-line **index/handle** — its DAG node id, priority, `Side-effect Class`, and a readiness-gate reference — so reading a single scenario is self-sufficient for how it schedules and how risky it is, without hopping to the DAG, gates, and slice sections. The index denormalizes only those cheap, closed-set tokens; the Execution DAG (§6) stays the single source of scheduling facts, and each field below stays the home for its own detail. For each scenario include:
+Before detailed scenario cards, emit a matrix-first `Scenario Inventory` ([REFERENCE.md](REFERENCE.md#scenario-inventory-and-matrix-first-scale)). This table is the unique scenario index: every scenario ID later used by the DAG, coverage matrix, document-code diff, migration matrix, gaps, or executor handoff must appear here exactly once.
+
+Use stable columns: `Scenario`, `Group`, `Priority`, `Slice`, `Risk/Purpose`, `Edges`, `Channel`, `Side-effect Class`, `Data policy`, and `Related issue`; use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized labels. `Related issue` points only to an existing or future executor-generated issue document; the planner does not create bug issue files before runtime evidence exists.
+
+For large or naturally grouped plans, keep the document single-file and matrix-first: add a compact `Scenario Group Summary` immediately before the inventory, classify rows as `Core Slice`, `Extended Slice`, or `Hazardous/Defer`, and expand only the Core/default or high-risk rows below. For small plans, the inventory still exists, but every row may also have a detailed scenario card.
+
+Completion criterion: every scenario has one inventory row with priority, slice, journey edges, side-effect class, data policy, and issue placeholder/status; at least one Core/default row is identified; deferred or hazardous rows are explicit rather than hidden in prose.
+
+## 6. Test Scenarios
+
+Write detailed scenario cards at the level a downstream implementation agent can execute without rediscovering the analysis. Expand every Core/default scenario and any scenario whose setup, oracle, side effect, or safety decision cannot be represented safely in the inventory row. Do not expand every Extended or Hazardous/Defer row in a large plan just to repeat matrix text.
+
+Lead each detailed scenario with a one-line **index/handle** — its DAG node id, priority, `Side-effect Class`, and a readiness-gate reference — so reading a single scenario is self-sufficient for how it schedules and how risky it is, without hopping to the DAG, gates, and slice sections. The index denormalizes only those cheap, closed-set tokens; the Execution DAG (§7) stays the single source of scheduling facts, and each field below stays the home for its own detail. For each detailed scenario include:
 
 - `Purpose/Risk`, `Priority`, `Sources`, `Edges`, `Setup`, `Steps`, `Expected`, `Automation`, and `Isolation/Cleanup`.
 - Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized scenario field labels.
@@ -85,14 +97,14 @@ Write scenarios at the level a downstream implementation agent can execute witho
 - In `Steps`, include the named-variable dependency chain: what each step consumes from previous steps and what it produces.
 - In `Expected`, include probes, waits, and invariants at user, API, data, event, external-system, and async levels.
 - In `Automation`, name the level: E2E, API integration, contract, load/performance, chaos/recovery, or manual exploratory.
-- In `Isolation/Cleanup`, name cleanup, determinism, and flake risks; match cleanup to real transaction boundaries rather than assuming outer test rollback works for committed end-to-end calls.
+- In `Isolation/Cleanup`, name the retention policy, owner marker, TTL, cleanup command, determinism, and flake risks; default to preserving self-owned traces for local/test executor runs unless explicitly overridden, and match any cleanup command to real transaction boundaries rather than assuming outer test rollback works for committed end-to-end calls.
 - `Side-effect Class`: classify each scenario by what it does to shared state — `read-only`, `additive-retained`, `soft-delete`, `destructive-delete`, `config-change`, `external-file`, or `async-replay`. A `soft-delete`, `destructive-delete`, or scope-mutating scenario requires explicit user authorization or a dedicated fixture before an executor may run it, and is re-risked whenever a data-retention override is in force ([REFERENCE.md](REFERENCE.md#side-effect-class)). Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized field labels.
 
-Completion criterion: no scenario assumes an impossible state, hidden setup, or unavailable previous result.
+Completion criterion: no detailed scenario assumes an impossible state, hidden setup, or unavailable previous result; every Core/default scenario has a detailed card, while matrix-only rows are deliberately classified as Extended, Hazardous/Defer, manual, or blocked in the inventory.
 
-## 6. Execution DAG
+## 7. Execution DAG
 
-After scenarios, provide an executor-consumable DAG. The DAG states scheduling facts; it does not decide the runtime schedule for a specific machine or environment.
+After the inventory and selected detailed scenario cards, provide an executor-consumable DAG. The DAG states scheduling facts; it does not decide the runtime schedule for a specific machine or environment.
 
 Use a table with one row per executable node. Nodes usually map to scenarios; split setup, probe, disruptive, or cleanup nodes only when a downstream executor needs different dependencies or isolation. Include:
 
@@ -102,22 +114,22 @@ Use a table with one row per executable node. Nodes usually map to scenarios; sp
 - Required capabilities: API, RPC, CLI, UI, DB, MQ, job, log, metric, stub, or local service controls.
 - Side-effect scope and isolation key: affected tables, queues, caches, external stubs, tenant/account, batch ID, trace ID, or data prefix.
 - Parallel safety: `safe`, `unsafe`, or `unknown`, with a short reason.
-- Cleanup dependency: when cleanup may run and which produced variables it needs.
+- Cleanup dependency: when cleanup may run under the retention policy and which produced variables it needs.
 - Disruptive marker: concurrency, recovery, compensation, load, callback race, or none.
 
 Use stable table headers: `Node`, `Scenario`, `Depends on`, `Consumes`, `Produces`, `Required capabilities`, `Side-effect scope`, `Isolation key`, `Parallel safety`, `Cleanup dependency`, and `Disruptive marker`. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized equivalents.
 
-Completion criterion: every scenario appears in the DAG or is listed as intentionally manual/blocked; every `unsafe` or `unknown` node has a reason; every variable used across scenarios has a producer or source-supported fixture and a consumer; produced variables consumed by a node come from predecessor nodes named in `Depends on`, not from later or unrelated nodes; the DAG is acyclic; execution order can be derived from `Depends on` without rereading the prose.
+Completion criterion: every Core/default or selected execution scenario appears in the DAG; non-selected matrix-only scenarios remain classified as Extended, Hazardous/Defer, manual, or blocked in Scenario Inventory; every `unsafe` or `unknown` node has a reason; every variable used across scenarios has a producer or source-supported fixture and a consumer; produced variables consumed by a node come from predecessor nodes named in `Depends on`, not from later or unrelated nodes; the DAG is acyclic; execution order can be derived from `Depends on` without rereading the prose.
 
 Delegated execution branch: add Level-2 `Executor Handoff Index` immediately after the DAG when execution will be delegated to `e2e-test-executor`, a separate agent session, or automation. Use [REFERENCE.md](REFERENCE.md#executor-handoff-index) for the fields and [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized section labels.
 
-## 7. Closure
+## 8. Closure
 
 End with the sections below. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized section labels:
 
 - Level-2 `Coverage Matrix` mapping requirements, business-flow edges, journey graph edges, and risk families to scenario IDs.
 - Level-2 `Gaps, Assumptions, Questions` naming doc/code conflicts, assumptions, and questions that could change the plan. Each gap carries a **disposition** ([REFERENCE.md](REFERENCE.md#gap--defect-disposition)) so an accepted, conditional, or out-of-scope item is never read as a pending one.
-- Mark plan defaults the user may later override — the cleanup policy and the run's exit/completion criteria — as `default unless overridden`, so an executor can supersede them cleanly rather than report a superseded criterion as unmet.
+- Mark plan defaults the user may later override — data policy (`preserve traces` for local/test executor runs unless explicitly overridden), cleanup command timing, and the run's exit/completion criteria — as `default unless overridden`, so an executor can supersede them cleanly rather than report a superseded criterion as unmet.
 - Project-specific technical facts found at run time (wire ID types, real pagination/field names, replay triggers, cache-refresh behavior) are recorded as plan revisions or emergent findings here, never promoted into generic rules.
 - Optional Level-2 `Execution Order`, only when a human reader wants a ready-made sequence: a recommended dependency order derived from the Execution DAG, not a replacement for it. The executor derives order from the DAG `Depends on`, so this section is not required for agent handoff.
 - Level-2 `Agent-ready Gates`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution. Keep these gates consistent with the run facts asserted elsewhere in the plan: a fact stated as `confirmed by source` must not also appear here as an unmet prerequisite or blocker, and any runtime fact the executor must still probe — trigger-channel reachability, datasource or DDL readiness, credentials, or dependency availability — is `assumed until executor probe`, not presented as established.

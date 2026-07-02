@@ -272,6 +272,39 @@ if lh.exists():
 else:
     item("loop-health.txt", "missing - run docs/research/2026-07-02-analyze-sessions.py to create the baseline")
 
+meta_cli = HOME / "bin" / "meta-loop.mjs"
+item("~/bin/meta-loop.mjs", "ok" if meta_cli.exists() else "MISSING (run install.py)")
+backlog = repo / "docs" / "meta-loop" / "backlog.jsonl"
+if backlog.exists():
+    counts: dict[str, int] = {}
+    stale = 0
+    try:
+        import json as _json
+        for line in backlog.read_text(encoding="utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = _json.loads(line)
+            except ValueError:
+                continue
+            st = str(row.get("status", "pending"))
+            counts[st] = counts.get(st, 0) + 1
+            if st == "in_progress":
+                try:
+                    claimed = time.mktime(time.strptime(str(row.get("claimed_at", "")), "%Y-%m-%dT%H:%M:%SZ"))
+                    if time.time() - claimed > 6 * 3600:
+                        stale += 1
+                except (ValueError, TypeError):
+                    pass
+        summary = " ".join(f"{k}:{v}" for k, v in sorted(counts.items())) or "empty"
+        note = f" - WARN: {stale} stale claim(s), a prior round likely crashed" if stale else ""
+        item("meta-loop backlog", f"{summary}{note}")
+    except OSError:
+        item("meta-loop backlog", "unreadable")
+else:
+    item("meta-loop backlog", "absent (no candidates enqueued yet)")
+
 # ---------------- Disk ----------------
 section("Disk")
 try:

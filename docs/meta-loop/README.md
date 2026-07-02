@@ -25,9 +25,10 @@ The driver reads the backlog to find its single unit of work, does exactly that
 unit, records the outcome, then exits. The runtime re-feeds a fresh context.
 
 ```text
-1. python ~/bin/meta-loop.py next --repo <asdf-repo>
-   - Prints a candidate (a stale in_progress one to resume, else the oldest
-     pending, which it claims -> in_progress) or "none".
+1. node ~/bin/meta-loop.mjs next --repo <asdf-repo>
+   - Prints the single active unit: any in_progress candidate (keep working it;
+     a stale one means a prior round crashed), else the oldest pending, which it
+     claims -> in_progress. One slot: an active claim blocks a new one. Or "none".
    - "none": run the corpus + drift step (below), enqueue any new candidates
      with sanitized wording, then STOP. The next iteration picks them up.
 2. For the claimed candidate, run ONE AGENTS.md evidence round:
@@ -36,7 +37,7 @@ unit, records the outcome, then exits. The runtime re-feeds a fresh context.
    gates + two-axis rule. Do not self-grade in the same context that wrote it.
 3. Write the round note to docs/meta-loop/rounds/<id>-<slug>.md (AGENTS.md
    compact format), then:
-   python ~/bin/meta-loop.py resolve --id <id> \
+   node ~/bin/meta-loop.mjs resolve --id <id> \
      --decision accept|reject|continue --note docs/meta-loop/rounds/<id>-<slug>.md
    (`continue` keeps it in_progress for another round; accept/reject is terminal.)
 4. STOP. Do not start a second candidate in the same context.
@@ -49,7 +50,7 @@ python docs/research/2026-07-02-analyze-sessions.py --out <scratch-dir>
 # diff <scratch-dir>/loop-health.txt against the recorded baseline (playbook §5).
 # For each metric that regressed or each repeated correction, enqueue a
 # sanitized candidate:
-python ~/bin/meta-loop.py enqueue --repo <asdf-repo> \
+node ~/bin/meta-loop.mjs enqueue --repo <asdf-repo> \
   --skill <skill> --failure "<neutral failure mode>" --evidence "<sanitized pointer>"
 ```
 

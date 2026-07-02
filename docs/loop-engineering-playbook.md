@@ -68,10 +68,15 @@ executor 的输出接回修复环，而不是接回人。
 
 "分析 session → 改 skill" 已手动跑过 ≥3 次，最该定时化：
 
-- 每周一次 cron 跑分析脚本（`docs/research/2026-07-02-analyze-sessions.py`），
-  产出改进建议清单，人做周会式批量拍板。
+- **文件态化（Ralph 形态）**：元循环状态落文件 + git，每轮 fresh context，不再挤在一个长会话里。
+  待办由 `node ~/bin/meta-loop.mjs` 管理（`docs/meta-loop/backlog.jsonl` 脱敏可评审，
+  私有语料仍在 gitignored 的 `docs/research/`）；一轮 = `next` 认领单个候选 → 跑一轮证据循环 →
+  `resolve` 记决策 → 退出，由 ralph-loop/automation 重喂新上下文。协议见
+  [docs/meta-loop/README.md](meta-loop/README.md)。
+- 每周/每月一次 cron 跑分析脚本（`docs/research/2026-07-02-analyze-sessions.py`），
+  drift 出的改进点用 `meta-loop.mjs enqueue`（脱敏措辞）入待办，而不是堆进对话。
 - 改动仍走已验证的三段式：改 → 独立证伪子代理 → 复查，
-  直到"独立反证未找到剩余缺口"。
+  直到"独立反证未找到剩余缺口"；每个候选的轮次笔记落 `docs/meta-loop/rounds/`。
 - Claude Code v2.1.59+ 的原生 auto memory（会话内自动写入项目 MEMORY.md）与 Codex 的
   内置 memories（后台整合已完成会话，写入 `~/.codex/memories/MEMORY.md`，需在
   config.toml `[features] memories = true` 开启）都是元循环的**候选池**而非直接采信源：
@@ -137,10 +142,12 @@ scope / adversarial 中最相关的视角独立审查，吸收所有确认的问
 | 已落地 | P0 三件套：阶段 gate、Touch 清单交接物、Execution Contract 章节；有 `.agent-workflows/` 时启用 hook 记账/拦截 | 已完成 |
 | 之后 | P1 工装（报文-SQL 回归 diff、doctor 扩展）；P2 定时化（元循环 cron、恢复 weekly automation） | 逐个推进 |
 
-P2 定时化的可执行形态：Claude 端 `claude -p "跑 docs/research/2026-07-02-analyze-sessions.py
-并把 loop-health 变化写进月报"` 挂系统计划任务，或 Codex 端 automations（standalone 型）。
-前提与护栏：触发机需常驻开机、仓库路径可访问；每次运行设 wall-clock 与预算上限，
-超限升级给人而非静默重试。
+P2 定时化的可执行形态：文件态元循环（`docs/meta-loop/`，见
+[README](meta-loop/README.md)）由 Claude 端官方 ralph-loop 插件或 `claude -p "<驱动器提示>"`
+挂计划任务驱动，Codex 端用 standalone automation `codex exec "<驱动器提示>"`；每轮读 backlog、
+做一个候选、退出，重喂新上下文。前提与护栏：触发机需常驻开机、仓库路径可访问；
+每次运行设 wall-clock 与预算上限，超限升级给人而非静默重试。分析脚本本身保持 Python
+（它与 meta-loop.mjs 同属离线维护上下文，但解析本机会话语料，不进热路径）。
 
 ## 5. 有效性对账（一个月后）
 

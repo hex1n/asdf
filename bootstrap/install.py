@@ -214,6 +214,11 @@ def main() -> None:
         HOME / "bin" / "agent-workflow-hook.mjs",
         dry,
     )
+    copy_file(
+        REPO / "bootstrap" / "bin" / "meta-loop.mjs",
+        HOME / "bin" / "meta-loop.mjs",
+        dry,
+    )
 
     # summary
     order = ("new", "update", "append", "ok", "same", "error")

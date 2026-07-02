@@ -15,7 +15,7 @@
 |---|---|---|
 | `~/.claude/CLAUDE.md` | 工作循环 + 契约（中文块） | Claude Code 全局，任意项目生效 |
 | `~/.codex/AGENTS.md` | 工作循环 + 契约（bullet 块） | Codex 全局，任意项目生效 |
-| `~/bin/agent-workflow-hook.mjs` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；CLI 提供 `init/status/validate/close` |
+| `~/bin/agent-workflow-hook.mjs` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；Stop 时执行 `criterion` 做判停机器裁决（判据闸门：strict 未通过不放行，连续 8 次/累计 12 次后强制放行，会话绑定防陈旧状态）；CLI 提供 `init/status/validate/close` |
 
 项目级**不在本仓分发**：差异条目进各项目自己的启动文件（AGENTS.md / CLAUDE.md 的
 Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层时用 bootstrap-agent-os

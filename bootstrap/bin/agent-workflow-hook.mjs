@@ -13,7 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { parseArgs } from "node:util";
 
 const STATE_DIR = ".agent-workflows";
@@ -23,6 +23,13 @@ const VALID_STATUSES = new Set(["active", "closed", "paused"]);
 const VALID_ENFORCEMENT = new Set(["off", "warn", "strict"]);
 const VALID_UNKNOWN_WRITE_POLICY = new Set(["warn", "deny"]);
 const SCOPE_FIELDS = ["files", "tables", "interfaces"];
+// Criterion gate defaults. The consecutive cap mirrors Claude Code's native
+// 8-consecutive-block Stop-hook override; the absolute fuse is a second,
+// never-reset counter that guards against reset bugs (Codex has no native
+// cap, so the hook must own both limits itself).
+const GATE_BLOCK_CAP = 8;
+const GATE_BLOCK_FUSE = 12;
+const CRITERION_TIMEOUT_SECONDS = 300;
 
 const FILE_FIELD_NAMES = [
   "file_path",
@@ -508,6 +515,14 @@ function deny(message) {
   return 2;
 }
 
+// Stop-hook block: exit 2 + stderr is the shared Claude Code / Codex protocol
+// ("decision": "block" forces continuation; stderr becomes model feedback).
+function block(reason) {
+  process.stdout.write(JSON.stringify({ decision: "block", reason }) + "\n");
+  process.stderr.write(reason + "\n");
+  return 2;
+}
+
 function checkPretool(payload, repo, touch) {
   const tool = toolName(payload);
   const mapping = toolInput(payload);
@@ -579,14 +594,159 @@ function checkPretool(payload, repo, touch) {
   return 0;
 }
 
+function touchListPath(repo) {
+  return path.join(repo, STATE_DIR, TOUCH_LIST);
+}
+
+function intField(value, fallback) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// Run the declared completion criterion. Executing it grants the agent no new
+// capability (the agent can already run commands); the gate only turns the
+// criterion the loop templates require into a machine verdict at Stop time.
+function runCriterion(criterion, repo, timeoutSec) {
+  const opts = {
+    cwd: repo,
+    encoding: "utf8",
+    timeout: timeoutSec * 1000,
+    stdio: ["ignore", "pipe", "pipe"],
+    maxBuffer: 10 * 1024 * 1024,
+  };
+  try {
+    const stdout = execSync(criterion, opts);
+    return { verdict: "pass", exit: 0, output: String(stdout ?? "") };
+  } catch (err) {
+    const output = String(err.stdout ?? "") + String(err.stderr ?? "");
+    if (err.signal || err.code === "ETIMEDOUT") {
+      return { verdict: "not_executable", exit: null, output, detail: `timed out or killed after ${timeoutSec}s` };
+    }
+    const status = typeof err.status === "number" ? err.status : null;
+    if (status === null || status === 126 || status === 127) {
+      return { verdict: "not_executable", exit: status, output, detail: `command not executable (exit ${status ?? "spawn error"})` };
+    }
+    return { verdict: "fail", exit: status, output };
+  }
+}
+
+function outputTail(text, limit = 2000) {
+  const trimmed = String(text ?? "").trim();
+  return trimmed.length > limit ? "..." + trimmed.slice(-limit) : trimmed;
+}
+
+// Criterion gate: the machine-side stop verdict. Prose contracts stay
+// advisory; this makes "green before stop" deterministic in strict mode.
+// warn mode runs the criterion and records the verdict without blocking
+// (grayscale before flipping to strict). Degrade paths never trap a session:
+// unreadable state, non-executable criterion, session mismatch, cap and fuse
+// all release the stop with a ledger record instead of blocking forever.
 function checkStop(payload, repo, touch) {
   if (!stateEnabled(repo, touch)) return 0;
-  appendLedger(repo, {
+  const base = {
     ...ledgerBase(payload, repo, "Stop", toolName(payload)),
-    decision: "observe",
     status: (payload.status || payload.stop_reason) ?? null,
+    stop_hook_active: payload.stop_hook_active ?? null,
+  };
+  const mode = enforcementMode(touch);
+  if (!shouldEnforce(touch) || mode === "off") {
+    appendLedger(repo, { ...base, decision: "observe" });
+    return 0;
+  }
+  if (touch._invalid) {
+    // Unparseable state cannot be safely persisted or gated; PreToolUse
+    // already fails closed on it, so blocking the stop too would only trap.
+    appendLedger(repo, { ...base, decision: "warn", reason: String(touch._invalid) });
+    return 0;
+  }
+
+  // Session binding: the touch-list belongs to the loop that first ran under
+  // it. A stale active touch-list (abandoned loop, Esc-interrupted session)
+  // must not gate an unrelated session's stops.
+  const sid = (payload.session_id || payload.conversation_id) ?? null;
+  if (touch.session_id && sid && touch.session_id !== sid) {
+    appendLedger(repo, {
+      ...base,
+      decision: "warn",
+      reason: `session mismatch: touch-list bound to ${touch.session_id}; close or re-init it for this session`,
+    });
+    return 0;
+  }
+  if (!touch.session_id && sid) {
+    touch.session_id = sid;
+    writeJson(touchListPath(repo), touch);
+  }
+
+  const validationErrors = validateTouchList(touch);
+  const criterion = String(touch.criterion ?? "").trim();
+  const cap = intField(touch.gate_block_cap, GATE_BLOCK_CAP);
+  const fuse = intField(touch.gate_block_fuse, GATE_BLOCK_FUSE);
+  const timeoutSec = intField(touch.criterion_timeout_seconds, CRITERION_TIMEOUT_SECONDS);
+
+  let verdict;
+  if (validationErrors.length) {
+    verdict = { verdict: "fail", exit: null, output: "invalid touch-list: " + validationErrors.join("; ") };
+  } else {
+    verdict = runCriterion(criterion, repo, timeoutSec);
+  }
+
+  if (verdict.verdict === "pass") {
+    touch.gate_blocks = 0;
+    writeJson(touchListPath(repo), touch);
+    appendLedger(repo, { ...base, decision: "allow", reason: "criterion passed", criterion_exit: 0 });
+    return 0;
+  }
+
+  if (verdict.verdict === "not_executable") {
+    appendLedger(repo, {
+      ...base,
+      decision: "warn",
+      reason: `criterion not executable: ${verdict.detail}; fix the criterion or close the touch-list`,
+      criterion_exit: verdict.exit,
+    });
+    return 0;
+  }
+
+  // Red criterion. Count first so the caps hold even if a runtime lacks a
+  // native consecutive-block override.
+  touch.gate_blocks = (Number.parseInt(String(touch.gate_blocks), 10) || 0) + 1;
+  touch.gate_blocks_total = (Number.parseInt(String(touch.gate_blocks_total), 10) || 0) + 1;
+  writeJson(touchListPath(repo), touch);
+
+  const released = touch.gate_blocks > cap || touch.gate_blocks_total > fuse;
+  const reasonTail = outputTail(verdict.output);
+  if (mode !== "strict") {
+    appendLedger(repo, {
+      ...base,
+      decision: "warn",
+      reason: `criterion failed (exit ${verdict.exit ?? "n/a"})`,
+      criterion_exit: verdict.exit,
+    });
+    return 0;
+  }
+  if (released) {
+    appendLedger(repo, {
+      ...base,
+      decision: "release",
+      reason:
+        `criterion gate released after ${touch.gate_blocks} consecutive / ${touch.gate_blocks_total} total blocks; ` +
+        "produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
+      criterion_exit: verdict.exit,
+    });
+    return 0;
+  }
+  appendLedger(repo, {
+    ...base,
+    decision: "block",
+    reason: `criterion failed (exit ${verdict.exit ?? "n/a"})`,
+    criterion_exit: verdict.exit,
   });
-  return 0;
+  return block(
+    `completion criterion not met (exit ${verdict.exit ?? "n/a"}): ${criterion}\n` +
+      (reasonTail ? `--- criterion output (tail) ---\n${reasonTail}\n` : "") +
+      `Fix the failure and re-verify; the stop gate releases after ${cap} consecutive blocks. ` +
+      `If the criterion itself is wrong, update it via ${STATE_DIR}/${TOUCH_LIST} or close the touch-list.`,
+  );
 }
 
 function repoFromArg(value) {
@@ -616,6 +776,11 @@ function cmdInit(values) {
     interfaces: normalizePatterns(values.interfaces ?? []),
     criterion: values.criterion.trim(),
   };
+  // Session binding is normally adopted from the first hook event; --session
+  // pins it explicitly when the caller knows its own id.
+  if (values.session && String(values.session).trim()) {
+    data.session_id = String(values.session).trim();
+  }
   const errors = validateTouchList(data);
   if (errors.length) {
     for (const error of errors) process.stderr.write(`error: ${error}\n`);
@@ -720,6 +885,7 @@ const CLI_OPTIONS = {
     tables: { type: "string", multiple: true },
     interfaces: { type: "string", multiple: true },
     criterion: { type: "string" },
+    session: { type: "string" },
     enforcement: { type: "string", default: "strict" },
     "unknown-write-policy": { type: "string", default: "warn" },
     force: { type: "boolean", default: false },

@@ -22,7 +22,7 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 | `../skills/` | 全部源技能 | `~/.claude/skills/`、`~/.codex/skills/` |
 | `commands/` | `/land`、`/fixloop`、`/converge` 循环启动模板 | `~/.claude/commands/`、`~/.agents/skills/<command>/` |
 | `contract/` | **工作循环 + Execution Contract**（[设计说明](../docs/execution-contract.md)） | 合并进 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`（标记块内替换，不重复追加） |
-| `bin/` | `agent-doctor.py` 只读环境自检、`agent-workflow-hook.mjs` Touch 清单/evidence ledger hook（跨平台） | `~/bin/` |
+| `bin/` | `agent-doctor.py` 只读环境自检、`agent-workflow-hook.mjs` Touch 清单/evidence ledger/判据闸门 hook（Node，零额外依赖） | `~/bin/` |
 
 ## 日常使用：接一个新需求
 

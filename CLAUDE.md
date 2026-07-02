@@ -17,8 +17,9 @@ adding or changing any skill. The domain language for skill distribution
 ## Repository layout
 
 - `skills/` — source skills, one directory each. Current skills:
-  `deep-research`, `e2e-test-planner`, `e2e-test-executor`,
-  `first-principles-planner`, `java-stack-craft`.
+  `bootstrap-agent-os`, `deep-research`, `e2e-test-executor`,
+  `e2e-test-planner`, `first-principles-planner`, `generating-api-docs`,
+  `generating-test-scope`, `java-stack-craft`.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`).
   - `REFERENCE.md` / extra `.md` — progressive-disclosure detail loaded on demand.
   - `scripts/` — stdlib-only helper scripts.

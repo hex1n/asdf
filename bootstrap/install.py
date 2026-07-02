@@ -106,7 +106,7 @@ def main() -> None:
     merge_contract(REPO / "bootstrap" / "contract" / "codex.md", HOME / ".codex" / "AGENTS.md", dry)
 
     # 4. doctor script
-    copy_file(REPO / "bootstrap" / "bin" / "agent-doctor.ps1", HOME / "bin" / "agent-doctor.ps1", dry)
+    copy_file(REPO / "bootstrap" / "bin" / "agent-doctor.py", HOME / "bin" / "agent-doctor.py", dry)
 
     # summary
     order = ("new", "update", "append", "ok", "same")
@@ -149,8 +149,8 @@ def main() -> None:
 
     print(
         "\nmanual wiring to verify on a new machine (not automated):\n"
-        "  - PATH contains ~/bin (for agent-doctor.ps1)\n"
-        "  - run: pwsh ~/bin/agent-doctor.ps1  (verifies versions, contract presence, skill drift)"
+        "  - PATH contains ~/bin (for agent-doctor.py)\n"
+        "  - run: python ~/bin/agent-doctor.py  (macOS/Linux: python3) - verifies versions, contract presence, skill drift"
     )
 
 

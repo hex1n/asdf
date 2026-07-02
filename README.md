@@ -16,7 +16,7 @@ conditions (repeated failure, no-progress, iteration cap).
 
 ```bash
 python bootstrap/install.py        # distribute the loop to ~/.claude and ~/.codex
-pwsh ~/bin/agent-doctor.ps1         # post-install self-check
+python ~/bin/agent-doctor.py        # post-install self-check (macOS/Linux: python3)
 ```
 
 - [`bootstrap/`](bootstrap/) — machine-level install: the work-loop + Execution

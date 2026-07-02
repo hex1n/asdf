@@ -14,7 +14,7 @@
 
 ```bash
 python bootstrap/install.py        # 把循环分发到 ~/.claude 与 ~/.codex
-pwsh ~/bin/agent-doctor.ps1         # 安装后自检
+python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3）
 ```
 
 - [`bootstrap/`](bootstrap/) — 机器级安装：工作循环 + Execution Contract 契约块、

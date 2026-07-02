@@ -9,10 +9,11 @@
 ```bash
 git clone <asdf-repo> && cd asdf
 python bootstrap/install.py            # 或先 --dry-run 预览
-pwsh ~/bin/agent-doctor.ps1            # 安装后自检
+python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 python3）
 ```
 
-安装器是幂等的（重复跑只报告 `ok`/`same`），stdlib-only，Windows/macOS/Linux 通用。
+安装器与 doctor 均为 stdlib-only、Windows/macOS/Linux 通用（doctor 里仅"读取系统代理"
+一项按 OS 分支，其余检查跨平台一致）。
 
 ## 资产清单
 
@@ -21,7 +22,7 @@ pwsh ~/bin/agent-doctor.ps1            # 安装后自检
 | `../skills/` | 全部源技能 | `~/.claude/skills/`、`~/.codex/skills/` |
 | `commands/` | `/land`、`/fixloop`、`/converge` 循环启动模板 | `~/.claude/commands/`、`~/.codex/prompts/` |
 | `contract/` | **工作循环 + Execution Contract**（[设计说明](../docs/execution-contract.md)） | 合并进 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`（标记块内替换，不重复追加） |
-| `bin/` | `agent-doctor.ps1` 只读环境自检 | `~/bin/` |
+| `bin/` | `agent-doctor.py` 只读环境自检（跨平台） | `~/bin/` |
 
 ## 日常使用：接一个新需求
 
@@ -81,10 +82,7 @@ pwsh ~/bin/agent-doctor.ps1            # 安装后自检
 
 ## 不自动化的部分（装完手动核对一次）
 
-- `~/bin` 在 PATH 里
-- 非 Windows 机器需先安装 PowerShell Core（`pwsh`，macOS：`brew install powershell`，
-  Linux：见微软官方源）才能跑 agent-doctor.ps1；注意脚本内的注册表/盘符检查项仅在
-  Windows 上有意义
+- `~/bin` 在 PATH 里（doctor 用 `python`/`python3` 跑，无需 PowerShell）
 - 仓库若不在 `~/Desktop/asdf`，给 doctor 设 `ASDF_REPO` 环境变量指向仓库根
 - 周期性任务不会自动注册：元循环（月度跑 `docs/research/2026-07-02-analyze-sessions.py`
   产出 `loop-health.txt`）与 weekly automation 需自行挂 cron/schedule；doctor 会在

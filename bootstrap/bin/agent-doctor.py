@@ -183,7 +183,7 @@ try:
     item("codex MCP servers", mcp)
 except OSError:
     pass
-for f in ("land", "fixloop", "converge"):
+for f in ("loop", "land", "fixloop", "converge"):
     cc = (HOME / ".claude" / "commands" / f"{f}.md").exists()
     cx = codex_command_skill_status(f)
     item(

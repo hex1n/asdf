@@ -15,7 +15,7 @@
 |---|---|---|
 | `~/.claude/CLAUDE.md` | 工作循环 + 契约（中文块） | Claude Code 全局，任意项目生效 |
 | `~/.codex/AGENTS.md` | 工作循环 + 契约（bullet 块） | Codex 全局，任意项目生效 |
-| `~/bin/agent-workflow-hook.mjs` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；Stop 时执行 `criterion` 做判停机器裁决（判据闸门：strict 未通过不放行，连续 8 次/累计 12 次后强制放行，会话绑定防陈旧状态）；CLI 提供 `init/status/validate/close` |
+| `~/bin/agent-workflow-hook.mjs` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；Stop 时执行 `criterion` 做判停机器裁决（判据闸门：strict 未通过不放行，连续 8 次拦截后强制放行，会话绑定防陈旧状态）；CLI 提供 `init/status/validate/close` |
 
 项目级**不在本仓分发**：差异条目进各项目自己的启动文件（AGENTS.md / CLAUDE.md 的
 Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层时用 bootstrap-agent-os
@@ -79,6 +79,15 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 - 用户级分发由 [bootstrap/install.py](../bootstrap/install.py) 自动完成（合同块以标记
   幂等合并；机器可读源在 [bootstrap/contract/](../bootstrap/contract/)）；业务仓库的
   项目级条目走各仓库 git，不由安装器分发。
+- **判据闸门的威胁模型边界**：判据闸门（Stop hook 执行 `criterion`）是**协作式 agent 的机器兜底**，
+  防的是"看着像完成了就想停"这类无意提前判停——红判据会真的拦住、失败输出回注、连续 8 次后
+  强制放行并要求可续跑快照。它**不是**对抗性防线：`.agent-workflows/` 是 agent 的合法工作区
+  （touch-list 本就靠 CLI 写入其中），所以一个刻意规避的 agent 能用普通被许可的写操作改
+  `status`/`enforcement`/`criterion`、抬高计数器、删除 touch-list 或清空未签名的 ledger，
+  从而在真实判据仍红时放行——这类绕过超出本 hook 的能力范围，需要签名/树外状态才能防，
+  本仓不做。闸门与 ledger 的定位同源：证明协作过程，不证明业务正确、也不防篡改。降级永不困死
+  （状态不可解析/判据不可执行/超时/写盘失败一律放行），会话绑定只防**遗弃 touch-list 误伤新会话**，
+  不防同会话内的主动改写。
 - **Guardian 准则的生效边界**：写在 `~/.codex/AGENTS.md` 的"Guardian 审批准则"面向
   主代理自律；要让审批代理机制化拦截，还需在 `config.toml` 的审批配置侧接入
   （官方文档口径的 reviewer 取值/`[auto_review].policy`）——机器级配置不由本仓分发，

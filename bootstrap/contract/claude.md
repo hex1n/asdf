@@ -18,7 +18,7 @@
 4. **排查**：按 `/fixloop` 契约——复现输入 + 通过标准 → 定位 → 修 → 重放 → 逐字段对账。
 5. **判停**：判据满足、同一失败重复两次、或迭代超 8 轮 → 停下报告；绝不无限空转。
    仓库启用 `.agent-workflows/` 且 touch-list 处于 active 时，判停由 Stop hook 执行
-   criterion 机器裁决（判据闸门）：strict 下未通过不放行，连续 8 次或累计 12 次拦截后
+   criterion 机器裁决（判据闸门）：strict 下未通过不放行，连续 8 次拦截后
    强制放行并要求可续跑快照；闸门只对绑定会话生效，prose 不再是判停的唯一依据。
 6. **新项目**：以上零配置即可用；需要项目级操作层（AGENTS.md / VISION.md / goal 合同）
    时，用 bootstrap-agent-os 生成，不手写。

@@ -23,12 +23,14 @@ const VALID_STATUSES = new Set(["active", "closed", "paused"]);
 const VALID_ENFORCEMENT = new Set(["off", "warn", "strict"]);
 const VALID_UNKNOWN_WRITE_POLICY = new Set(["warn", "deny"]);
 const SCOPE_FIELDS = ["files", "tables", "interfaces"];
-// Criterion gate defaults. The consecutive cap mirrors Claude Code's native
-// 8-consecutive-block Stop-hook override; the absolute fuse is a second,
-// never-reset counter that guards against reset bugs (Codex has no native
-// cap, so the hook must own both limits itself).
+// Criterion gate defaults. The consecutive-block cap mirrors Claude Code's
+// native 8-consecutive-block Stop-hook override and is the sole release
+// trigger, so the hook owns the limit itself (Codex has no native cap).
+// It counts CONSECUTIVE red stops and resets on any green, so a healthy long
+// loop that reds intermittently is never disarmed — only a genuinely stuck
+// loop (cap reds in a row) releases. gate_blocks_total is lifetime telemetry
+// only, never a release trigger.
 const GATE_BLOCK_CAP = 8;
-const GATE_BLOCK_FUSE = 12;
 const CRITERION_TIMEOUT_SECONDS = 300;
 
 const FILE_FIELD_NAMES = [
@@ -680,7 +682,6 @@ function checkStop(payload, repo, touch) {
   const validationErrors = validateTouchList(touch);
   const criterion = String(touch.criterion ?? "").trim();
   const cap = intField(touch.gate_block_cap, GATE_BLOCK_CAP);
-  const fuse = intField(touch.gate_block_fuse, GATE_BLOCK_FUSE);
   const timeoutSec = intField(touch.criterion_timeout_seconds, CRITERION_TIMEOUT_SECONDS);
 
   let verdict;
@@ -707,13 +708,14 @@ function checkStop(payload, repo, touch) {
     return 0;
   }
 
-  // Red criterion. Count first so the caps hold even if a runtime lacks a
-  // native consecutive-block override.
+  // Red criterion. Count consecutive blocks first so the cap holds even if a
+  // runtime lacks a native override. gate_blocks_total is lifetime telemetry
+  // and never gates a release (a long healthy loop reds many times overall).
   touch.gate_blocks = (Number.parseInt(String(touch.gate_blocks), 10) || 0) + 1;
   touch.gate_blocks_total = (Number.parseInt(String(touch.gate_blocks_total), 10) || 0) + 1;
   writeJson(touchListPath(repo), touch);
 
-  const released = touch.gate_blocks > cap || touch.gate_blocks_total > fuse;
+  const released = touch.gate_blocks > cap;
   const reasonTail = outputTail(verdict.output);
   if (mode !== "strict") {
     appendLedger(repo, {
@@ -729,7 +731,8 @@ function checkStop(payload, repo, touch) {
       ...base,
       decision: "release",
       reason:
-        `criterion gate released after ${touch.gate_blocks} consecutive / ${touch.gate_blocks_total} total blocks; ` +
+        `criterion gate released after ${touch.gate_blocks} consecutive blocks ` +
+        `(${touch.gate_blocks_total} total this session); ` +
         "produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
       criterion_exit: verdict.exit,
     });
@@ -958,7 +961,19 @@ function main() {
   const touch = loadTouchList(repo);
 
   if (event === "pretooluse") return checkPretool(payload, repo, touch);
-  if (event === "stop") return checkStop(payload, repo, touch);
+  if (event === "stop") {
+    // The stop gate must never crash a turn's end over an environment fault
+    // (e.g. an unwritable ledger/state dir). Degrade loudly to a released stop
+    // instead of an uncaught non-zero exit that a runtime might misread.
+    try {
+      return checkStop(payload, repo, touch);
+    } catch (err) {
+      process.stderr.write(
+        `agent-workflow-hook: stop gate degraded (${err && err.message ? err.message : err}); allowing stop\n`,
+      );
+      return 0;
+    }
+  }
   if (stateEnabled(repo, touch)) {
     appendLedger(repo, {
       ...ledgerBase(payload, repo, event || "unknown", toolName(payload)),

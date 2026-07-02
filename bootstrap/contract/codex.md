@@ -5,7 +5,7 @@
 - 方案类任务先不写码（建议用 Plan collaboration mode 承载）；/converge 只用于显式要求或高风险未收敛场景，终版给编号选项等拍板。用户已明确拍板（如"按方案1来/落地/开始实现"）后，不自行回到收敛，除非出现新的硬阻塞或用户要求再证伪。
 - 拍板后按 /land 契约循环：复述 Touch 清单+判据 → 改→验→审→修，判据满足才停。仓库已有 `.agent-workflows/` 时，把当前 Touch 清单同步到 `.agent-workflows/touch-list.json`，让 hook 记录/拦截写目标；该目录是 gitignored 的 agent 私有运行状态，不是项目政策源。并行推进多个循环时各用独立 git worktree，不共享工作目录。
 - 排查按 /fixloop 契约：复现输入+通过标准 → 定位→修→重放→逐字段对账。
-- 判停：判据满足、同一失败重复两次、或迭代超 8 轮即停下报告，不无限空转。仓库启用 `.agent-workflows/` 且 touch-list 处于 active 时，判停由 Stop hook 执行 criterion 机器裁决（判据闸门）：strict 下未通过不放行，连续 8 次或累计 12 次拦截后强制放行并要求可续跑快照；闸门只对绑定会话生效，prose 不再是判停的唯一依据。
+- 判停：判据满足、同一失败重复两次、或迭代超 8 轮即停下报告，不无限空转。仓库启用 `.agent-workflows/` 且 touch-list 处于 active 时，判停由 Stop hook 执行 criterion 机器裁决（判据闸门）：strict 下未通过不放行，连续 8 次拦截后强制放行并要求可续跑快照；闸门只对绑定会话生效，prose 不再是判停的唯一依据。
 - 新项目零配置即可用本流程；需要项目级操作层（AGENTS.md/VISION.md/goal 合同）时用 bootstrap-agent-os 生成。
 - 元循环是离线维护任务：按需或每月重跑 session 分析对账循环健康指标（loop-health）；新规律过 Rule Harvest Gate 再固化，不在普通任务中自动插入。
 

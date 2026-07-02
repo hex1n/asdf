@@ -24,6 +24,9 @@ adding or changing any skill. The domain language for skill distribution
   - `scripts/` — stdlib-only helper scripts.
   - `tests/` — stdlib `unittest` tests for that skill.
 - `tests/` — repo-level contract tests that validate skill structure and routing.
+- `bootstrap/` — machine-level install assets (Execution Contract blocks, `/land`
+  `/fixloop` `/converge` command templates, agent-doctor, hooks) plus the
+  idempotent `install.py`; see `bootstrap/README.md`.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
 - `AGENTS.md` — skill-authoring and maintenance conventions.
 - `CONTEXT.md` — canonical domain terms for skill distribution.

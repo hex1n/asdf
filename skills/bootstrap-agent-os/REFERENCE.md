@@ -14,6 +14,17 @@ Include:
 - Local shell or command quoting rules only when the project has a real recurring trap.
 - Pointers to profile, goal, evidence, and workflow assets.
 
+Multi-runtime notes (advisory):
+
+- When the project is used by both an `AGENTS.md`-reading runtime and Claude Code,
+  prefer having `CLAUDE.md` import the shared rules via the `@AGENTS.md` syntax
+  instead of copying the same rule list into both files; keep only runtime-specific
+  adapters inline.
+- For Claude Code, directory- or file-type-scoped rules can live in `.claude/rules/`
+  files with `paths` frontmatter as a native complement to explicit pointers; keep
+  the explicit-pointer route as the cross-runtime fallback, since other runtimes
+  have no equivalent loader.
+
 Do not include:
 
 - Full code conventions.

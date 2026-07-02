@@ -6,3 +6,12 @@ __pycache__/
 tmp/
 # Local eval run artifacts can carry real-project identifiers; keep them out of the repo.
 evals/
+# analyze-sessions.py outputs contain personal prompt corpora; only loop-health.txt aggregates are safe
+docs/research/corpus_*.txt
+docs/research/first_prompts*.txt
+docs/research/corrections.txt
+docs/research/codex_*.txt
+docs/research/stats.txt
+# Private session-analysis outputs: real business corpus / personal metrics — never publish
+docs/research/2026-07-02-personal-loop-engineering.md
+docs/research/loop-health.txt

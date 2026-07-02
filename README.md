@@ -1,33 +1,58 @@
-# asdf-skills
+# asdf — agent loop engineering
 
 > English | [简体中文](README.zh-CN.md)
 
-Portable agent skills for local agent runtimes such as **Codex** and **Claude Code**.
+A portable **personal agent work loop** for local runtimes such as **Codex** and
+**Claude Code** — distilled from a full analysis of local coding sessions and made
+installable on any machine, effective in any project with zero per-project config.
+Skills are one component the loop calls; **the loop is the product**.
 
-Each skill is a self-contained directory under [`skills/`](skills/) with Markdown
-instructions and, where needed, stdlib-only helper scripts and tests. Skills are
-authored once as a *source skill* and distributed into runtimes as *managed
-installed skills* — see [CONTEXT.md](CONTEXT.md) for the distribution model.
+## The loop
 
-## Skills
+The work loop drives a task from intake to delivery — **judge scope → converge →
+land → verify → log** — so you step in at only two points (approve the plan,
+accept the result) and the middle runs itself under machine-checkable stop
+conditions (repeated failure, no-progress, iteration cap).
 
-| Skill | Purpose |
-| --- | --- |
-| [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | Bootstrap or review project-level agent workflow operating docs: startup route, direction anchor, repo profile, goal loop, and evidence structure. |
-| [`deep-research`](skills/deep-research/) | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
-| [`e2e-test-planner`](skills/e2e-test-planner/) | Build source-backed end-to-end test plans from design, requirements, and code. |
-| [`e2e-test-executor`](skills/e2e-test-executor/) | Execute E2E test plans and produce evidence-backed reports. |
-| [`first-principles-planner`](skills/first-principles-planner/) | Reframe the root problem and return the current-best plan with failure conditions. |
-| [`generating-api-docs`](skills/generating-api-docs/) | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
-| [`generating-test-scope`](skills/generating-test-scope/) | Generate QA test-scope documents from branch diffs and traced change impact. |
-| [`java-stack-craft`](skills/java-stack-craft/) | Write and review Java/Spring code with profile detection and quality gates. |
+```bash
+python bootstrap/install.py        # distribute the loop to ~/.claude and ~/.codex
+pwsh ~/bin/agent-doctor.ps1         # post-install self-check
+```
+
+- [`bootstrap/`](bootstrap/) — machine-level install: the work-loop + Execution
+  Contract blocks, `/converge` `/land` `/fixloop` command templates, an
+  agent-doctor self-check, and an idempotent installer. Its
+  [README](bootstrap/README.md) documents the **new-requirement workflow**.
+- [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — the
+  day-to-day playbook (six work families, loop starters, stop conditions).
+- [`docs/execution-contract.md`](docs/execution-contract.md) — how the work loop
+  and Execution Contract are sourced and distributed to both runtimes.
+
+## Skills — components the loop calls
+
+Skills are self-contained instruction units under [`skills/`](skills/) that the
+loop routes to at each stage. Each is authored once as a *source skill* and
+distributed into runtimes as a *managed installed skill* — see
+[CONTEXT.md](CONTEXT.md) for the distribution model.
+
+| Skill | Loop stage | Purpose |
+| --- | --- | --- |
+| [`first-principles-planner`](skills/first-principles-planner/) | converge | Reframe the root problem and return the current-best plan with failure conditions. |
+| [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
+| [`java-stack-craft`](skills/java-stack-craft/) | land | Write and review Java/Spring code with profile detection, quality gates, and the landing-contract loop discipline. |
+| [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
+| [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
+| [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
+| [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
+| [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | new project | Generate a project-level operating layer (startup route, direction anchor, repo profile, goal loop) so the loop works in a fresh repo. |
 
 ## Repository layout
 
 ```
-skills/      # source skills (one directory each)
-tests/       # repo-level contract tests for skill structure and routing
-docs/        # design notes, plans, research
+bootstrap/   # the loop: work-loop contract, command templates, doctor, installer
+skills/      # source skills the loop calls (one directory each)
+docs/        # loop-engineering playbook, execution-contract spec, design notes
+tests/       # repo-level contract tests for the installer, contracts, and skills
 AGENTS.md    # skill-authoring and maintenance conventions
 CONTEXT.md   # canonical domain terms for skill distribution
 CLAUDE.md    # runtime guidance for Claude Code
@@ -42,7 +67,7 @@ demand, and optional `scripts/` and `tests/`.
 Tests use the Python standard library `unittest` — no third-party dependencies required.
 
 ```bash
-# Repo-level contract tests
+# Repo-level contract tests (installer, contract parity, skill structure)
 python3 -m unittest discover -s tests
 
 # A single skill's tests

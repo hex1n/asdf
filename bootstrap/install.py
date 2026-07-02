@@ -210,8 +210,8 @@ def main() -> None:
     # 4. local helper scripts
     copy_file(REPO / "bootstrap" / "bin" / "agent-doctor.py", HOME / "bin" / "agent-doctor.py", dry)
     copy_file(
-        REPO / "bootstrap" / "bin" / "agent-workflow-hook.py",
-        HOME / "bin" / "agent-workflow-hook.py",
+        REPO / "bootstrap" / "bin" / "agent-workflow-hook.mjs",
+        HOME / "bin" / "agent-workflow-hook.mjs",
         dry,
     )
 
@@ -256,8 +256,8 @@ def main() -> None:
 
     print(
         "\nmanual wiring to verify on a new machine (not automated):\n"
-        "  - PATH contains ~/bin (for agent-doctor.py and agent-workflow-hook.py)\n"
-        "  - PreToolUse/Stop hooks call: python ~/bin/agent-workflow-hook.py  (macOS/Linux: python3)\n"
+        "  - PATH contains ~/bin (for agent-doctor.py and agent-workflow-hook.mjs)\n"
+        "  - PreToolUse/Stop hooks call: node ~/bin/agent-workflow-hook.mjs  (node ships with Claude Code/Codex machines)\n"
         "  - run: python ~/bin/agent-doctor.py  (macOS/Linux: python3) - verifies versions, contract presence, hooks, skill drift"
     )
 

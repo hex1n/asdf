@@ -155,18 +155,23 @@ section("Agent config presence")
 claude_md = HOME / ".claude" / "CLAUDE.md"
 codex_agents = HOME / ".codex" / "AGENTS.md"
 codex_cfg = HOME / ".codex" / "config.toml"
-workflow_hook = HOME / "bin" / "agent-workflow-hook.py"
+workflow_hook = HOME / "bin" / "agent-workflow-hook.mjs"
 item("~/.claude/settings.json", "ok" if (HOME / ".claude" / "settings.json").exists() else "MISSING")
 item("~/.claude/CLAUDE.md",
      "ok (contract present)" if file_has(claude_md, "Execution Contract") else "WARN: no Execution Contract section")
 item("~/.codex/config.toml", "ok" if codex_cfg.exists() else "MISSING")
 item("~/.codex/AGENTS.md",
      "ok (contract present)" if file_has(codex_agents, "Execution Contract") else "WARN: no Execution Contract section")
-item("~/bin/agent-workflow-hook.py", "ok" if workflow_hook.exists() else "MISSING")
-claude_workflow_hook = file_has(HOME / ".claude" / "settings.json", r"agent-workflow-hook\.py")
+item("~/bin/agent-workflow-hook.mjs", "ok" if workflow_hook.exists() else "MISSING")
+node_paths = which_all("node")
+item("node runtime (for hook)", node_paths[0] if node_paths else "MISSING (agent-workflow-hook.mjs needs node)")
+legacy_hook = HOME / "bin" / "agent-workflow-hook.py"
+if legacy_hook.exists():
+    item("~/bin/agent-workflow-hook.py", "legacy python hook present; superseded by .mjs - re-wire hooks to node and remove")
+claude_workflow_hook = file_has(HOME / ".claude" / "settings.json", r"agent-workflow-hook\.mjs")
 codex_workflow_hook = (
-    file_has(codex_cfg, r"agent-workflow-hook\.py")
-    or file_has(HOME / ".codex" / "hooks.json", r"agent-workflow-hook\.py")
+    file_has(codex_cfg, r"agent-workflow-hook\.mjs")
+    or file_has(HOME / ".codex" / "hooks.json", r"agent-workflow-hook\.mjs")
 )
 item(
     "workflow hook registration",

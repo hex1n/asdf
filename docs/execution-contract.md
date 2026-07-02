@@ -15,7 +15,7 @@
 |---|---|---|
 | `~/.claude/CLAUDE.md` | 工作循环 + 契约（中文块） | Claude Code 全局，任意项目生效 |
 | `~/.codex/AGENTS.md` | 工作循环 + 契约（bullet 块） | Codex 全局，任意项目生效 |
-| `~/bin/agent-workflow-hook.py` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；CLI 提供 `init/status/validate/close` |
+| `~/bin/agent-workflow-hook.mjs` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；CLI 提供 `init/status/validate/close` |
 
 项目级**不在本仓分发**：差异条目进各项目自己的启动文件（AGENTS.md / CLAUDE.md 的
 Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层时用 bootstrap-agent-os
@@ -44,7 +44,7 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 - Before landing a plan, restate the touch list (target repo/working directory plus
   files, tables, interfaces); stop and confirm before touching anything outside it.
 - If the repo has `.agent-workflows/`, mirror the active touch list into
-  `.agent-workflows/touch-list.json` with `agent-workflow-hook.py init` and use
+  `.agent-workflows/touch-list.json` with `agent-workflow-hook.mjs init` and use
   `.agent-workflows/evidence-ledger.jsonl` as local hook evidence; this state is
   gitignored and non-authoritative. The ledger proves scope/process observations
   only, not business correctness.

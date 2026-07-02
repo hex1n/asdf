@@ -4,7 +4,7 @@
 > 分析依据是对本机 782 个会话、4,597 条人工提示的全量分析（分析文档含真实业务语料，
 > 留在本机、不入公开仓）；量化基线可用 `docs/research/2026-07-02-analyze-sessions.py`
 > 重跑得到。P0 机制建设已落入全局 Execution Contract、`/land`/`/fixloop` 模板，
-> 以及可选的 `agent-workflow-hook.py init/status/close` + `.agent-workflows/touch-list.json`
+> 以及可选的 `agent-workflow-hook.mjs init/status/close` + `.agent-workflows/touch-list.json`
 > + `evidence-ledger.jsonl` 本地 hook 状态。
 > 本手册只讲"用法"。
 
@@ -29,7 +29,7 @@
 > 每个循环的三要素——机器可查的判据、Touch 清单、显式判停——与项目无关，
 > 已作为"工作循环"随 `bootstrap/install.py` 全局分发（见
 > [docs/execution-contract.md](execution-contract.md)），在任意项目零配置生效。仓库存在
-> `.agent-workflows/` 时，Touch 清单还会通过 `agent-workflow-hook.py init` 落成机器可读的
+> `.agent-workflows/` 时，Touch 清单还会通过 `agent-workflow-hook.mjs init` 落成机器可读的
 > `touch-list.json`，hook 证据写入 `evidence-ledger.jsonl`。ledger 只证明范围/过程，
 > 不证明业务正确性。
 
@@ -98,7 +98,7 @@ CLI 升级、进程残留、代理配置做成 doctor 自检脚本 + runbook；
 ```text
 按这个方案落地。Touch 清单：<文件/表清单>。
 完成判据：<测试命令> 全绿 + 行为等价（<老场景> 结果不变）。
-若仓库有 .agent-workflows/，先用 agent-workflow-hook.py init 写入 touch-list.json。
+若仓库有 .agent-workflows/，先用 agent-workflow-hook.mjs init 写入 touch-list.json。
 循环执行：改 → 测 → 自审 → 修，直到判据满足才回来找我。
 中途不要问我，除非需要触碰清单外的文件/表——那种情况立即停下确认。
 ```

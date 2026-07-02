@@ -88,7 +88,7 @@ Default path: `.agent-workflows/`.
 Include:
 
 - `active-goal.json`: optional current goal snapshot for long-running work.
-- `touch-list.json`: current loop boundary for files, tables, interfaces, and completion criterion. Prefer creating it with `agent-workflow-hook.py init` rather than hand-written JSON. Use `enforcement: "strict"` after the user approves the scope; use `"warn"` only while the list is still being discovered.
+- `touch-list.json`: current loop boundary for files, tables, interfaces, and completion criterion. Prefer creating it with `agent-workflow-hook.mjs init` rather than hand-written JSON. Use `enforcement: "strict"` after the user approves the scope; use `"warn"` only while the list is still being discovered.
 - `evidence-ledger.jsonl`: append-only hook observations for PreToolUse/Stop events and other local loop evidence. It proves scope/process observations only; it does not prove business correctness.
 - `checkpoints/`: context compaction or interruption recovery notes.
 - Runtime capability probes and temporary verifier state.
@@ -99,7 +99,7 @@ Do not include:
 - Credentials, secrets, raw customer identifiers, or production payloads.
 - Facts that should be reviewed with the project, such as repo profiles, evidence contracts, or reusable templates.
 
-Local run state is non-authoritative. Promote stable, reviewable assets to `docs/agent-workflows/`. The global `agent-workflow-hook.py` may read `touch-list.json`, validate its schema, fail closed on invalid active scope, and append to `evidence-ledger.jsonl`, but the hook never makes `.agent-workflows/` a project policy source.
+Local run state is non-authoritative. Promote stable, reviewable assets to `docs/agent-workflows/`. The global `agent-workflow-hook.mjs` may read `touch-list.json`, validate its schema, fail closed on invalid active scope, and append to `evidence-ledger.jsonl`, but the hook never makes `.agent-workflows/` a project policy source.
 
 ## Bootstrap Tree
 

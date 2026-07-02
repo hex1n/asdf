@@ -22,7 +22,7 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 | `../skills/` | 全部源技能 | `~/.claude/skills/`、`~/.codex/skills/` |
 | `commands/` | `/land`、`/fixloop`、`/converge` 循环启动模板 | `~/.claude/commands/`、`~/.agents/skills/<command>/` |
 | `contract/` | **工作循环 + Execution Contract**（[设计说明](../docs/execution-contract.md)） | 合并进 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`（标记块内替换，不重复追加） |
-| `bin/` | `agent-doctor.py` 只读环境自检、`agent-workflow-hook.py` Touch 清单/evidence ledger hook（跨平台） | `~/bin/` |
+| `bin/` | `agent-doctor.py` 只读环境自检、`agent-workflow-hook.mjs` Touch 清单/evidence ledger hook（跨平台） | `~/bin/` |
 
 ## 日常使用：接一个新需求
 
@@ -42,7 +42,7 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 
 **第 2 步 · 落地 `/land`（拍板后自驱）**
 
-复述目标仓库 + Touch 清单 + 机器可查判据（假设存在的表/字段先只读核验）→ 若仓库有 `.agent-workflows/`，用 `python ~/bin/agent-workflow-hook.py init --repo <repo> --files <glob> --criterion <check>` 同步写入 `.agent-workflows/touch-list.json` 供 hook 记账/拦截 → 循环：改 → 验 → 自审/必要时独立上下文子代理审（只看正确性/需求缺口，P1/P2/P3 分级，仅 P1 打断）→ 修；每轮 `git status` 核对没越界 → 判据满足才停。撞上判停条件才回来找你。任何"已读/已写/已完成/已验证"都必须能指向真实工具结果；`.agent-workflows/evidence-ledger.jsonl` 只证明 hook 观察到的范围/过程，不证明业务正确性。
+复述目标仓库 + Touch 清单 + 机器可查判据（假设存在的表/字段先只读核验）→ 若仓库有 `.agent-workflows/`，用 `node ~/bin/agent-workflow-hook.mjs init --repo <repo> --files <glob> --criterion <check>` 同步写入 `.agent-workflows/touch-list.json` 供 hook 记账/拦截 → 循环：改 → 验 → 自审/必要时独立上下文子代理审（只看正确性/需求缺口，P1/P2/P3 分级，仅 P1 打断）→ 修；每轮 `git status` 核对没越界 → 判据满足才停。撞上判停条件才回来找你。任何"已读/已写/已完成/已验证"都必须能指向真实工具结果；`.agent-workflows/evidence-ledger.jsonl` 只证明 hook 观察到的范围/过程，不证明业务正确性。
 
 **第 3 步 · 验证（打到真实世界）**
 
@@ -85,8 +85,8 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 
 - `~/bin` 在 PATH 里（doctor 用 `python`/`python3` 跑，无需 PowerShell）
 - `~/.claude/settings.json` 与 `~/.codex/config.toml` 中的 PreToolUse/Stop hooks 调用
-  `python ~/bin/agent-workflow-hook.py`；doctor 会检查是否已注册
-- `python ~/bin/agent-workflow-hook.py status --repo <repo>` 可只读查看当前 Touch 清单、
+  `node ~/bin/agent-workflow-hook.mjs`；doctor 会检查是否已注册
+- `node ~/bin/agent-workflow-hook.mjs status --repo <repo>` 可只读查看当前 Touch 清单、
   最近 hook ledger 和 schema 有效性；`close --repo <repo>` 用于结束当前循环
 - 仓库若不在 `~/Desktop/asdf`，给 doctor 设 `ASDF_REPO` 环境变量指向仓库根
 - 周期性任务不会自动注册：元循环（月度跑 `docs/research/2026-07-02-analyze-sessions.py`

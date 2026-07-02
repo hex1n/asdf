@@ -3,7 +3,8 @@
 > 目的：把**个人 agent 工作循环**（任意项目通用的推进流程）和本机会话语料分析中
 > 反复口头重申的约束（"循环漏气点"——分析文档含真实业务语料，留在本机、不入公开仓；
 > 可用 `docs/research/2026-07-02-analyze-sessions.py` 重跑得到聚合基线）一次性固化到
-> 各运行时的启动文件里。流程是主体，契约是兜底。
+> 各运行时的启动文件里。默认轻量推进，流程只在显式要求或高风险未收敛时升档，
+> 契约兜住范围、证据和不可逆操作。
 > 本文件是**源**；下表列出的安装位置是**受管副本**——改这里，然后同步过去，
 > 不要单独改副本（与 skill 分发同一纪律，防 Cache Drift）。
 > 每条规则都过了 Rule Harvest Gate：来自 ≥2 次重复纠正或明确认可的不变量。
@@ -14,6 +15,7 @@
 |---|---|---|
 | `~/.claude/CLAUDE.md` | 工作循环 + 契约（中文块） | Claude Code 全局，任意项目生效 |
 | `~/.codex/AGENTS.md` | 工作循环 + 契约（bullet 块） | Codex 全局，任意项目生效 |
+| `~/bin/agent-workflow-hook.py` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；CLI 提供 `init/status/validate/close` |
 
 项目级**不在本仓分发**：差异条目进各项目自己的启动文件（AGENTS.md / CLAUDE.md 的
 Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层时用 bootstrap-agent-os
@@ -28,9 +30,12 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 - Claude 版：[bootstrap/contract/claude.md](../bootstrap/contract/claude.md)
 - Codex 版：[bootstrap/contract/codex.md](../bootstrap/contract/codex.md)
 
-设计重心：**先流程后约束**。工作循环（判据 → 收敛 → 落地 → 排查 → 判停 → 新项目
-零配置）是这套体系的主体，在任意项目、任意机器生效，不依赖项目级文件；契约只是
-流程之外的兜底不变量。"缺判据先索要"已并入工作循环第 1 步，不再单列。
+设计重心：**默认轻，必要时升档**。工作循环（判据 → 按需收敛 → 落地 → 排查 →
+判停 → 新项目零配置）在任意项目、任意机器生效，不依赖项目级文件；契约兜住范围、
+证据和不可逆操作。"缺判据先索要"已并入工作循环第 1 步，不再单列。
+用户明确拍板后，拍板优先于通用流程；只有缺失判据、清单外触碰或新发现的硬阻塞
+才停下。完成声明必须由真实工具结果、diff/status、命令输出或 SQL 断言支撑，
+工具失败时不得声明成功。
 
 ## 项目级差异条目模板（装入目标项目启动文件的 Boundaries 类章节）
 
@@ -38,6 +43,15 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 - Preserve run/test data by default; capture the diagnostic scene before any cleanup.
 - Before landing a plan, restate the touch list (target repo/working directory plus
   files, tables, interfaces); stop and confirm before touching anything outside it.
+- If the repo has `.agent-workflows/`, mirror the active touch list into
+  `.agent-workflows/touch-list.json` with `agent-workflow-hook.py init` and use
+  `.agent-workflows/evidence-ledger.jsonl` as local hook evidence; this state is
+  gitignored and non-authoritative. The ledger proves scope/process observations
+  only, not business correctness.
+- Treat explicit user approval as execution permission; do not add another
+  convergence/planning gate unless new blocking evidence appears.
+- Completion claims must cite real tool output, status/diff, command output, or
+  SQL assertions; failed or skipped tools cannot support success claims.
 - If a landing or debugging task lacks a machine-checkable completion criterion
   (test command, SQL assertion, expected response), ask for one before editing;
   a trivial single-file change with no data/interface impact may use a one-line
@@ -56,7 +70,12 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 - 新增规则先进本文件，写明语料证据，再分发；分发后用冷启动会话做证伪验证
   （不重申约束，诱导违规，观察默认行为）。
 - 与 slash 模板（[bootstrap/commands/](../bootstrap/commands/)）里的循环契约保持同义：
-  模板是"每次任务显式声明"，本契约是"不声明时的默认值"。
+  模板是"每次任务显式声明"，本契约是"不声明时的默认值"；默认档必须保持轻量，
+  不把 `/converge` 变成用户拍板后的隐式回退步骤。
+- 机器可读运行状态只落在目标仓库的 `.agent-workflows/`：`touch-list.json`
+  是当前循环的文件/表/接口边界，`evidence-ledger.jsonl` 是 hook 观察到的工具证据。
+  它们是 gitignored 的 agent 私有状态，不替代 `docs/agent-workflows/` 里的可评审资产；
+  ledger 只能支撑范围/过程声明，不能替代测试、SQL、API 响应、diff 等业务验证证据。
 - 用户级分发由 [bootstrap/install.py](../bootstrap/install.py) 自动完成（合同块以标记
   幂等合并；机器可读源在 [bootstrap/contract/](../bootstrap/contract/)）；业务仓库的
   项目级条目走各仓库 git，不由安装器分发。

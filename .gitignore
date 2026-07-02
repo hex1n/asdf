@@ -2,7 +2,10 @@
 **/.DS_Store
 __pycache__/
 *.py[cod]
+.pytest_cache/
 .codex/
+.agent-workflows/
+.tmp/
 tmp/
 # Local eval run artifacts can carry real-project identifiers; keep them out of the repo.
 evals/
@@ -14,4 +17,5 @@ docs/research/codex_*.txt
 docs/research/stats.txt
 # Private session-analysis outputs: real business corpus / personal metrics — never publish
 docs/research/2026-07-02-personal-loop-engineering.md
+docs/research/2026-07-02-loop-engineering-multiview-review.md
 docs/research/loop-health.txt

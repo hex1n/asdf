@@ -40,7 +40,14 @@ def item(key: str, val: object) -> None:
 
 def run(cmd: list[str]) -> str:
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        out = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=8,
+        )
         return (out.stdout or out.stderr).strip()
     except Exception:
         return ""
@@ -78,6 +85,16 @@ def file_has(path: Path, pattern: str) -> bool:
         return re.search(pattern, path.read_text(encoding="utf-8", errors="replace"), re.M) is not None
     except OSError:
         return False
+
+
+def codex_command_skill_status(name: str) -> str:
+    path = HOME / ".agents" / "skills" / name / "SKILL.md"
+    if not path.exists():
+        return "MISSING"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    has_name = re.search(rf"^name:\s*{re.escape(name)}\s*$", text, re.M)
+    has_description = re.search(r"^description:\s*.+$", text, re.M)
+    return "ok" if has_name and has_description else "WARN: malformed"
 
 
 # ---------------- CLI versions ----------------
@@ -138,12 +155,24 @@ section("Agent config presence")
 claude_md = HOME / ".claude" / "CLAUDE.md"
 codex_agents = HOME / ".codex" / "AGENTS.md"
 codex_cfg = HOME / ".codex" / "config.toml"
+workflow_hook = HOME / "bin" / "agent-workflow-hook.py"
 item("~/.claude/settings.json", "ok" if (HOME / ".claude" / "settings.json").exists() else "MISSING")
 item("~/.claude/CLAUDE.md",
      "ok (contract present)" if file_has(claude_md, "Execution Contract") else "WARN: no Execution Contract section")
 item("~/.codex/config.toml", "ok" if codex_cfg.exists() else "MISSING")
 item("~/.codex/AGENTS.md",
      "ok (contract present)" if file_has(codex_agents, "Execution Contract") else "WARN: no Execution Contract section")
+item("~/bin/agent-workflow-hook.py", "ok" if workflow_hook.exists() else "MISSING")
+claude_workflow_hook = file_has(HOME / ".claude" / "settings.json", r"agent-workflow-hook\.py")
+codex_workflow_hook = (
+    file_has(codex_cfg, r"agent-workflow-hook\.py")
+    or file_has(HOME / ".codex" / "hooks.json", r"agent-workflow-hook\.py")
+)
+item(
+    "workflow hook registration",
+    f"claude={'ok' if claude_workflow_hook else 'MISSING'} "
+    f"codex={'ok' if codex_workflow_hook else 'MISSING'}",
+)
 try:
     mcp = len(re.findall(r"^\[mcp_servers\.", codex_cfg.read_text(encoding="utf-8", errors="replace"), re.M))
     item("codex MCP servers", mcp)
@@ -151,8 +180,11 @@ except OSError:
     pass
 for f in ("land", "fixloop", "converge"):
     cc = (HOME / ".claude" / "commands" / f"{f}.md").exists()
-    cx = (HOME / ".codex" / "prompts" / f"{f}.md").exists()
-    item(f"cmd /{f}", f"claude={'ok' if cc else 'MISSING'} codex={'ok' if cx else 'MISSING'}")
+    cx = codex_command_skill_status(f)
+    item(
+        f"cmd /{f}",
+        f"claude={'ok' if cc else 'MISSING'} codex_skill={cx}",
+    )
 if file_has(HOME / ".claude" / "settings.json", r'"skipDangerousModePermissionPrompt"\s*:\s*true'):
     item("skipDangerousPrompt",
          "WARN: true - dangerous-mode confirmations are skipped (weakens the only prompt-layer friction on scope drift)")
@@ -160,10 +192,18 @@ try:
     m = re.search(r'approvals_reviewer\s*=\s*"([^"]+)"', codex_cfg.read_text(encoding="utf-8", errors="replace"))
     if m:
         ar = m.group(1)
-        note = f"ok ({ar})" if ar in ("user", "auto_review") else (
-            f"WARN: '{ar}' is not in the documented value set (user/auto_review) - verify against official "
-            "Codex docs whether this reviewer actually runs; the AGENTS.md Guardian criteria only bind if the "
-            "approvals layer is live")
+        if ar in ("user", "auto_review"):
+            note = f"ok ({ar})"
+        elif ar == "guardian_subagent":
+            # Accepted legacy alias for auto_review per codex-rs config.schema.json;
+            # may be dropped in a future release.
+            note = ("ok (guardian_subagent - legacy alias of auto_review, still accepted; "
+                    "prefer migrating to auto_review)")
+        else:
+            note = (
+                f"WARN: '{ar}' is not in the documented value set (user/auto_review, legacy "
+                "guardian_subagent) - verify against official Codex docs whether this reviewer actually "
+                "runs; the AGENTS.md Guardian criteria only bind if the approvals layer is live")
         item("approvals_reviewer", note)
 except OSError:
     pass
@@ -174,13 +214,25 @@ repo = Path(os.environ.get("ASDF_REPO") or (HOME / "Desktop" / "asdf"))
 src_root = repo / "skills"
 
 
+# Interpreter build artifacts drift independently of the source and are not
+# distributed content, so they must not count toward source-vs-installed drift.
+_IGNORED_DIR_PARTS = {"__pycache__"}
+_IGNORED_SUFFIXES = (".pyc", ".pyo")
+
+
 def tree_hash(root: Path) -> str:
     h = hashlib.sha256()
     for f in sorted(root.rglob("*")):
+        if not f.is_file():
+            continue
         rel = f.relative_to(root).as_posix()
-        if f.is_file() and not any(part.startswith(".") for part in rel.split("/")):
-            h.update(rel.encode())
-            h.update(f.read_bytes())
+        parts = rel.split("/")
+        if any(p.startswith(".") or p in _IGNORED_DIR_PARTS for p in parts):
+            continue
+        if f.suffix in _IGNORED_SUFFIXES:
+            continue
+        h.update(rel.encode())
+        h.update(f.read_bytes())
     return h.hexdigest()
 
 

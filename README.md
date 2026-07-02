@@ -9,10 +9,12 @@ Skills are one component the loop calls; **the loop is the product**.
 
 ## The loop
 
-The work loop drives a task from intake to delivery — **judge scope → converge →
-land → verify → log** — so you step in at only two points (approve the plan,
-accept the result) and the middle runs itself under machine-checkable stop
-conditions (repeated failure, no-progress, iteration cap).
+The work loop drives a task from intake to delivery — **judge scope → converge
+only when needed → land → verify → log**. Its default is light: small and clear
+work moves straight to implementation with a checkable criterion. `/converge`
+is reserved for explicit requests, unresolved mechanism choices, or irreversible
+high-risk changes. Once you approve a plan, approval means execute; the loop
+does not add another planning gate unless new blocking evidence appears.
 
 ```bash
 python bootstrap/install.py        # distribute the loop to ~/.claude and ~/.codex
@@ -21,7 +23,7 @@ python ~/bin/agent-doctor.py        # post-install self-check (macOS/Linux: pyth
 
 - [`bootstrap/`](bootstrap/) — machine-level install: the work-loop + Execution
   Contract blocks, `/converge` `/land` `/fixloop` command templates, an
-  agent-doctor self-check, and an idempotent installer. Its
+  agent-doctor self-check, the optional `.agent-workflows` hook, and an idempotent installer. Its
   [README](bootstrap/README.md) documents the **new-requirement workflow**.
 - [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — the
   day-to-day playbook (six work families, loop starters, stop conditions).
@@ -49,7 +51,7 @@ distributed into runtimes as a *managed installed skill* — see
 ## Repository layout
 
 ```
-bootstrap/   # the loop: work-loop contract, command templates, doctor, installer
+bootstrap/   # the loop: work-loop contract, command templates, doctor, hook, installer
 skills/      # source skills the loop calls (one directory each)
 docs/        # loop-engineering playbook, execution-contract spec, design notes
 tests/       # repo-level contract tests for the installer, contracts, and skills

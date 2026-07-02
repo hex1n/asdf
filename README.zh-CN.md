@@ -8,9 +8,10 @@
 
 ## 工作循环
 
-工作循环把一个任务从接入推进到交付——**判规模 → 收敛 → 落地 → 验证 → 留痕**——
-你只在两个点介入（方案拍板、结果验收），中间在机器可查的判停条件下自驱
-（同错两次、无进展、迭代上限）。
+工作循环把一个任务从接入推进到交付——**判规模 → 必要时收敛 → 落地 → 验证 → 留痕**。
+默认档是轻量的：小而清楚的任务直接带判据落地；`/converge` 只用于显式要求、机制未收敛，
+或不可逆/高风险改动。你明确拍板后，拍板就是执行许可；除非出现新的硬阻塞，不再自动追加
+一轮方案流程。
 
 ```bash
 python bootstrap/install.py        # 把循环分发到 ~/.claude 与 ~/.codex
@@ -18,7 +19,8 @@ python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3�
 ```
 
 - [`bootstrap/`](bootstrap/) — 机器级安装：工作循环 + Execution Contract 契约块、
-  `/converge` `/land` `/fixloop` 命令模板、agent-doctor 自检、幂等安装器。
+  `/converge` `/land` `/fixloop` 命令模板、agent-doctor 自检、可选的 `.agent-workflows`
+  hook、幂等安装器。
   其 [README](bootstrap/README.md) 内含**接新需求的工作流程**。
 - [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — 日常打法
   手册（六类工作、循环启动语、判停条件）。
@@ -45,7 +47,7 @@ python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3�
 ## 仓库结构
 
 ```
-bootstrap/   # 循环本体：工作循环契约、命令模板、doctor、安装器
+bootstrap/   # 循环本体：工作循环契约、命令模板、doctor、hook、安装器
 skills/      # 循环调用的源技能（每个技能一个目录）
 docs/        # loop-engineering 手册、execution-contract 规范、设计笔记
 tests/       # 仓库级契约测试：安装器、契约一致性、技能结构

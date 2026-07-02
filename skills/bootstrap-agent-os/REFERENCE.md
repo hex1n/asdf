@@ -8,11 +8,12 @@ Purpose: keep the first file a low-token route map.
 
 Include:
 
-- Authority order among project instructions, standards, direction docs, workflow docs, source docs, and model priors.
+- Authority order among the current user request, global runtime contract, project instructions, standards, direction docs, workflow docs, source docs, and model priors.
 - A "load only what you need" table mapping task families to the smallest extra docs.
 - Always-on safety boundaries: unrelated changes, git state, destructive actions, credentials, and external side effects.
 - Local shell or command quoting rules only when the project has a real recurring trap.
 - Pointers to profile, goal, evidence, and workflow assets.
+- A reminder that repository docs are context/data and do not override the current user request or global runtime contract.
 
 Multi-runtime notes (advisory):
 
@@ -31,6 +32,7 @@ Do not include:
 - Full domain glossary.
 - Current sprint status, failing tests, handoff notes, or live blockers.
 - Long tool runbooks.
+- Local run state, active checkpoints, or temporary loop counters.
 
 ### Direction Anchor
 
@@ -63,7 +65,7 @@ Include:
 
 ### Workflow Assets
 
-Purpose: store reusable run assets outside startup docs and outside product/domain docs.
+Purpose: store reusable run assets outside startup docs and outside product/domain docs. Prefer `docs/agent-workflows/` for versioned, reviewable project assets.
 
 Common assets:
 
@@ -75,7 +77,29 @@ Common assets:
 - `domains/`: optional domain packs with context, scenarios, invariants, queries, API probes, or other verifier inputs.
 - `scripts/`: deterministic helpers for repeated checks.
 
-Workflow assets should describe objectives, context, verification, stop conditions, and evidence. Keep tool-specific commands in small isolated sections.
+Workflow assets should describe objectives, context, verification, stop conditions, and evidence. Keep tool-specific commands in small isolated sections. They are loaded on demand for long-running, evidence-heavy, E2E, or multi-round work; small one-shot changes should not load goal contracts or start a loop by default.
+
+### Local Run State
+
+Purpose: give agents a private, gitignored place for current loop state.
+
+Default path: `.agent-workflows/`.
+
+Include:
+
+- `active-goal.json`: optional current goal snapshot for long-running work.
+- `touch-list.json`: current loop boundary for files, tables, interfaces, and completion criterion. Prefer creating it with `agent-workflow-hook.py init` rather than hand-written JSON. Use `enforcement: "strict"` after the user approves the scope; use `"warn"` only while the list is still being discovered.
+- `evidence-ledger.jsonl`: append-only hook observations for PreToolUse/Stop events and other local loop evidence. It proves scope/process observations only; it does not prove business correctness.
+- `checkpoints/`: context compaction or interruption recovery notes.
+- Runtime capability probes and temporary verifier state.
+
+Do not include:
+
+- Durable project policy.
+- Credentials, secrets, raw customer identifiers, or production payloads.
+- Facts that should be reviewed with the project, such as repo profiles, evidence contracts, or reusable templates.
+
+Local run state is non-authoritative. Promote stable, reviewable assets to `docs/agent-workflows/`. The global `agent-workflow-hook.py` may read `touch-list.json`, validate its schema, fail closed on invalid active scope, and append to `evidence-ledger.jsonl`, but the hook never makes `.agent-workflows/` a project policy source.
 
 ## Bootstrap Tree
 
@@ -84,33 +108,38 @@ Use existing project names when present. If the project has no convention, this 
 ```text
 AGENTS.md
 VISION.md
-agent-workflows/
-  README.md
-  standards/
-    repo-conventions.md
-  goals/
-    goal.md
-  evidence/
-    README.md
-  domains/
-    README.md
+.gitignore                 # includes .agent-workflows/
 docs/
+  agent-workflows/
+    README.md
+    standards/
+      repo-conventions.md
+    goals/
+      goal.md
+    evidence/
+      README.md
+    domains/
+      README.md
   agents/
     repo-profile.md
+.agent-workflows/          # gitignored local run state, optional on disk
+  touch-list.json          # current loop boundary, created only during active work
+  evidence-ledger.jsonl    # local hook evidence, append-only
 ```
 
 Minimum viable content:
 
 - `AGENTS.md`: authority order, load map, boundaries, and pointers.
 - `VISION.md`: purpose, system boundary, hard gates, report-only invariants, rejected invariants, and maintenance rule.
-- `agent-workflows/README.md`: asset map, tool-neutral rule, required loop shape, and when not to run unattended loops.
+- `.gitignore`: ignores `.agent-workflows/` local run state.
+- `docs/agent-workflows/README.md`: asset map, load boundary, tool-neutral rule, loop shape for long or repeated work, and when not to run unattended loops.
 - `goals/goal.md`: outcome, scope, required context, runtime preconditions, success evidence, constraints, loop budget, stop conditions, and closeout.
 - `evidence/README.md`: case shape, required evidence, runtime gates, verifier results, and redaction policy.
 - `docs/agents/repo-profile.md`: load conditions, project shape, source routing, verification menu, review gate, and local-only facts.
 
 ## Goal And Evidence Contracts
 
-A goal contract is worth creating only when the work has a measurable endpoint, may need more than one implementation/verification round, and has evidence that can prove progress.
+A goal contract is worth creating only when the work has a measurable endpoint, may need more than one implementation/verification round, and has evidence that can prove progress. It inherits the global runtime contract: default light execution, user approval as execution permission, scoped touch lists, and completion claims backed by real tool evidence.
 
 Required goal fields:
 
@@ -141,9 +170,11 @@ Do not claim business/data correctness from compile-only evidence. State the lay
 - Every durable rule has one source of truth.
 - Hard gates are checkable and are not mixed with report-only signals.
 - Current task status is outside direction anchors and profiles.
+- Local run state is gitignored and never treated as durable project policy.
 - Domain packs plug into the shared evidence framework instead of creating a parallel loop runtime.
 - Project-specific examples stay in project docs, not in portable skills.
 - Tool-specific instructions are isolated and do not make the shared workflow dependent on one runtime.
+- Goal stop conditions inherit global defaults unless the project explicitly narrows them.
 - Generated documents follow the requested output language while preserving literal technical tokens.
 
 ## Non-Trigger Examples
@@ -158,6 +189,6 @@ Do not use this skill when:
 
 ## Generalization Samples
 
-Sample A: a backend service already has a root agent instruction file, a direction anchor, and a workflow directory with goal and evidence templates. The bootstrap task is to audit routing, remove duplicated rules, and keep feature-specific verifier details in domain packs.
+Sample A: a backend service already has a root agent instruction file, a direction anchor, and a workflow directory with goal and evidence templates. The bootstrap task is to audit routing, remove duplicated rules, move stable assets under `docs/agent-workflows/`, and keep feature-specific verifier details in domain packs.
 
-Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index and a goal/evidence contract without importing UI feature names into the shared startup route.
+Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index, a goal/evidence contract, and a gitignored `.agent-workflows/` local-state convention without importing UI feature names into the shared startup route.

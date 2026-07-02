@@ -3,7 +3,9 @@
 > 本手册回答一个问题：**在每天的实际工作中怎么用 loop engineering**。
 > 分析依据是对本机 782 个会话、4,597 条人工提示的全量分析（分析文档含真实业务语料，
 > 留在本机、不入公开仓）；量化基线可用 `docs/research/2026-07-02-analyze-sessions.py`
-> 重跑得到。P0 机制建设（阶段 gate / Touch 清单 / Execution Contract）另有落地方案，
+> 重跑得到。P0 机制建设已落入全局 Execution Contract、`/land`/`/fixloop` 模板，
+> 以及可选的 `agent-workflow-hook.py init/status/close` + `.agent-workflows/touch-list.json`
+> + `evidence-ledger.jsonl` 本地 hook 状态。
 > 本手册只讲"用法"。
 
 ---
@@ -18,23 +20,26 @@
 | **人肉判停器**：什么时候算完靠人看 | 70% 会话开场无完成判据 | 开场给可验证判据，代理拿判据自己判停 |
 | **人肉守卫**：越界了事后纠正 | 范围漂移占纠正的 ~40% | 约束前置（Touch 清单 + Execution Contract），越界即停 |
 
-**一句话用法**：每次开会话，把原来会话中途才给的东西——推进指令、完成判据、
-负向约束——全部搬到第一条消息里，然后让代理循环；人只在两个点出现：
-**方案拍板**和**最终验收**。
+**一句话用法**：默认轻量推进；把完成判据和负向约束尽量前置，能直接做就直接做。
+只有用户显式要求、机制未收敛，或不可逆/高风险改动时，才启动完整循环。用户拍板后，
+拍板就是执行许可，不再让流程反过来接管判断。
 
 ## 2. 六类实际工作的循环打法
 
 > 每个循环的三要素——机器可查的判据、Touch 清单、显式判停——与项目无关，
 > 已作为"工作循环"随 `bootstrap/install.py` 全局分发（见
-> [docs/execution-contract.md](execution-contract.md)），在任意项目零配置生效。
+> [docs/execution-contract.md](execution-contract.md)），在任意项目零配置生效。仓库存在
+> `.agent-workflows/` 时，Touch 清单还会通过 `agent-workflow-hook.py init` 落成机器可读的
+> `touch-list.json`，hook 证据写入 `evidence-ledger.jsonl`。ledger 只证明范围/过程，
+> 不证明业务正确性。
 
 ### 2.1 需求落地（业务代码仓库）
 
 - 旧模式：grill → 方案 → 落地 → "审查一下" → "fix" → "继续" → 部署 → 验证，
   每步人工推一次，20+ 轮交互。
-- 新模式：方案拍板后发一条 **落地循环启动语**（见第 3 节）。
+- 新模式：方案拍板后直接落地；需要长循环时再发一条 **落地循环启动语**（见第 3 节）。
   循环体 = 改 → 跑测试 → 子代理审查 → 修；判停 = 测试全绿 + 审查无新缺口；
-  中途不回来找人。人工交互降到 2-3 轮。
+  中途只在清单外触碰、判据不可达、新硬阻塞时回来找人。
 
 ### 2.2 排查 / 数据修复
 
@@ -48,8 +53,8 @@
 ### 2.3 方案收敛
 
 - 旧模式："还有更好的方案吗"串行问 2-3 轮（人工模拟退火，语料中 99 次探针）。
-- 新模式：一次并行。开场即要求"给方案后并行开 coherence / feasibility /
-  scope / adversarial 四个只读视角审它，吸收后给终版"。
+- 新模式：按需并行。只有机制未收敛或高风险时，要求"给方案后并行开 coherence /
+  feasibility / scope / adversarial 中最相关的 2-4 个只读视角审它，吸收后给终版"。
   串行 N 轮压成并行 1 轮，人只对终版拍板。
 
 ### 2.4 E2E 验证
@@ -67,9 +72,10 @@ executor 的输出接回修复环，而不是接回人。
   产出改进建议清单，人做周会式批量拍板。
 - 改动仍走已验证的三段式：改 → 独立证伪子代理 → 复查，
   直到"独立反证未找到剩余缺口"。
-- Claude Code v2.1.59+ 的原生 auto memory（会话内自动写入项目 MEMORY.md）是元循环的
-  **候选池**而非直接采信源：月度自审时先过一遍近期项目的 MEMORY.md，高频模式当
-  Rule Harvest Gate 的候选处理（仅 Claude 单端生效，Codex 无对应机制）。
+- Claude Code v2.1.59+ 的原生 auto memory（会话内自动写入项目 MEMORY.md）与 Codex 的
+  内置 memories（后台整合已完成会话，写入 `~/.codex/memories/MEMORY.md`，需在
+  config.toml `[features] memories = true` 开启）都是元循环的**候选池**而非直接采信源：
+  月度自审时两端各过一遍近期记忆，高频模式当 Rule Harvest Gate 的候选处理。
 
 ### 2.6 环境运维（当前占 ~10-15% 会话）
 
@@ -92,6 +98,7 @@ CLI 升级、进程残留、代理配置做成 doctor 自检脚本 + runbook；
 ```text
 按这个方案落地。Touch 清单：<文件/表清单>。
 完成判据：<测试命令> 全绿 + 行为等价（<老场景> 结果不变）。
+若仓库有 .agent-workflows/，先用 agent-workflow-hook.py init 写入 touch-list.json。
 循环执行：改 → 测 → 自审 → 修，直到判据满足才回来找我。
 中途不要问我，除非需要触碰清单外的文件/表——那种情况立即停下确认。
 ```
@@ -107,8 +114,8 @@ CLI 升级、进程残留、代理配置做成 doctor 自检脚本 + runbook；
 **方案收敛**（替代串行的"还有更好的方案吗"）：
 
 ```text
-先不 coding。给出方案后，并行开 4 个只读子代理从 coherence / feasibility /
-scope / adversarial 四个视角独立审查，吸收所有确认的问题后给终版。
+先不 coding。给出方案后，并行开 2-4 个只读子代理从 coherence / feasibility /
+scope / adversarial 中最相关的视角独立审查，吸收所有确认的问题后给终版。
 终版直接给我 2-3 个编号选项和你的推荐。
 ```
 
@@ -126,9 +133,9 @@ scope / adversarial 四个视角独立审查，吸收所有确认的问题后给
 
 | 阶段 | 动作 | 成本 |
 |---|---|---|
-| 本周 | 启用三条启动语；每个新会话第一条消息带完成判据 | 零 |
-| 下一步 | 落地 P0 三件套：阶段硬 gate、Touch 清单交接物、Execution Contract 章节 | 约半天 |
-| 之后 | P1 工装（报文-SQL 回归 diff、doctor 脚本）；P2 定时化（元循环 cron、恢复 weekly automation） | 逐个推进 |
+| 本周 | 默认轻量推进；只给需要循环的任务贴启动语；新会话尽量带完成判据 | 零 |
+| 已落地 | P0 三件套：阶段 gate、Touch 清单交接物、Execution Contract 章节；有 `.agent-workflows/` 时启用 hook 记账/拦截 | 已完成 |
+| 之后 | P1 工装（报文-SQL 回归 diff、doctor 扩展）；P2 定时化（元循环 cron、恢复 weekly automation） | 逐个推进 |
 
 P2 定时化的可执行形态：Claude 端 `claude -p "跑 docs/research/2026-07-02-analyze-sessions.py
 并把 loop-health 变化写进月报"` 挂系统计划任务，或 Codex 端 automations（standalone 型）。

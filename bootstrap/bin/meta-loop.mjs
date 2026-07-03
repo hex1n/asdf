@@ -11,7 +11,10 @@
 //
 // Private session corpus (loop-health.txt, corrections.txt) stays gitignored
 // under docs/research/; only neutral, reviewable candidates and decisions live
-// here. node:* builtins only (Node 18+), matching agent-loop.mjs.
+// here. Sanitization is operator-enforced, not CLI-enforced: enqueue writes
+// --evidence verbatim, so whoever enqueues is responsible for keeping secrets,
+// private paths, and personal data out of the git-tracked backlog.
+// node:* builtins only (Node 18+), matching agent-loop.mjs.
 //
 // One fresh-context iteration:
 //     meta-loop.mjs next            # claim the next unit or "none"
@@ -223,6 +226,12 @@ function cmdResolve(v) {
   if (!row) {
     process.stderr.write(`no candidate ${v.id}\n`);
     return 1;
+  }
+  // Terminal decisions need an audit trail: accept/reject without a round note
+  // is an unexplained verdict, the same leak the loop's amend --reason closes.
+  if ((v.decision === "accept" || v.decision === "reject") && !String(v.note ?? "").trim()) {
+    process.stderr.write(`${v.decision} requires --note <round note path or reason>\n`);
+    return 2;
   }
   row.status = DECISION_TO_STATUS[v.decision];
   row.decision = v.decision;

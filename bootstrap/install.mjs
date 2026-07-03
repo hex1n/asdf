@@ -29,6 +29,14 @@ const LEGACY_HOOK_MARKERS = [
 const ACTIONS = [];
 const WORKFLOW_SKILLS = ["converge", "fixloop", "land", "loop"];
 const LOOP_HOOK_RE = /agent-(?:workflow-hook|loop)\.(?:py|mjs)/i;
+// The Stop gate re-runs the done-when criterion, which is budgeted
+// CRITERION_TIMEOUT_SECONDS (300) inside bin/agent-loop.mjs. The runtime's
+// outer hook timeout must exceed that budget or the runtime kills the gate
+// mid-verdict on any real test suite (Claude Code's default hook timeout is
+// 60s; the Codex TOML previously said 30s). 330 = criterion budget + slack.
+// tests/bootstrap_install.test.mjs locks this against the runtime constant.
+const STOP_HOOK_TIMEOUT_SECONDS = 330;
+const PRETOOL_HOOK_TIMEOUT_SECONDS = 30;
 const LEGACY_WORKFLOW_HASHES = {
   claude: {
     converge: new Set(["36ac6f3314effe80c8790c2297fda6c03f9b15cbac6eec2c1083e6ad05f5b648"]),
@@ -192,12 +200,12 @@ function pruneWorkflowHookGroups(groups) {
   return next;
 }
 
-function addClaudeHook(settings, event, matcher, command) {
+function addClaudeHook(settings, event, matcher, command, timeoutSeconds) {
   settings.hooks ??= {};
   settings.hooks[event] = pruneWorkflowHookGroups(settings.hooks[event]);
   settings.hooks[event].push({
     matcher,
-    hooks: [{ type: "command", command }],
+    hooks: [{ type: "command", command, timeout: timeoutSeconds }],
   });
 }
 
@@ -215,8 +223,8 @@ function configureClaudeHooks(dry) {
     }
   }
   const command = workflowHookCommand();
-  addClaudeHook(settings, "PreToolUse", "Write|Edit|MultiEdit|Bash|PowerShell|mcp__.*", command);
-  addClaudeHook(settings, "Stop", "*", command);
+  addClaudeHook(settings, "PreToolUse", "Write|Edit|MultiEdit|Bash|PowerShell|mcp__.*", command, PRETOOL_HOOK_TIMEOUT_SECONDS);
+  addClaudeHook(settings, "Stop", "*", command, STOP_HOOK_TIMEOUT_SECONDS);
   const next = JSON.stringify(settings, null, 2) + "\n";
   writeTextIfChanged(target, next, dry);
   if (!dry && hadTarget && original !== next) {
@@ -356,7 +364,7 @@ function managedCodexHookBlock() {
     '[[hooks.PreToolUse.hooks]]',
     'type = "command"',
     `command = ${commandToml}`,
-    'timeout = 30',
+    `timeout = ${PRETOOL_HOOK_TIMEOUT_SECONDS}`,
     'statusMessage = "Checking agent loop run contract"',
     '',
     '[[hooks.Stop]]',
@@ -365,7 +373,7 @@ function managedCodexHookBlock() {
     '[[hooks.Stop.hooks]]',
     'type = "command"',
     `command = ${commandToml}`,
-    'timeout = 30',
+    `timeout = ${STOP_HOOK_TIMEOUT_SECONDS}`,
     'statusMessage = "Checking agent loop stop gate"',
     HOOK_END,
     '',

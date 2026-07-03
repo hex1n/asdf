@@ -68,7 +68,8 @@ amend fixes the target, it does not buy more iterations; re-init resets budget.
 Changing the criterion by direct file edit still works but is flagged at the
 next stop as an unrecorded goalpost move: the machine cannot judge whether the
 change is legitimate, only that "defining green" and "passing green" stayed
-separable and auditable.
+separable and auditable. Drift is only checked in `warn`/`strict` enforcement;
+`off` observes nothing, including moved goalposts.
 
 ## Terminal States
 

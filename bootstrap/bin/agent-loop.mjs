@@ -1495,12 +1495,17 @@ function cmdInit(values) {
   // intent with --allow-green-init. A non-executable criterion is not judged
   // here; the stop gate degrades on it at run time.
   const timeoutSec = intField(values["criterion-timeout-seconds"], CRITERION_TIMEOUT_SECONDS);
+  // Persist the budget so the Stop gate uses the same timeout as this init
+  // check — checkStop reads criterion_timeout_seconds from the run contract.
+  data.criterion_timeout_seconds = timeoutSec;
   const initVerdict = runCriterion(data.criterion, repo, timeoutSec);
   data.evidence.init_criterion = {
     verdict: initVerdict.verdict,
     exit: initVerdict.exit ?? null,
     checked_at: now,
     allow_green_init: Boolean(values["allow-green-init"]),
+    // An intentionally-green start is an exception; exceptions carry reasons.
+    ...(values["allow-green-init"] ? { reason: String(values.reason ?? "").trim() } : {}),
   };
   // Freeze the criterion baseline so a later goalpost move is recordable.
   data.criterion_hash = criterionHash(data.criterion);
@@ -1526,6 +1531,7 @@ function cmdInit(values) {
     evidence_kind: "loop_runtime",
     repo: String(repo),
     init_criterion: initVerdict.verdict,
+    ...(values["allow-green-init"] ? { green_init_reason: String(values.reason ?? "").trim() } : {}),
     ...(values.steal ? { reason: `stolen: ${values.reason}`, previous_session_id: ownerSessionId(existing) || null } : {}),
   });
   process.stdout.write(`created ${file}\n`);
@@ -1846,6 +1852,9 @@ function runCli(command, argv) {
     }
     if ((values["git-allowed"] ?? []).length && !String(values["git-reason"] ?? "").trim()) {
       return cliError("--git-reason is required when --git-allowed is used");
+    }
+    if (values["allow-green-init"] && !String(values.reason ?? "").trim()) {
+      return cliError("--allow-green-init requires --reason <why a green start is intentional>");
     }
     return cmdInit(values);
   }

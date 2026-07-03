@@ -19,6 +19,12 @@ Only **neutral, reviewable** candidates enter the tracked backlog — sanitize
 failure-mode wording before `enqueue` (Generalization Gate: no source-project
 identifiers). The raw corpus stays gitignored.
 
+Sanitization is **operator-enforced, not CLI-enforced**: `enqueue` writes
+`--failure`/`--evidence` verbatim into the git-tracked backlog with no secret or
+identifier scanning, so whoever enqueues owns keeping private data out. Terminal
+decisions are audit-enforced: `resolve --decision accept|reject` refuses to run
+without `--note`.
+
 ## One iteration (fresh context each time)
 
 The driver reads the backlog to find its single unit of work, does exactly that

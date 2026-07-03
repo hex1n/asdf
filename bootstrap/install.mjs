@@ -511,6 +511,7 @@ function main() {
   copyFile(path.join(REPO, "bootstrap", "bin", "agent-doctor.mjs"), path.join(HOME, "bin", "agent-doctor.mjs"), dry);
   copyFile(path.join(REPO, "bootstrap", "bin", "agent-loop.mjs"), path.join(HOME, "bin", "agent-loop.mjs"), dry);
   copyFile(path.join(REPO, "bootstrap", "bin", "meta-loop.mjs"), path.join(HOME, "bin", "meta-loop.mjs"), dry);
+  copyFile(path.join(REPO, "bootstrap", "bin", "e2e-report-check.mjs"), path.join(HOME, "bin", "e2e-report-check.mjs"), dry);
   configureClaudeHooks(dry);
   configureCodexHooks(dry);
   configureCodexHooksJson(dry);

@@ -39,6 +39,20 @@ strict mode refuses `init` because the criterion cannot discriminate "done" from
 "not started". Declare an intentional already-green loop (noop verify,
 keep-green regression guard) with `--allow-green-init --reason <why>`.
 
+When the done-when is an E2E result, do not make the criterion re-run the
+executor — the Stop gate re-runs its criterion on every stop. Let the loop body
+run the executor once, then point the criterion at the report:
+
+```text
+node ~/bin/e2e-report-check.mjs --report <execution-report.md> --require-passed <ids> --build <artifact>
+```
+
+It is read-only and idempotent: exit 0 when the required scenarios passed on the
+current build, 1 on a scenario failure or a missing required scenario, 2 on a
+stale report (its loaded-build fingerprint differs from the current build),
+absent/malformed report, or unverifiable freshness. Pass `--no-freshness` only
+when there is no build artifact to fingerprint.
+
 Abandoned state does not trap Stop, but write operations still require `close`,
 `steal`, or a separate worktree. Take over only with:
 

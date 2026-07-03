@@ -1,0 +1,47 @@
+name: tests
+
+# Enforce the repo's anti-drift contract tests on every change. The bootstrap
+# installer/doctor and agent loop hook are Node; remaining skill/contract suites
+# use Python stdlib unittest, so CI provisions both runtimes.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unittest:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Show runtime versions
+        run: |
+          python --version
+          node --version
+
+      - name: Node bootstrap contract tests
+        run: node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs tests/e2e_report_check.test.mjs
+
+      - name: Python repo-level contract tests
+        run: python -m unittest discover -s tests
+
+      - name: Per-skill tests (java-stack-craft)
+        run: python -m unittest discover -s skills/java-stack-craft/tests

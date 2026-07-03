@@ -11,19 +11,20 @@ Skills are one component the loop calls; **the loop is the product**.
 
 The work loop drives a task from intake to delivery — **judge scope → converge
 only when needed → land → verify → log**. Its default is light: small and clear
-work moves straight to implementation with a checkable criterion. `/converge`
-is reserved for explicit requests, unresolved mechanism choices, or irreversible
-high-risk changes. Once you approve a plan, approval means execute; the loop
-does not add another planning gate unless new blocking evidence appears.
+work moves straight to implementation with a checkable criterion. The
+`converge` skill is reserved for explicit requests, unresolved mechanism
+choices, or irreversible high-risk changes. Once you approve a plan, approval
+means execute; the loop does not add another planning gate unless new blocking
+evidence appears.
 
 ```bash
-python bootstrap/install.py        # distribute the loop to ~/.claude and ~/.codex
-python ~/bin/agent-doctor.py        # post-install self-check (macOS/Linux: python3)
+node bootstrap/install.mjs         # distribute the loop to ~/.claude and ~/.codex
+node ~/bin/agent-doctor.mjs         # post-install self-check
 ```
 
 - [`bootstrap/`](bootstrap/) — machine-level install: the work-loop + Execution
-  Contract blocks, `/converge` `/land` `/fixloop` command templates, an
-  agent-doctor self-check, the optional `.agent-workflows` hook, and an idempotent installer. Its
+  Contract blocks, agent-doctor self-check, optional `.agent-loop` hook,
+  and an idempotent installer. Its
   [README](bootstrap/README.md) documents the **new-requirement workflow**.
 - [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — the
   day-to-day playbook (six work families, loop starters, stop conditions).
@@ -39,6 +40,10 @@ distributed into runtimes as a *managed installed skill* — see
 
 | Skill | Loop stage | Purpose |
 | --- | --- | --- |
+| [`converge`](skills/converge/) | converge | Planning-only convergence for explicit or high-risk unresolved decisions. |
+| [`land`](skills/land/) | land | Approved implementation loop: Goal, run contract, Done when, change, verify, review, stop. |
+| [`fixloop`](skills/fixloop/) | land/verify | Reproduce-driven diagnose-fix loop for live failures and failing checks. |
+| [`loop`](skills/loop/) | driver | Self-driving loop driver that runs until a machine-checkable criterion reaches a terminal state. |
 | [`first-principles-planner`](skills/first-principles-planner/) | converge | Reframe the root problem and return the current-best plan with failure conditions. |
 | [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
 | [`java-stack-craft`](skills/java-stack-craft/) | land | Write and review Java/Spring code with profile detection, quality gates, and the landing-contract loop discipline. |
@@ -48,11 +53,14 @@ distributed into runtimes as a *managed installed skill* — see
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
 | [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | new project | Generate a project-level operating layer (startup route, direction anchor, repo profile, goal loop) so the loop works in a fresh repo. |
 
+`skills/workflow-core/` is a shared support directory for the workflow skills,
+not an invocable skill.
+
 ## Repository layout
 
 ```
-bootstrap/   # the loop: work-loop contract, command templates, doctor, hook, installer
-skills/      # source skills the loop calls (one directory each)
+bootstrap/   # machine install: work-loop contract, doctor, hook, installer
+skills/      # source skills and non-invocable support directories
 docs/        # loop-engineering playbook, execution-contract spec, design notes
 tests/       # repo-level contract tests for the installer, contracts, and skills
 AGENTS.md    # skill-authoring and maintenance conventions
@@ -66,17 +74,20 @@ demand, and optional `scripts/` and `tests/`.
 
 ## Testing
 
-Tests use the Python standard library `unittest` — no third-party dependencies required.
+Tests use Node's built-in `node:test` for bootstrap runtime scripts and Python
+standard-library `unittest` for the remaining repository and skill contracts.
+No third-party dependencies are required. CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml))
+runs the full suite on every push and pull request with both runtimes provisioned.
 
 ```bash
-# Repo-level contract tests (installer, contract parity, skill structure)
-python3 -m unittest discover -s tests
+# Node bootstrap contract tests (installer, doctor)
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs
+
+# Python repo-level contract tests (contract parity, skill structure)
+python -m unittest discover -s tests
 
 # A single skill's tests
-python3 -m unittest discover -s skills/java-stack-craft/tests
-
-# Everything (pytest also works if installed)
-python3 -m pytest
+python -m unittest discover -s skills/java-stack-craft/tests
 ```
 
 ## Contributing

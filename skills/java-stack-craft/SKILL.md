@@ -3,7 +3,7 @@ name: java-stack-craft
 description: >
   Writes and reviews Java stack code by detecting JDK/Spring profile, matching local conventions, and applying Java/Spring quality gates.
   Use when writing, editing, refactoring, reviewing, or landing an accepted plan into Java stack code in Maven, Gradle, or Spring Boot projects — including 写/重构/审查 Java 代码, 按计划落地 Java 改动, 根据计划实现 Java/Spring 改动, 根据方案实现 Java/Spring 改动, Spring Boot 接口/服务, Java 并发, JDK 兼容性, 依赖注入, 事务, 优化 Java/Spring 项目 requests — especially when JDK compatibility, Spring conventions, dependency injection, concurrency, tests, or application architecture quality matter.
-  Do not use for pure planning, architecture/design discussion, feasibility research, or non-Java implementation unless the task includes writing or reviewing Java stack code; for live JVM incidents use diagnose, and for pure what-is-true system investigation use deep-research.
+  Do not use for pure planning, architecture/design discussion, feasibility research, or non-Java implementation unless the task includes writing or reviewing Java stack code; for live JVM incidents use the fixloop diagnose-fix skill, and for pure what-is-true system investigation use deep-research.
 ---
 
 # Java Stack Craft

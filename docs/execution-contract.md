@@ -15,7 +15,9 @@
 |---|---|---|
 | `~/.claude/CLAUDE.md` | 工作循环 + 契约（中文块） | Claude Code 全局，任意项目生效 |
 | `~/.codex/AGENTS.md` | 工作循环 + 契约（bullet 块） | Codex 全局，任意项目生效 |
-| `~/bin/agent-workflow-hook.py` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-workflows/` 时，按 `touch-list.json` 记录或拦截写目标，并写入 `evidence-ledger.jsonl`；CLI 提供 `init/status/validate/close` |
+| `~/.claude/skills/`、`~/.codex/skills/` | source skills + support dirs | `converge`、`land`、`fixloop`、`loop` 由 `skills/` 下的 source skill 分发；`skills/workflow-core/` 是无 `SKILL.md` 的共享支持目录，不可触发 |
+| `~/bin/agent-loop.mjs` | PreToolUse/Stop hook + CLI | 仓库存在 `.agent-loop/` 时，按 v2 `run-contract.json` runtime contract 记录或拦截写目标，并写入 `loop-events.jsonl`；active run contract 绑定首个会话，跨会话共享同一工作目录会被拦截；Stop 时执行 `criterion` 做判停机器裁决（判据闸门：strict 未通过不放行；判据通过才进入 `terminal_state=success`；无需改动为 `noop`；缺外部输入为 `blocked`；重复无进展为 `stalled`；预算耗尽为 `exhausted`；遗弃状态不会卡住 Stop，但写操作仍需 `close`、`steal` 或独立 worktree）；git 写操作需先创建或更新 run contract 显式授权和预算；同一 worktree 多 session 需用 `claim` 显式进入 `partitioned`；CLI 提供 `init/claim/status/validate/close` |
+| `~/bin/meta-loop.mjs` | 元循环待办 CLI | 文件态 skill 演化循环：`docs/meta-loop/backlog.jsonl`（脱敏可评审）+ `rounds/`，`next` 单槽认领、`resolve` 记决策，每轮 fresh context。协议见 [docs/meta-loop/README.md](meta-loop/README.md) |
 
 项目级**不在本仓分发**：差异条目进各项目自己的启动文件（AGENTS.md / CLAUDE.md 的
 Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层时用 bootstrap-agent-os
@@ -41,17 +43,30 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 
 ```markdown
 - Preserve run/test data by default; capture the diagnostic scene before any cleanup.
-- Before landing a plan, restate the touch list (target repo/working directory plus
+- Before landing a plan, restate the run contract (target repo/working directory plus
   files, tables, interfaces); stop and confirm before touching anything outside it.
-- If the repo has `.agent-workflows/`, mirror the active touch list into
-  `.agent-workflows/touch-list.json` with `agent-workflow-hook.py init` and use
-  `.agent-workflows/evidence-ledger.jsonl` as local hook evidence; this state is
-  gitignored and non-authoritative. The ledger proves scope/process observations
-  only, not business correctness.
+- If the repo has `.agent-loop/`, mirror the active run contract into
+  `.agent-loop/run-contract.json` v2 runtime contract with
+  `agent-loop.mjs init` and use `.agent-loop/loop-events.jsonl`
+  as local hook evidence; this state is gitignored and non-authoritative. The
+  event log proves scope/process observations only, not business correctness. A
+  stale run contract will not trap Stop, but write operations still require
+  `close`, `steal`, or a separate worktree.
+- Do not run two active writer loops in the same worktree by default: the active
+  run contract binds the first session. Use a separate git worktree, deliberately
+  take over with `init --force --steal --reason <why>`, or only when explicitly
+  requested use `agent-loop.mjs claim` to enter `partitioned` mode with
+  non-overlapping file claims and a single integrator session.
+- Only run git add/commit/push/reset/restore/checkout/clean after the user asks
+  for that operation; before running it, create or update the active run contract
+  with `--git-allowed <op>`, `--git-reason <why>`, and enough git budget.
 - Treat explicit user approval as execution permission; do not add another
   convergence/planning gate unless new blocking evidence appears.
 - Completion claims must cite real tool output, status/diff, command output, or
   SQL assertions; failed or skipped tools cannot support success claims.
+- Keep terminal states explicit: `success` and `noop` are normal closures;
+  `blocked`, `stalled`, and `exhausted` are not success and require a resumable
+  state snapshot.
 - If a landing or debugging task lacks a machine-checkable completion criterion
   (test command, SQL assertion, expected response), ask for one before editing;
   a trivial single-file change with no data/interface impact may use a one-line
@@ -69,16 +84,33 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
 
 - 新增规则先进本文件，写明语料证据，再分发；分发后用冷启动会话做证伪验证
   （不重申约束，诱导违规，观察默认行为）。
-- 与 slash 模板（[bootstrap/commands/](../bootstrap/commands/)）里的循环契约保持同义：
-  模板是"每次任务显式声明"，本契约是"不声明时的默认值"；默认档必须保持轻量，
-  不把 `/converge` 变成用户拍板后的隐式回退步骤。
-- 机器可读运行状态只落在目标仓库的 `.agent-workflows/`：`touch-list.json`
-  是当前循环的文件/表/接口边界，`evidence-ledger.jsonl` 是 hook 观察到的工具证据。
+- 与 workflow skills（[skills/converge](../skills/converge/)、[skills/land](../skills/land/)、
+  [skills/fixloop](../skills/fixloop/)、[skills/loop](../skills/loop/)）里的循环契约保持同义：
+  skills 是"每次任务显式声明"，本契约是"不声明时的默认值"；默认档必须保持轻量，
+  不把 `converge` skill 变成用户拍板后的隐式回退步骤。
+- 机器可读运行状态只落在目标仓库的 `.agent-loop/`：v2 `run-contract.json`
+  是当前循环的单一 runtime contract，承载
+  `goal/criterion/touch/budget/session/terminal_state/evidence/review/concurrency`；
+  旧 v1 清单不兼容，需重新 `init`。`loop-events.jsonl` 是 hook 观察到的工具证据。
   它们是 gitignored 的 agent 私有状态，不替代 `docs/agent-workflows/` 里的可评审资产；
-  ledger 只能支撑范围/过程声明，不能替代测试、SQL、API 响应、diff 等业务验证证据。
-- 用户级分发由 [bootstrap/install.py](../bootstrap/install.py) 自动完成（合同块以标记
-  幂等合并；机器可读源在 [bootstrap/contract/](../bootstrap/contract/)）；业务仓库的
-  项目级条目走各仓库 git，不由安装器分发。
+  event log 只能支撑范围/过程声明，不能替代测试、SQL、API 响应、diff 等业务验证证据。
+- 用户级分发由 [bootstrap/install.mjs](../bootstrap/install.mjs) 自动完成（合同块以标记
+  幂等合并；机器可读源在 [bootstrap/contract/](../bootstrap/contract/)；PreToolUse/Stop
+  hook 写入 `~/.claude/settings.json` 与 `~/.codex/config.toml` 并替换旧入口；旧
+  `.claude/commands/{converge,land,fixloop,loop}.md` 与
+  `.agents/skills/{converge,land,fixloop,loop}/SKILL.md` 受管 wrapper 会被清理；旧
+  `~/.codex/hooks.json` 中的 agent loop hook 会被移除）；业务仓库的项目级条目走各仓库 git，
+  不由安装器分发。
+- **判据闸门的威胁模型边界**：判据闸门（Stop hook 执行 `criterion`）是**协作式 agent 的机器兜底**，
+  防的是"看着像完成了就想停"这类无意提前判停——红判据会真的拦住、失败输出回注，判据通过才
+  写入 `terminal_state=success`；无需改动写入 `noop`；缺外部输入写入 `blocked`；重复无进展写入
+  `stalled`；预算耗尽写入 `exhausted`；非成功终态要求可续跑快照。它**不是**对抗性防线：`.agent-loop/` 是 agent 的合法工作区
+  （run contract 本就靠 CLI 写入其中），所以一个刻意规避的 agent 能用普通被许可的写操作改
+  `status`/`enforcement`/`criterion`、抬高计数器、删除 run contract 或清空未签名的 event log，
+  从而在真实判据仍红时放行——这类绕过超出本 hook 的能力范围，需要签名/树外状态才能防，
+  本仓不做。闸门与 event log 的定位同源：证明协作过程，不证明业务正确、也不防篡改。降级永不困死
+  （状态不可解析/判据不可执行/超时/写盘失败一律放行）。会话绑定只防**遗弃 run contract 误伤 Stop**；
+  写操作仍由 PreToolUse 的会话绑定拦截，需要 `close`、`steal` 或独立 worktree，不防同会话内的主动改写。
 - **Guardian 准则的生效边界**：写在 `~/.codex/AGENTS.md` 的"Guardian 审批准则"面向
   主代理自律；要让审批代理机制化拦截，还需在 `config.toml` 的审批配置侧接入
   （官方文档口径的 reviewer 取值/`[auto_review].policy`）——机器级配置不由本仓分发，

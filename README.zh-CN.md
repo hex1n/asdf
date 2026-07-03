@@ -9,18 +9,17 @@
 ## 工作循环
 
 工作循环把一个任务从接入推进到交付——**判规模 → 必要时收敛 → 落地 → 验证 → 留痕**。
-默认档是轻量的：小而清楚的任务直接带判据落地；`/converge` 只用于显式要求、机制未收敛，
-或不可逆/高风险改动。你明确拍板后，拍板就是执行许可；除非出现新的硬阻塞，不再自动追加
-一轮方案流程。
+默认档是轻量的：小而清楚的任务直接带判据落地；`converge` skill 只用于显式要求、
+机制未收敛，或不可逆/高风险改动。你明确拍板后，拍板就是执行许可；除非出现新的
+硬阻塞，不再自动追加一轮方案流程。
 
 ```bash
-python bootstrap/install.py        # 把循环分发到 ~/.claude 与 ~/.codex
-python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3）
+node bootstrap/install.mjs         # 把循环分发到 ~/.claude 与 ~/.codex
+node ~/bin/agent-doctor.mjs         # 安装后自检
 ```
 
 - [`bootstrap/`](bootstrap/) — 机器级安装：工作循环 + Execution Contract 契约块、
-  `/converge` `/land` `/fixloop` 命令模板、agent-doctor 自检、可选的 `.agent-workflows`
-  hook、幂等安装器。
+  agent-doctor 自检、可选的 `.agent-loop` hook、幂等安装器。
   其 [README](bootstrap/README.md) 内含**接新需求的工作流程**。
 - [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — 日常打法
   手册（六类工作、循环启动语、判停条件）。
@@ -35,6 +34,10 @@ python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3�
 
 | 技能 | 循环阶段 | 用途 |
 | --- | --- | --- |
+| [`converge`](skills/converge/) | 收敛 | 显式或高风险未收敛决策的只读方案收敛。 |
+| [`land`](skills/land/) | 落地 | 已拍板实现循环：Goal、run contract、Done when、改、验、审、判停。 |
+| [`fixloop`](skills/fixloop/) | 落地/验证 | 面向真实失败和红色检查的复现驱动诊断修复循环。 |
+| [`loop`](skills/loop/) | 驱动器 | 自驱循环驱动器，围绕机器可查判据运行到明确终态。 |
 | [`first-principles-planner`](skills/first-principles-planner/) | 收敛 | 重构根本问题，给出当前最佳方案及其失效条件。 |
 | [`deep-research`](skills/deep-research/) | 收敛 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`java-stack-craft`](skills/java-stack-craft/) | 落地 | 识别 JDK/Spring profile、匹配本地约定地编写与审查 Java/Spring 代码，含落地契约循环纪律。 |
@@ -44,11 +47,13 @@ python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3�
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
 | [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | 新项目 | 生成项目级操作层（启动路由、方向锚点、repo profile、goal loop），让循环在全新 repo 生效。 |
 
+`skills/workflow-core/` 是 workflow skills 的共享支持目录，不是可触发技能。
+
 ## 仓库结构
 
 ```
-bootstrap/   # 循环本体：工作循环契约、命令模板、doctor、hook、安装器
-skills/      # 循环调用的源技能（每个技能一个目录）
+bootstrap/   # 机器安装：工作循环契约、doctor、hook、安装器
+skills/      # 源技能与不可触发支持目录
 docs/        # loop-engineering 手册、execution-contract 规范、设计笔记
 tests/       # 仓库级契约测试：安装器、契约一致性、技能结构
 AGENTS.md    # 技能编写与维护约定
@@ -61,17 +66,19 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 ## 测试
 
-测试使用 Python 标准库 `unittest`，无需第三方依赖。
+bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能契约使用 Python 标准库
+`unittest`；无需第三方依赖。CI（[`.github/workflows/tests.yml`](.github/workflows/tests.yml)）
+在每次 push 与 pull request 上以 Node + Python 双运行时跑全量测试。
 
 ```bash
-# 仓库级契约测试（安装器、契约一致性、技能结构）
-python3 -m unittest discover -s tests
+# Node bootstrap 契约测试（安装器、doctor）
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs
+
+# Python 仓库级契约测试（契约一致性、技能结构）
+python -m unittest discover -s tests
 
 # 单个技能的测试
-python3 -m unittest discover -s skills/java-stack-craft/tests
-
-# 全部（已安装 pytest 时也可用）
-python3 -m pytest
+python -m unittest discover -s skills/java-stack-craft/tests
 ```
 
 ## 参与贡献

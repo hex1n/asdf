@@ -1175,14 +1175,26 @@ function outputTail(text, limit = 2000) {
 // changed signature means the loop moved and the stall counter resets. FNV-1a
 // over exit + tail keeps this deterministic across platforms without importing
 // a hash module.
-function failureSignature(exit, tail) {
-  const input = `${exit ?? "n/a"} ${String(tail ?? "")}`;
+function fnv1aHex(input) {
+  const s = String(input ?? "");
   let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i += 1) {
-    hash ^= input.charCodeAt(i) & 0xff;
+  for (let i = 0; i < s.length; i += 1) {
+    hash ^= s.charCodeAt(i) & 0xff;
     hash = Math.imul(hash, 0x01000193) >>> 0;
   }
   return hash.toString(16).padStart(8, "0");
+}
+
+function failureSignature(exit, tail) {
+  return fnv1aHex(`${exit ?? "n/a"} ${String(tail ?? "")}`);
+}
+
+// Baseline hash of the done-when criterion, frozen at init. A later mismatch
+// is a moved goalpost: the machine cannot judge whether the change is
+// legitimate, but it records it so "defining green" stays separable from
+// "passing green".
+function criterionHash(criterion) {
+  return fnv1aHex(String(criterion ?? "").trim());
 }
 
 // Criterion gate: the machine-side stop verdict. Prose contracts stay
@@ -1232,6 +1244,28 @@ function checkStop(payload, repo, touch) {
   const criterion = criterionValue(touch);
   const cap = intField(budgetValue(touch, "max_iterations", touch.gate_block_cap ?? GATE_BLOCK_CAP), GATE_BLOCK_CAP);
   const timeoutSec = intField(touch.criterion_timeout_seconds, CRITERION_TIMEOUT_SECONDS);
+
+  // Goalpost check. The blessed way to change a criterion is `amend` (records a
+  // reason and updates the baseline). A criterion changed by editing the run
+  // contract directly bypasses that, so surface it loudly here: the machine
+  // cannot judge whether the change is legitimate, only that it happened. Reset
+  // the stall identity since failures now belong to a different check. Contracts
+  // written before this baseline existed adopt it silently (no false event).
+  const liveCriterionHash = criterionHash(criterion);
+  if (touch.criterion_hash && touch.criterion_hash !== liveCriterionHash) {
+    appendEvent(repo, {
+      ...base,
+      decision: "warn",
+      reason:
+        "criterion amended outside 'amend' (goalpost moved without a recorded reason); " +
+        `previous_hash=${touch.criterion_hash} new_hash=${liveCriterionHash}`,
+      criterion_amended: true,
+      via: "direct-edit",
+    });
+    touch.stall_signature = null;
+    touch.stall_count = 0;
+  }
+  touch.criterion_hash = liveCriterionHash;
 
   let verdict;
   if (validationErrors.length) {
@@ -1468,6 +1502,8 @@ function cmdInit(values) {
     checked_at: now,
     allow_green_init: Boolean(values["allow-green-init"]),
   };
+  // Freeze the criterion baseline so a later goalpost move is recordable.
+  data.criterion_hash = criterionHash(data.criterion);
   if (initVerdict.verdict === "pass" && !values["allow-green-init"]) {
     const mustBlock = String(data.enforcement).toLowerCase() === "strict";
     const message =
@@ -1658,6 +1694,59 @@ function cmdClose(values) {
   return 0;
 }
 
+// Blessed criterion change: the only path that attaches a reason to a moved
+// goalpost. Amending resets the stall identity (failures now belong to a new
+// check) but deliberately does NOT refill the block budget — amend fixes the
+// target, it does not buy more iterations. Re-init is the way to reset budget.
+function cmdAmend(values) {
+  const repo = repoFromArg(values.repo);
+  const touch = loadTouchList(repo);
+  const file = runContractPath(repo);
+  if (touch === null) {
+    process.stderr.write(`${file} does not exist\n`);
+    return 1;
+  }
+  if (lifecycleStatus(touch) !== "active") {
+    process.stderr.write(`${file} is not active (status ${lifecycleStatus(touch)}); re-init to start a new loop\n`);
+    return 1;
+  }
+  const next = String(values.criterion ?? "").trim();
+  if (!next) {
+    process.stderr.write("amend requires --criterion <new check>\n");
+    return 2;
+  }
+  const reason = String(values.reason ?? "").trim();
+  if (!reason) {
+    process.stderr.write("amend requires --reason <why the goalpost moved>\n");
+    return 2;
+  }
+  const previous = criterionValue(touch);
+  const previousHash = touch.criterion_hash ?? criterionHash(previous);
+  touch.criterion = next;
+  touch.criterion_hash = criterionHash(next);
+  touch.stall_signature = null;
+  touch.stall_count = 0;
+  const errors = validateTouchList(touch);
+  if (errors.length) {
+    for (const error of errors) process.stderr.write(`error: ${error}\n`);
+    return 1;
+  }
+  writeJson(file, touch);
+  appendEvent(repo, {
+    event: "Amend",
+    decision: "observe",
+    evidence_kind: "loop_runtime",
+    repo: String(repo),
+    reason,
+    criterion_amended: true,
+    via: "amend",
+    previous_hash: previousHash,
+    new_hash: touch.criterion_hash,
+  });
+  process.stdout.write(`amended criterion in ${file}\n`);
+  return 0;
+}
+
 const CLI_OPTIONS = {
   init: {
     repo: { type: "string" },
@@ -1705,6 +1794,11 @@ const CLI_OPTIONS = {
     repo: { type: "string" },
     reason: { type: "string", default: "complete" },
     "terminal-state": { type: "string", default: "success" },
+  },
+  amend: {
+    repo: { type: "string" },
+    criterion: { type: "string" },
+    reason: { type: "string" },
   },
 };
 
@@ -1758,6 +1852,7 @@ function runCli(command, argv) {
   if (command === "status") return cmdStatus(values);
   if (command === "validate") return cmdValidate(values);
   if (command === "claim") return cmdClaim(values);
+  if (command === "amend") return cmdAmend(values);
   return cmdClose(values);
 }
 

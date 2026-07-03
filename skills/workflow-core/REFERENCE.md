@@ -55,6 +55,21 @@ node ~/bin/agent-loop.mjs close --repo <repo> --terminal-state <success|noop|blo
 Omitting `--terminal-state` means `success`; use an explicit non-success state
 when the loop stops without meeting the done-when criterion.
 
+If the criterion itself turns out wrong, change it through `amend`, not by
+editing `run-contract.json`:
+
+```text
+node ~/bin/agent-loop.mjs amend --repo <repo> --criterion <new check> --reason <why the goalpost moved>
+```
+
+`amend` records the change with its reason and resets stall tracking (failures
+now belong to a different check) but does **not** refill the block budget —
+amend fixes the target, it does not buy more iterations; re-init resets budget.
+Changing the criterion by direct file edit still works but is flagged at the
+next stop as an unrecorded goalpost move: the machine cannot judge whether the
+change is legitimate, only that "defining green" and "passing green" stayed
+separable and auditable.
+
 ## Terminal States
 
 Use one terminal state in every closeout:

@@ -76,5 +76,5 @@ the schedule (both cap wall-clock/iterations and escalate on cap, not retry):
 - **Codex**: a standalone `automation` runs `codex exec "<driver prompt>"` on a
   cadence.
 
-`agent-doctor.py` reports backlog health (pending/in_progress counts, stale
+`agent-doctor.mjs` reports backlog health (pending/in_progress counts, stale
 claims, loop-health.txt age) so a missed or stuck month is visible.

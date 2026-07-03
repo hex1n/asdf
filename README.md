@@ -17,8 +17,8 @@ high-risk changes. Once you approve a plan, approval means execute; the loop
 does not add another planning gate unless new blocking evidence appears.
 
 ```bash
-python bootstrap/install.py        # distribute the loop to ~/.claude and ~/.codex
-python ~/bin/agent-doctor.py        # post-install self-check (macOS/Linux: python3)
+node bootstrap/install.mjs         # distribute the loop to ~/.claude and ~/.codex
+node ~/bin/agent-doctor.mjs         # post-install self-check
 ```
 
 - [`bootstrap/`](bootstrap/) — machine-level install: the work-loop + Execution
@@ -66,20 +66,20 @@ demand, and optional `scripts/` and `tests/`.
 
 ## Testing
 
-Tests use the Python standard library `unittest` — no third-party dependencies
-required. The workflow hook is Node, so its contract tests need `node` on PATH
-(they skip if it is absent). CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml))
+Tests use Node's built-in `node:test` for bootstrap runtime scripts and Python
+standard-library `unittest` for the remaining repository and skill contracts.
+No third-party dependencies are required. CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml))
 runs the full suite on every push and pull request with both runtimes provisioned.
 
 ```bash
-# Repo-level contract tests (installer, contract parity, skill structure)
-python3 -m unittest discover -s tests
+# Node bootstrap contract tests (installer, doctor)
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_workflow_hook.test.mjs tests/meta_loop.test.mjs
+
+# Python repo-level contract tests (contract parity, skill structure)
+python -m unittest discover -s tests
 
 # A single skill's tests
-python3 -m unittest discover -s skills/java-stack-craft/tests
-
-# Everything (pytest also works if installed)
-python3 -m pytest
+python -m unittest discover -s skills/java-stack-craft/tests
 ```
 
 ## Contributing

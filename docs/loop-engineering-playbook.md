@@ -27,7 +27,7 @@
 ## 2. 六类实际工作的循环打法
 
 > 每个循环的三要素——机器可查的判据、Touch 清单、显式判停——与项目无关，
-> 已作为"工作循环"随 `bootstrap/install.py` 全局分发（见
+> 已作为"工作循环"随 `bootstrap/install.mjs` 全局分发（见
 > [docs/execution-contract.md](execution-contract.md)），在任意项目零配置生效。仓库存在
 > `.agent-workflows/` 时，Touch 清单还会通过 `agent-workflow-hook.mjs init` 落成机器可读的
 > `touch-list.json`，hook 证据写入 `evidence-ledger.jsonl`。ledger 只证明范围/过程，

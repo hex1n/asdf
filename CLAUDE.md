@@ -27,24 +27,25 @@ adding or changing any skill. The domain language for skill distribution
 - `tests/` — repo-level contract tests that validate skill structure and routing.
 - `bootstrap/` — machine-level install assets (Execution Contract blocks, `/land`
   `/fixloop` `/converge` command templates, agent-doctor, hooks) plus the
-  idempotent `install.py`; see `bootstrap/README.md`.
+  idempotent `install.mjs`; see `bootstrap/README.md`.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
 - `AGENTS.md` — skill-authoring and maintenance conventions.
 - `CONTEXT.md` — canonical domain terms for skill distribution.
 
 ## Commands
 
-Tests are plain `unittest` (stdlib only, no third-party deps required):
+Tests use built-in runtimes only: Node `node:test` for bootstrap runtime scripts
+and Python `unittest` for the remaining repo and skill contracts.
 
 ```bash
-# Repo-level contract tests
-python3 -m unittest discover -s tests
+# Node bootstrap contract tests
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_workflow_hook.test.mjs tests/meta_loop.test.mjs
+
+# Python repo-level contract tests
+python -m unittest discover -s tests
 
 # A single skill's tests
-python3 -m unittest discover -s skills/java-stack-craft/tests
-
-# Everything (pytest also works if installed)
-python3 -m pytest
+python -m unittest discover -s skills/java-stack-craft/tests
 ```
 
 ## Working conventions
@@ -65,6 +66,6 @@ When adding or changing a skill, follow `AGENTS.md`:
 
 ## Verification expectation
 
-Before claiming a skill change is done, run the relevant `unittest` target above
-and report the result. Protect load-bearing rules with a small example or test
-when practical.
+Before claiming a skill change is done, run the relevant test target above and
+report the result. Protect load-bearing rules with a small example or test when
+practical.

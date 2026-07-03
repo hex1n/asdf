@@ -8,11 +8,11 @@
 
 ```bash
 git clone <asdf-repo> && cd asdf
-python bootstrap/install.py            # 或先 --dry-run 预览
-python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 python3）
+node bootstrap/install.mjs             # 或先 --dry-run 预览
+node ~/bin/agent-doctor.mjs            # 安装后自检
 ```
 
-安装器与 doctor 均为 stdlib-only、Windows/macOS/Linux 通用（doctor 里仅"读取系统代理"
+安装器与 doctor 均为 Node built-in only、Windows/macOS/Linux 通用（doctor 里仅读取系统代理
 一项按 OS 分支，其余检查跨平台一致）。
 
 ## 资产清单
@@ -22,7 +22,7 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 | `../skills/` | 全部源技能 | `~/.claude/skills/`、`~/.codex/skills/` |
 | `commands/` | `/land`、`/fixloop`、`/converge` 循环启动模板 | `~/.claude/commands/`、`~/.agents/skills/<command>/` |
 | `contract/` | **工作循环 + Execution Contract**（[设计说明](../docs/execution-contract.md)） | 合并进 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`（标记块内替换，不重复追加） |
-| `bin/` | `agent-doctor.py` 只读环境自检、`agent-workflow-hook.mjs` Touch 清单/evidence ledger/判据闸门 hook（Node，零额外依赖） | `~/bin/` |
+| `bin/` | `agent-doctor.mjs` 只读环境自检、`agent-workflow-hook.mjs` Touch 清单/evidence ledger/判据闸门 hook（Node，零额外依赖） | `~/bin/` |
 
 ## 日常使用：接一个新需求
 
@@ -83,16 +83,16 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 
 ## 不自动化的部分（装完手动核对一次）
 
-- `~/bin` 在 PATH 里（doctor 用 `python`/`python3` 跑，无需 PowerShell）
+- `~/bin` 在 PATH 里（doctor 用 `node` 跑，无需 PowerShell）
 - `~/.claude/settings.json` 与 `~/.codex/config.toml` 中的 PreToolUse/Stop hooks 调用
-  `node ~/bin/agent-workflow-hook.mjs`；doctor 会检查是否已注册
+  `node ~/bin/agent-workflow-hook.mjs`；安装器不新建配置，doctor 会检查是否已注册
 - `node ~/bin/agent-workflow-hook.mjs status --repo <repo>` 可只读查看当前 Touch 清单、
   最近 hook ledger 和 schema 有效性；`close --repo <repo>` 用于结束当前循环
 - 仓库若不在 `~/Desktop/asdf`，给 doctor 设 `ASDF_REPO` 环境变量指向仓库根
 - 周期性任务不会自动注册：元循环（月度跑 `docs/research/2026-07-02-analyze-sessions.py`
   产出 `loop-health.txt`）与 weekly automation 需自行挂 cron/schedule；doctor 会在
   loop-health.txt 超过 35 天时提醒
-- `~/.claude/settings.json` 与 `~/.codex/config.toml` 仍按机器维护（安装器不自动改配置，doctor 只读检查）
+- `~/.claude/settings.json` 与 `~/.codex/config.toml` 仍按机器维护（安装器不新建配置；doctor 只读检查）
 - Codex 审批层实际生效性：跑 `codex --ask-for-approval never "Summarize current instructions"`
   核对 AGENTS.md 加载链与审批配置是否真的被读取（doctor 会检查 `approvals_reviewer`
   取值是否在官方合法值内）
@@ -100,6 +100,6 @@ python ~/bin/agent-doctor.py           # 安装后自检（macOS/Linux 用 pytho
 
 ## 维护纪律
 
-改动先改本目录的源，再跑 `install.py` 分发；不要直接改安装副本
+改动先改本目录的源，再跑 `install.mjs` 分发；不要直接改安装副本
 （与 skill 分发同一防 Cache Drift 纪律）。新增规则先过
 [docs/execution-contract.md](../docs/execution-contract.md) 的 Rule Harvest Gate。

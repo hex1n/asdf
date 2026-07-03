@@ -14,8 +14,8 @@
 一轮方案流程。
 
 ```bash
-python bootstrap/install.py        # 把循环分发到 ~/.claude 与 ~/.codex
-python ~/bin/agent-doctor.py        # 安装后自检（macOS/Linux 用 python3）
+node bootstrap/install.mjs         # 把循环分发到 ~/.claude 与 ~/.codex
+node ~/bin/agent-doctor.mjs         # 安装后自检
 ```
 
 - [`bootstrap/`](bootstrap/) — 机器级安装：工作循环 + Execution Contract 契约块、
@@ -61,19 +61,19 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 ## 测试
 
-测试使用 Python 标准库 `unittest`，无需第三方依赖。工作循环 hook 是 Node 实现，
-其契约测试需要 PATH 上有 `node`（缺失则跳过）。CI（[`.github/workflows/tests.yml`](.github/workflows/tests.yml)）
-在每次 push 与 pull request 上以 python3 + node 双运行时跑全量测试。
+bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能契约使用 Python 标准库
+`unittest`；无需第三方依赖。CI（[`.github/workflows/tests.yml`](.github/workflows/tests.yml)）
+在每次 push 与 pull request 上以 Node + Python 双运行时跑全量测试。
 
 ```bash
-# 仓库级契约测试（安装器、契约一致性、技能结构）
-python3 -m unittest discover -s tests
+# Node bootstrap 契约测试（安装器、doctor）
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_workflow_hook.test.mjs tests/meta_loop.test.mjs
+
+# Python 仓库级契约测试（契约一致性、技能结构）
+python -m unittest discover -s tests
 
 # 单个技能的测试
-python3 -m unittest discover -s skills/java-stack-craft/tests
-
-# 全部（已安装 pytest 时也可用）
-python3 -m pytest
+python -m unittest discover -s skills/java-stack-craft/tests
 ```
 
 ## 参与贡献

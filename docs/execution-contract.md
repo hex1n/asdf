@@ -77,7 +77,7 @@ Boundaries 类章节），由各仓库的 git 管理；新项目需要操作层�
   是当前循环的文件/表/接口边界，`evidence-ledger.jsonl` 是 hook 观察到的工具证据。
   它们是 gitignored 的 agent 私有状态，不替代 `docs/agent-workflows/` 里的可评审资产；
   ledger 只能支撑范围/过程声明，不能替代测试、SQL、API 响应、diff 等业务验证证据。
-- 用户级分发由 [bootstrap/install.py](../bootstrap/install.py) 自动完成（合同块以标记
+- 用户级分发由 [bootstrap/install.mjs](../bootstrap/install.mjs) 自动完成（合同块以标记
   幂等合并；机器可读源在 [bootstrap/contract/](../bootstrap/contract/)）；业务仓库的
   项目级条目走各仓库 git，不由安装器分发。
 - **判据闸门的威胁模型边界**：判据闸门（Stop hook 执行 `criterion`）是**协作式 agent 的机器兜底**，

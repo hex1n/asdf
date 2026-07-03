@@ -8,7 +8,7 @@ argument-hint: "[完成判据（测试命令/SQL 断言/预期响应）+ 可选 
 1. **驱动器 / 闸门 / 判停三件套**：
    - **判停**（判据）：`$ARGUMENTS` 必须含机器可查的完成判据（测试命令、SQL 断言、预期响应）。缺判据 → 先索要，再开始；这是唯一开场就必须停下问的情况。
    - **闸门**（机器兜底）：若目标仓库有 `.agent-workflows/`，用 `node ~/bin/agent-workflow-hook.mjs init --repo <repo> --files <glob> --criterion <判据>` 写入 touch-list，让 Stop hook 执行判据、未绿不放行；无 `.agent-workflows/` 时你自己持有判据判停。
-   - **驱动器**（自驱推进）：在 `/goal <判据>` 下承载本次循环——每轮结束自动复查判据并续跑，免人工"继续"；Claude 端长自主任务可用官方 `ralph-loop` 插件以 fresh context 重喂驱动器提示。
+   - **驱动器**（自驱推进）：在 `/goal <判据>` 下承载本次循环——每轮结束自动复查判据并续跑，免人工"继续"；Claude 端长自主任务可用官方 `ralph-loop` 插件以 fresh context 重喂驱动器提示。若 `agent-doctor.mjs` 的 `loop driver dependency` 不是 ok，本命令只提供判据/闸门契约，不能承诺自动重喂；开场先报告驱动缺口并按普通 `/land` 或 `/fixloop` 单轮推进。
 
 2. **选循环体**：落地类走 `/land` 契约（复述 Touch 清单+判据 → 改→验→审→修）；排查类走 `/fixloop` 契约（复现输入+通过标准 → 定位→修→生效→重放→对账）。驱动器只负责"自驱重喂"，循环体负责"一轮做什么"。
 

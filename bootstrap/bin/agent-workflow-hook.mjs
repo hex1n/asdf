@@ -605,6 +605,45 @@ function intField(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function hasShellSyntax(command) {
+  return /[|&;<>\n\r]/.test(command);
+}
+
+function splitSimpleCommand(command) {
+  const args = [];
+  let current = "";
+  let quote = null;
+  const text = command.trim();
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      if (ch === "\\" && text[i + 1] === quote) {
+        current += text[i + 1];
+        i += 1;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      else current += ch;
+      continue;
+    }
+    if (ch === "'" || ch === "\"") {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (current) {
+        args.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += ch;
+  }
+  if (quote) return null;
+  if (current) args.push(current);
+  return args.length ? args : null;
+}
+
 // Run the declared completion criterion. Executing it grants the agent no new
 // capability (the agent can already run commands); the gate only turns the
 // criterion the loop templates require into a machine verdict at Stop time.
@@ -616,13 +655,16 @@ function runCriterion(criterion, repo, timeoutSec) {
     stdio: ["ignore", "pipe", "pipe"],
     maxBuffer: 10 * 1024 * 1024,
   };
+  const argv = hasShellSyntax(criterion) ? null : splitSimpleCommand(criterion);
   try {
-    const stdout = execSync(criterion, opts);
+    const stdout = argv
+      ? execFileSync(argv[0], argv.slice(1), opts)
+      : execSync(criterion, opts);
     return { verdict: "pass", exit: 0, output: String(stdout ?? "") };
   } catch (err) {
     const output = String(err.stdout ?? "") + String(err.stderr ?? "");
     if (err.signal || err.code === "ETIMEDOUT") {
-      return { verdict: "not_executable", exit: null, output, detail: `timed out or killed after ${timeoutSec}s` };
+      return { verdict: "fail", exit: null, output, detail: `timed out or killed after ${timeoutSec}s` };
     }
     const status = typeof err.status === "number" ? err.status : null;
     if (status === null || status === 126 || status === 127) {
@@ -717,11 +759,12 @@ function checkStop(payload, repo, touch) {
 
   const released = touch.gate_blocks > cap;
   const reasonTail = outputTail(verdict.output);
+  const failureLabel = verdict.detail ?? `exit ${verdict.exit ?? "n/a"}`;
   if (mode !== "strict") {
     appendLedger(repo, {
       ...base,
       decision: "warn",
-      reason: `criterion failed (exit ${verdict.exit ?? "n/a"})`,
+      reason: `criterion failed (${failureLabel})`,
       criterion_exit: verdict.exit,
     });
     return 0;
@@ -741,11 +784,11 @@ function checkStop(payload, repo, touch) {
   appendLedger(repo, {
     ...base,
     decision: "block",
-    reason: `criterion failed (exit ${verdict.exit ?? "n/a"})`,
+    reason: `criterion failed (${failureLabel})`,
     criterion_exit: verdict.exit,
   });
   return block(
-    `completion criterion not met (exit ${verdict.exit ?? "n/a"}): ${criterion}\n` +
+    `completion criterion not met (${failureLabel}): ${criterion}\n` +
       (reasonTail ? `--- criterion output (tail) ---\n${reasonTail}\n` : "") +
       `Fix the failure and re-verify; the stop gate releases after ${cap} consecutive blocks. ` +
       `If the criterion itself is wrong, update it via ${STATE_DIR}/${TOUCH_LIST} or close the touch-list.`,

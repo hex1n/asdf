@@ -205,7 +205,7 @@ function cmdNext(v) {
     process.stdout.write("none\n");
     return 0;
   }
-  if (item.status === "pending") {
+  if (item.status === "pending" || isStale(item)) {
     item.status = "in_progress";
     item.claimed_at = now();
     item.updated_at = now();
@@ -227,6 +227,7 @@ function cmdResolve(v) {
   row.status = DECISION_TO_STATUS[v.decision];
   row.decision = v.decision;
   row.updated_at = now();
+  if (v.decision === "continue") row.claimed_at = now();
   if (v.note) row.round_note = v.note.trim();
   writeBacklog(repo, rows);
   process.stdout.write(`${v.id} -> ${row.status}\n`);

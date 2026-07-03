@@ -3,9 +3,9 @@
 > 本手册回答一个问题：**在每天的实际工作中怎么用 loop engineering**。
 > 分析依据是对本机 782 个会话、4,597 条人工提示的全量分析（分析文档含真实业务语料，
 > 留在本机、不入公开仓）；量化基线可用 `docs/research/2026-07-02-analyze-sessions.py`
-> 重跑得到。P0 机制建设已落入全局 Execution Contract、`/land`/`/fixloop` 模板，
-> 以及可选的 `agent-workflow-hook.mjs init/status/close` + `.agent-workflows/touch-list.json`
-> + `evidence-ledger.jsonl` 本地 hook 状态。
+> 重跑得到。P0 机制建设已落入全局 Execution Contract、`land`/`fixloop` workflow skills，
+> 以及可选的 `agent-loop.mjs init/claim/status/close` + `.agent-loop/run-contract.json`
+> + `loop-events.jsonl` 本地 hook 状态。
 > 本手册只讲"用法"。
 
 ---
@@ -18,7 +18,7 @@
 |---|---|---|
 | **人肉时钟**：每轮敲"继续"推进 | "继续"×56、"fix"×19 | 预授权循环：开场就授权"循环到 X 为止"，代理自己迭代 |
 | **人肉判停器**：什么时候算完靠人看 | 70% 会话开场无完成判据 | 开场给可验证判据，代理拿判据自己判停 |
-| **人肉守卫**：越界了事后纠正 | 范围漂移占纠正的 ~40% | 约束前置（Touch 清单 + Execution Contract），越界即停 |
+| **人肉守卫**：越界了事后纠正 | 范围漂移占纠正的 ~40% | 约束前置（Run Contract + Execution Contract），越界即停 |
 
 **一句话用法**：默认轻量推进；把完成判据和负向约束尽量前置，能直接做就直接做。
 只有用户显式要求、机制未收敛，或不可逆/高风险改动时，才启动完整循环。用户拍板后，
@@ -26,11 +26,12 @@
 
 ## 2. 六类实际工作的循环打法
 
-> 每个循环的三要素——机器可查的判据、Touch 清单、显式判停——与项目无关，
+> 每个循环的三要素——机器可查的判据、Run Contract、显式判停——与项目无关，
 > 已作为"工作循环"随 `bootstrap/install.mjs` 全局分发（见
 > [docs/execution-contract.md](execution-contract.md)），在任意项目零配置生效。仓库存在
-> `.agent-workflows/` 时，Touch 清单还会通过 `agent-workflow-hook.mjs init` 落成机器可读的
-> `touch-list.json`，hook 证据写入 `evidence-ledger.jsonl`。ledger 只证明范围/过程，
+> `.agent-loop/` 时，Run Contract 还会通过 `agent-loop.mjs init` 落成机器可读的
+> v2 `run-contract.json` runtime contract；同一 worktree 多 session 只有显式 `claim`
+> 才进入 `partitioned`，否则默认独占。hook 证据写入 `loop-events.jsonl`。event log 只证明范围/过程，
 > 不证明业务正确性。
 
 ### 2.1 需求落地（业务代码仓库）
@@ -97,18 +98,18 @@ CLI 升级、进程残留、代理配置做成 doctor 自检脚本 + runbook；
 ## 3. 三条可直接粘贴的"循环启动语"
 
 替换"继续"的零成本方案，无需任何基础设施改动。这三条就是**驱动器的授权语**——
-装了 `/loop` 命令后可直接 `/loop <判据>` 承接（`/goal` 每轮复查判据续跑，或 `ralph-loop`
-重喂 fresh context，判据闸门机器兜底）；没装命令时把下面的文本整段粘贴，效果相同：
+装了 `loop` skill 后可直接把判据交给它承接（`/goal` 每轮复查判据续跑，或 `ralph-loop`
+重喂 fresh context，判据闸门机器兜底）；没有可触发 skill 时把下面的文本整段粘贴，效果相同：
 **授权一次，你就从人肉时钟里撤出，agent 自驱到判据满足。**
 
 **落地循环**（拍板方案后发）：
 
 ```text
-按这个方案落地。Touch 清单：<文件/表清单>。
+按这个方案落地。Run Contract：<文件/表清单>。
 完成判据：<测试命令> 全绿 + 行为等价（<老场景> 结果不变）。
-若仓库有 .agent-workflows/，先用 agent-workflow-hook.mjs init 写入 touch-list.json。
+若仓库有 `.agent-loop/`，先用 `agent-loop.mjs init` 写入 v2 `run-contract.json` runtime contract。
 循环执行：改 → 测 → 自审 → 修，直到判据满足才回来找我。
-中途不要问我，除非需要触碰清单外的文件/表——那种情况立即停下确认。
+中途不要问我，除非需要触碰 Run Contract 之外的文件/表——那种情况立即停下确认。
 ```
 
 **排查循环**（贴完报文/SQL 后发）：
@@ -142,7 +143,7 @@ scope / adversarial 中最相关的视角独立审查，吸收所有确认的问
 | 阶段 | 动作 | 成本 |
 |---|---|---|
 | 本周 | 默认轻量推进；只给需要循环的任务贴启动语；新会话尽量带完成判据 | 零 |
-| 已落地 | P0 三件套：阶段 gate、Touch 清单交接物、Execution Contract 章节；有 `.agent-workflows/` 时启用 hook 记账/拦截 | 已完成 |
+| 已落地 | P0 三件套：阶段 gate、Run Contract 交接物、Execution Contract 章节；有 `.agent-loop/` 时启用 hook 记账/拦截 | 已完成 |
 | 之后 | P1 工装（报文-SQL 回归 diff、doctor 扩展）；P2 定时化（元循环 cron、恢复 weekly automation） | 逐个推进 |
 
 P2 定时化的可执行形态：文件态元循环（`docs/meta-loop/`，见

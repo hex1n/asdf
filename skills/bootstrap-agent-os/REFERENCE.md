@@ -83,13 +83,13 @@ Workflow assets should describe objectives, context, verification, stop conditio
 
 Purpose: give agents a private, gitignored place for current loop state.
 
-Default path: `.agent-workflows/`.
+Default path: `.agent-loop/`.
 
 Include:
 
 - `active-goal.json`: optional current goal snapshot for long-running work.
-- `touch-list.json`: current loop boundary for files, tables, interfaces, and completion criterion. Prefer creating it with `agent-workflow-hook.mjs init` rather than hand-written JSON. Use `enforcement: "strict"` after the user approves the scope; use `"warn"` only while the list is still being discovered.
-- `evidence-ledger.jsonl`: append-only hook observations for PreToolUse/Stop events and other local loop evidence. It proves scope/process observations only; it does not prove business correctness.
+- `run-contract.json`: current loop boundary for files, tables, interfaces, and completion criterion. Prefer creating it with `agent-loop.mjs init` rather than hand-written JSON. Use `enforcement: "strict"` after the user approves the scope; use `"warn"` only while the list is still being discovered.
+- `loop-events.jsonl`: append-only hook observations for PreToolUse/Stop events and other local loop evidence. It proves scope/process observations only; it does not prove business correctness.
 - `checkpoints/`: context compaction or interruption recovery notes.
 - Runtime capability probes and temporary verifier state.
 
@@ -99,7 +99,7 @@ Do not include:
 - Credentials, secrets, raw customer identifiers, or production payloads.
 - Facts that should be reviewed with the project, such as repo profiles, evidence contracts, or reusable templates.
 
-Local run state is non-authoritative. Promote stable, reviewable assets to `docs/agent-workflows/`. The global `agent-workflow-hook.mjs` may read `touch-list.json`, validate its schema, fail closed on invalid active scope, and append to `evidence-ledger.jsonl`, but the hook never makes `.agent-workflows/` a project policy source.
+Local run state is non-authoritative. Promote stable, reviewable assets to `docs/agent-workflows/`. The global `agent-loop.mjs` may read `run-contract.json`, validate its schema, fail closed on invalid active scope, and append to `loop-events.jsonl`, but the hook never makes `.agent-loop/` a project policy source.
 
 ## Bootstrap Tree
 
@@ -108,7 +108,7 @@ Use existing project names when present. If the project has no convention, this 
 ```text
 AGENTS.md
 VISION.md
-.gitignore                 # includes .agent-workflows/
+.gitignore                 # includes .agent-loop/
 docs/
   agent-workflows/
     README.md
@@ -122,16 +122,16 @@ docs/
       README.md
   agents/
     repo-profile.md
-.agent-workflows/          # gitignored local run state, optional on disk
-  touch-list.json          # current loop boundary, created only during active work
-  evidence-ledger.jsonl    # local hook evidence, append-only
+.agent-loop/          # gitignored local run state, optional on disk
+  run-contract.json          # current loop boundary, created only during active work
+  loop-events.jsonl    # local hook evidence, append-only
 ```
 
 Minimum viable content:
 
 - `AGENTS.md`: authority order, load map, boundaries, and pointers.
 - `VISION.md`: purpose, system boundary, hard gates, report-only invariants, rejected invariants, and maintenance rule.
-- `.gitignore`: ignores `.agent-workflows/` local run state.
+- `.gitignore`: ignores `.agent-loop/` local run state.
 - `docs/agent-workflows/README.md`: asset map, load boundary, tool-neutral rule, loop shape for long or repeated work, and when not to run unattended loops.
 - `goals/goal.md`: outcome, scope, required context, runtime preconditions, success evidence, constraints, loop budget, stop conditions, and closeout.
 - `evidence/README.md`: case shape, required evidence, runtime gates, verifier results, and redaction policy.
@@ -139,7 +139,7 @@ Minimum viable content:
 
 ## Goal And Evidence Contracts
 
-A goal contract is worth creating only when the work has a measurable endpoint, may need more than one implementation/verification round, and has evidence that can prove progress. It inherits the global runtime contract: default light execution, user approval as execution permission, scoped touch lists, and completion claims backed by real tool evidence.
+A goal contract is worth creating only when the work has a measurable endpoint, may need more than one implementation/verification round, and has evidence that can prove progress. It inherits the global runtime contract: default light execution, user approval as execution permission, scoped run contracts, and completion claims backed by real tool evidence.
 
 Required goal fields:
 
@@ -191,4 +191,4 @@ Do not use this skill when:
 
 Sample A: a backend service already has a root agent instruction file, a direction anchor, and a workflow directory with goal and evidence templates. The bootstrap task is to audit routing, remove duplicated rules, move stable assets under `docs/agent-workflows/`, and keep feature-specific verifier details in domain packs.
 
-Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index, a goal/evidence contract, and a gitignored `.agent-workflows/` local-state convention without importing UI feature names into the shared startup route.
+Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index, a goal/evidence contract, and a gitignored `.agent-loop/` local-state convention without importing UI feature names into the shared startup route.

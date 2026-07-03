@@ -39,7 +39,7 @@ and Python `unittest` for the remaining repo and skill contracts.
 
 ```bash
 # Node bootstrap contract tests
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_workflow_hook.test.mjs tests/meta_loop.test.mjs
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs
 
 # Python repo-level contract tests
 python -m unittest discover -s tests

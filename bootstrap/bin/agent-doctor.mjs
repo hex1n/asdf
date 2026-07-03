@@ -15,6 +15,12 @@ const TTY = process.stdout.isTTY;
 const CYAN = TTY ? "\x1b[36m" : "";
 const GREEN = TTY ? "\x1b[32m" : "";
 const RESET = TTY ? "\x1b[0m" : "";
+let FAILURES = 0;
+const LOOP_HOOK_RE = /agent-loop\.mjs/i;
+const LEGACY_LOOP_HOOK_RE = /agent-workflow-hook\.(?:py|mjs)/i;
+const STATE_DIR = ".agent-loop";
+const RUN_CONTRACT = "run-contract.json";
+const LEGACY_STATE_DIR = ".agent-workflows";
 
 function section(title) {
   process.stdout.write(`\n${CYAN}=== ${title} ===${RESET}\n`);
@@ -22,6 +28,11 @@ function section(title) {
 
 function item(key, val) {
   process.stdout.write(`  ${key.padEnd(28)} ${val}\n`);
+}
+
+function failItem(key, val) {
+  FAILURES += 1;
+  item(key, `FAIL: ${val}`);
 }
 
 function exists(p) {
@@ -38,6 +49,14 @@ function readText(p) {
     return fs.readFileSync(p, "utf8");
   } catch {
     return "";
+  }
+}
+
+function readJson(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch (err) {
+    return { _invalid: err.message };
   }
 }
 
@@ -90,13 +109,80 @@ function fileHas(p, pattern) {
   return pattern.test(readText(p));
 }
 
-function codexCommandSkillStatus(name) {
-  const p = path.join(HOME, ".agents", "skills", name, "SKILL.md");
-  if (!exists(p)) return "MISSING";
+function hookCommandPresent(value) {
+  if (Array.isArray(value)) return value.some(hookCommandPresent);
+  if (value && typeof value === "object") {
+    if (LOOP_HOOK_RE.test(String(value.command ?? ""))) return true;
+    return Object.values(value).some(hookCommandPresent);
+  }
+  return false;
+}
+
+function claudeHookEventStatus(settingsPath, event) {
+  const data = readJson(settingsPath);
+  if (data._invalid) return "MISSING";
+  return hookCommandPresent(data.hooks?.[event]) ? "ok" : "MISSING";
+}
+
+function codexTomlHookEventBlocks(text, event) {
+  const lines = text.split(/\r?\n/);
+  const header = new RegExp(`^\\s*\\[\\[hooks\\.${event}\\]\\]\\s*$`);
+  const childHeader = new RegExp(`^\\s*\\[\\[hooks\\.${event}\\.hooks\\]\\]\\s*$`);
+  const blocks = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!header.test(lines[i])) continue;
+    let j = i + 1;
+    while (j < lines.length) {
+      const line = lines[j];
+      if (/^\s*\[\[hooks\./.test(line) && !childHeader.test(line)) break;
+      if (/^\s*\[[^\[]/.test(line)) break;
+      j += 1;
+    }
+    blocks.push(lines.slice(i, j).join("\n"));
+  }
+  return blocks;
+}
+
+function codexHookEventStatus(configPath, hooksJsonPath, event) {
+  const text = readText(configPath);
+  const childHeader = new RegExp(`^\\s*\\[\\[hooks\\.${event}\\.hooks\\]\\]\\s*$`, "m");
+  if (codexTomlHookEventBlocks(text, event).some((block) => childHeader.test(block) && LOOP_HOOK_RE.test(block))) {
+    return "ok";
+  }
+  const hooks = readJson(hooksJsonPath);
+  return hookCommandPresent(hooks?.[event]) ? "ok" : "MISSING";
+}
+
+function workflowHookRegistrationStatus(claudeSettings, codexCfg, codexHooksJson) {
+  const claudePre = claudeHookEventStatus(claudeSettings, "PreToolUse");
+  const claudeStop = claudeHookEventStatus(claudeSettings, "Stop");
+  const codexPre = codexHookEventStatus(codexCfg, codexHooksJson, "PreToolUse");
+  const codexStop = codexHookEventStatus(codexCfg, codexHooksJson, "Stop");
+  const ok = [claudePre, claudeStop, codexPre, codexStop].every((v) => v === "ok");
+  return {
+    ok,
+    label: `claude=PreToolUse:${claudePre},Stop:${claudeStop} codex=PreToolUse:${codexPre},Stop:${codexStop}`,
+  };
+}
+
+function installedSkillStatus(root, name) {
+  const p = path.join(root, name, "SKILL.md");
+  if (!exists(p)) return { ok: false, label: "MISSING" };
   const text = readText(p);
   const hasName = new RegExp(`^name:\\s*${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "m").test(text);
   const hasDescription = /^description:\s*.+$/m.test(text);
-  return hasName && hasDescription ? "ok" : "WARN: malformed";
+  return hasName && hasDescription ? { ok: true, label: "ok" } : { ok: false, label: "malformed" };
+}
+
+function legacyWorkflowEntryStatus(name) {
+  const claudeCommand = path.join(HOME, ".claude", "commands", `${name}.md`);
+  const codexWrapper = path.join(HOME, ".agents", "skills", name, "SKILL.md");
+  const leftovers = [];
+  if (exists(claudeCommand)) leftovers.push(path.relative(HOME, claudeCommand));
+  if (exists(codexWrapper)) leftovers.push(path.relative(HOME, codexWrapper));
+  return leftovers.length
+    ? { ok: false, label: `legacy entries remain (${leftovers.join(", ")})` }
+    : { ok: true, label: "ok" };
 }
 
 function pathNameContains(root, needle, maxEntries = 2000) {
@@ -162,6 +248,14 @@ function dirs(root) {
   return fs.readdirSync(root).sort().map((name) => path.join(root, name)).filter((p) => fs.statSync(p).isDirectory());
 }
 
+function sourceSkillDirs(srcRoot) {
+  return dirs(srcRoot).filter((p) => exists(path.join(p, "SKILL.md")));
+}
+
+function workflowSupportDirs(srcRoot) {
+  return ["workflow-core"].map((name) => path.join(srcRoot, name)).filter((p) => exists(path.join(p, "REFERENCE.md")));
+}
+
 function daysSinceMtime(p) {
   const ms = Date.now() - fs.statSync(p).mtimeMs;
   return Math.floor(ms / 86400000);
@@ -170,6 +264,80 @@ function daysSinceMtime(p) {
 function parseUtc(ts) {
   const ms = Date.parse(String(ts));
   return Number.isNaN(ms) ? null : ms / 1000;
+}
+
+function normalizePatterns(values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .filter((v) => String(v).trim())
+    .map((v) => String(v).replace(/\\/g, "/").trim().replace(/^[./]+/, ""));
+}
+
+function patternPrefix(pattern) {
+  const pat = String(pattern ?? "").replace(/\\/g, "/").trim().replace(/^[./]+/, "");
+  const idx = pat.search(/[*?[\]]/);
+  const raw = idx === -1 ? pat : pat.slice(0, idx);
+  return raw.replace(/[^/]*$/, "");
+}
+
+function patternsOverlap(a, b) {
+  const left = String(a ?? "").replace(/\\/g, "/").trim().replace(/^[./]+/, "");
+  const right = String(b ?? "").replace(/\\/g, "/").trim().replace(/^[./]+/, "");
+  if (!left || !right) return true;
+  if (left === right) return true;
+  if (!/[*?[\]]/.test(left) && !/[*?[\]]/.test(right)) {
+    return left === right || left.startsWith(`${right.replace(/\/+$/, "")}/`) || right.startsWith(`${left.replace(/\/+$/, "")}/`);
+  }
+  const lp = patternPrefix(left);
+  const rp = patternPrefix(right);
+  if (!lp || !rp) return true;
+  return lp.startsWith(rp) || rp.startsWith(lp);
+}
+
+function workflowRuntimeFindings(touch) {
+  const errors = [];
+  const warnings = [];
+  if (!touch || touch._invalid) return { errors: [touch?._invalid || `cannot parse ${RUN_CONTRACT}`], warnings };
+  if (touch.version !== 2) errors.push(`${RUN_CONTRACT} must use v2 runtime contract; recreate it with agent-loop.mjs init`);
+  if (!touch.touch || typeof touch.touch !== "object") errors.push("touch must be an object");
+  if (!touch.budget || typeof touch.budget !== "object") errors.push("budget must be an object");
+  if (!touch.session || typeof touch.session !== "object") errors.push("session must be an object");
+  if (!touch.evidence || typeof touch.evidence !== "object") errors.push("evidence must be an object");
+  if (!touch.review || typeof touch.review !== "object") errors.push("review must be an object");
+  if (!touch.concurrency || typeof touch.concurrency !== "object") errors.push("concurrency must be an object");
+  const status = String(touch.status ?? "active");
+  const terminal = String(touch.terminal_state ?? "active");
+  if (status === "active" && terminal !== "active") errors.push("active status requires terminal_state active");
+  if (status === "closed" && terminal === "active") errors.push("closed status requires terminal terminal_state");
+  const budget = touch.budget || {};
+  if (budget.network_allowed === true) warnings.push("network_allowed=true");
+  if (budget.install_scripts_allowed === true) warnings.push("install_scripts_allowed=true");
+  if (budget.destructive_allowed === true) warnings.push("destructive_allowed=true");
+  if (String(budget.secrets_policy ?? "deny_env_dump") !== "deny_env_dump") warnings.push(`secrets_policy=${budget.secrets_policy}`);
+  const concurrency = touch.concurrency || {};
+  if (String(concurrency.mode ?? "exclusive") === "partitioned") {
+    const claims = Array.isArray(concurrency.claims) ? concurrency.claims : [];
+    if (!claims.length) errors.push("partitioned concurrency requires claims");
+    const seen = new Set();
+    for (const claim of claims) {
+      const sid = String(claim?.session_id ?? "").trim();
+      if (!sid) errors.push("partitioned claim is missing session_id");
+      else if (seen.has(sid)) errors.push(`duplicate partitioned claim for ${sid}`);
+      else seen.add(sid);
+    }
+    for (let i = 0; i < claims.length; i++) {
+      const left = normalizePatterns(claims[i]?.files ?? []);
+      for (let j = i + 1; j < claims.length; j++) {
+        const right = normalizePatterns(claims[j]?.files ?? []);
+        for (const a of left) {
+          for (const b of right) {
+            if (patternsOverlap(a, b)) errors.push(`partitioned claims overlap: ${a} conflicts with ${b}`);
+          }
+        }
+      }
+    }
+  }
+  return { errors, warnings };
 }
 
 function recentSandboxLogs() {
@@ -237,24 +405,55 @@ async function main() {
   section("Agent config presence");
   const claudeMd = path.join(HOME, ".claude", "CLAUDE.md");
   const codexAgents = path.join(HOME, ".codex", "AGENTS.md");
+  const claudeSettings = path.join(HOME, ".claude", "settings.json");
   const codexCfg = path.join(HOME, ".codex", "config.toml");
-  const workflowHook = path.join(HOME, "bin", "agent-workflow-hook.mjs");
-  item("~/.claude/settings.json", exists(path.join(HOME, ".claude", "settings.json")) ? "ok" : "MISSING");
+  const codexHooksJson = path.join(HOME, ".codex", "hooks.json");
+  const workflowHook = path.join(HOME, "bin", "agent-loop.mjs");
+  item("~/.claude/settings.json", exists(claudeSettings) ? "ok" : "MISSING");
   item("~/.claude/CLAUDE.md", fileHas(claudeMd, /Execution Contract/) ? "ok (contract present)" : "WARN: no Execution Contract section");
   item("~/.codex/config.toml", exists(codexCfg) ? "ok" : "MISSING");
   item("~/.codex/AGENTS.md", fileHas(codexAgents, /Execution Contract/) ? "ok (contract present)" : "WARN: no Execution Contract section");
-  item("~/bin/agent-workflow-hook.mjs", exists(workflowHook) ? "ok" : "MISSING");
+  item("~/bin/agent-loop.mjs", exists(workflowHook) ? "ok" : "MISSING");
   const nodePaths = whichAll("node");
-  item("node runtime (for hook)", nodePaths[0] || "MISSING (agent-workflow-hook.mjs needs node)");
-  const claudeWorkflowHook = fileHas(path.join(HOME, ".claude", "settings.json"), /agent-workflow-hook\.mjs/);
-  const codexWorkflowHook = fileHas(codexCfg, /agent-workflow-hook\.mjs/) || fileHas(path.join(HOME, ".codex", "hooks.json"), /agent-workflow-hook\.mjs/);
-  item("workflow hook registration", `claude=${claudeWorkflowHook ? "ok" : "MISSING"} codex=${codexWorkflowHook ? "ok" : "MISSING"}`);
+  item("node runtime (for hook)", nodePaths[0] || "MISSING (agent-loop.mjs needs node)");
+  const legacyWorkflowHook = fileHas(claudeSettings, LEGACY_LOOP_HOOK_RE)
+    || fileHas(codexCfg, LEGACY_LOOP_HOOK_RE)
+    || fileHas(codexHooksJson, LEGACY_LOOP_HOOK_RE);
+  if (legacyWorkflowHook) {
+    failItem("legacy loop hook", "agent-workflow-hook.py/.mjs is still registered; run node bootstrap/install.mjs");
+  } else {
+    item("legacy loop hook", "ok (no old hook registrations)");
+  }
+  const legacyContractMarker = [claudeMd, codexAgents].filter((p) => fileHas(p, /managed by asdf bootstrap\/install\.py/i));
+  if (legacyContractMarker.length) {
+    failItem("legacy contract marker", `${legacyContractMarker.map((p) => path.relative(HOME, p)).join(", ")} still references install.py; run node bootstrap/install.mjs`);
+  } else {
+    item("legacy contract marker", "ok");
+  }
+  const workflowHooks = workflowHookRegistrationStatus(claudeSettings, codexCfg, codexHooksJson);
+  if (workflowHooks.ok) {
+    item("loop hook registration", workflowHooks.label);
+  } else {
+    failItem("loop hook registration", workflowHooks.label);
+  }
   const mcp = (readText(codexCfg).match(/^\[mcp_servers\./gm) || []).length;
   if (exists(codexCfg)) item("codex MCP servers", mcp);
+  const workflowCoreClaude = exists(path.join(HOME, ".claude", "skills", "workflow-core", "REFERENCE.md"));
+  const workflowCoreCodex = exists(path.join(HOME, ".codex", "skills", "workflow-core", "REFERENCE.md"));
+  if (workflowCoreClaude && workflowCoreCodex) {
+    item("workflow-core support", "claude=ok codex=ok");
+  } else {
+    failItem("workflow-core support", `claude=${workflowCoreClaude ? "ok" : "MISSING"} codex=${workflowCoreCodex ? "ok" : "MISSING"}`);
+  }
   for (const f of ["loop", "land", "fixloop", "converge"]) {
-    const cc = exists(path.join(HOME, ".claude", "commands", `${f}.md`));
-    const cx = codexCommandSkillStatus(f);
-    item(`cmd /${f}`, `claude=${cc ? "ok" : "MISSING"} codex_skill=${cx}`);
+    const claudeSkill = installedSkillStatus(path.join(HOME, ".claude", "skills"), f);
+    const codexSkill = installedSkillStatus(path.join(HOME, ".codex", "skills"), f);
+    const skillStatus = `claude=${claudeSkill.label} codex=${codexSkill.label}`;
+    if (claudeSkill.ok && codexSkill.ok) item(`skill ${f}`, skillStatus);
+    else failItem(`skill ${f}`, skillStatus);
+    const legacy = legacyWorkflowEntryStatus(f);
+    if (legacy.ok) item(`legacy ${f}`, legacy.label);
+    else failItem(`legacy ${f}`, legacy.label);
   }
   const goalMarkers = [
     path.join(HOME, ".claude", "commands", "goal.md"),
@@ -264,7 +463,7 @@ async function main() {
     || pathNameContains(path.join(HOME, ".codex", "plugins", "cache"), "ralph-loop");
   if (goalMarkers.some(exists)) item("loop driver dependency", "ok (/goal marker found)");
   else if (ralphFound) item("loop driver dependency", "ok (ralph-loop marker found)");
-  else item("loop driver dependency", "WARN: /loop needs /goal or ralph-loop for autonomous re-feed; no local marker found");
+  else item("loop driver dependency", "WARN: loop skill needs /goal or ralph-loop for autonomous re-feed; no local marker found");
   if (fileHas(path.join(HOME, ".claude", "settings.json"), /"skipDangerousModePermissionPrompt"\s*:\s*true/)) {
     item("skipDangerousPrompt", "WARN: true - dangerous-mode confirmations are skipped (weakens the only prompt-layer friction on scope drift)");
   }
@@ -284,19 +483,23 @@ async function main() {
   if (exists(srcRoot)) {
     const linked = new Set();
     const copied = new Set();
-    for (const sk of dirs(srcRoot)) {
+    for (const sk of [...sourceSkillDirs(srcRoot), ...workflowSupportDirs(srcRoot)]) {
       for (const rt of [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]) {
         const inst = path.join(rt, path.basename(sk));
         if (!exists(inst)) continue;
-        if (treeHash(sk) !== treeHash(inst)) item(`${path.basename(sk)} -> ${rt}`, "DRIFT");
+        if (treeHash(sk) !== treeHash(inst)) failItem(`${path.basename(sk)} -> ${rt}`, "DRIFT");
         const probeSrc = path.join(sk, "SKILL.md");
         const probeInst = path.join(inst, "SKILL.md");
-        (exists(probeSrc) && exists(probeInst) && sameFile(probeSrc, probeInst) ? linked : copied).add(path.basename(sk));
+        if (exists(probeSrc) && exists(probeInst)) {
+          (sameFile(probeSrc, probeInst) ? linked : copied).add(path.basename(sk));
+        } else {
+          copied.add(path.basename(sk));
+        }
       }
     }
     item("linked installs", [...linked].sort().join(", "));
     item("copied installs", `${[...copied].sort().join(", ")}  <- re-run install.mjs after source edits`);
-    item("drift scan", "done (only DRIFT lines above are problems)");
+    item("drift scan", "done (DRIFT is a failed post-install check)");
   } else {
     item("drift scan", `WARN: source repo not found at ${srcRoot} (set ASDF_REPO env var); scan skipped`);
   }
@@ -339,6 +542,34 @@ async function main() {
     item("meta-loop backlog", "absent (no candidates enqueued yet)");
   }
 
+  section("Agent loop runtime contract");
+  const workflowState = path.join(repo, STATE_DIR, RUN_CONTRACT);
+  if (exists(workflowState)) {
+    const touch = readJson(workflowState);
+    const findings = workflowRuntimeFindings(touch);
+    if (findings.errors.length) {
+      failItem(`${STATE_DIR}/${RUN_CONTRACT}`, findings.errors.join("; "));
+    } else {
+      item(`${STATE_DIR}/${RUN_CONTRACT}`, `ok (v2, ${touch.status}/${touch.terminal_state})`);
+    }
+    item("runtime safety budget", findings.warnings.length ? `WARN: ${findings.warnings.join(", ")}` : "ok");
+  } else {
+    item(`${STATE_DIR}/${RUN_CONTRACT}`, "absent");
+  }
+  if (exists(path.join(repo, LEGACY_STATE_DIR))) {
+    failItem(LEGACY_STATE_DIR, `legacy runtime state present; run node ~/bin/agent-loop.mjs status --repo "${repo}" to migrate`);
+  }
+  if (exists(path.join(repo, ".git"))) {
+    const trackedWorkflow = run(["git", "-C", repo, "ls-files", STATE_DIR, LEGACY_STATE_DIR], 3000);
+    if (trackedWorkflow.trim()) {
+      failItem("agent loop state tracked", trackedWorkflow.replace(/\r?\n/g, ", "));
+    } else {
+      item("agent loop state tracked", "ok (private state not tracked)");
+    }
+  } else {
+    item("agent loop state tracked", "skipped (repo is not a git checkout)");
+  }
+
   section("Disk");
   try {
     const usage = fs.statfsSync(HOME);
@@ -359,6 +590,10 @@ async function main() {
     item("sandbox log", "none");
   }
 
+  if (FAILURES) {
+    process.stdout.write(`\nDone. Read-only check; nothing was changed. ${FAILURES} failure(s) found.\n`);
+    return 1;
+  }
   process.stdout.write(`\n${GREEN}Done. Read-only check; nothing was changed.${RESET}\n`);
   return 0;
 }

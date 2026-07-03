@@ -11,7 +11,7 @@
 //
 // Private session corpus (loop-health.txt, corrections.txt) stays gitignored
 // under docs/research/; only neutral, reviewable candidates and decisions live
-// here. node:* builtins only (Node 18+), matching agent-workflow-hook.mjs.
+// here. node:* builtins only (Node 18+), matching agent-loop.mjs.
 //
 // One fresh-context iteration:
 //     meta-loop.mjs next            # claim the next unit or "none"

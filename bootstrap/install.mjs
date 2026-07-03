@@ -5,6 +5,7 @@
 //   node bootstrap/install.mjs [--dry-run]
 
 import fs from "node:fs";
+import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -15,8 +16,33 @@ const REPO = path.resolve(process.env.ASDF_INSTALL_REPO ?? path.join(path.dirnam
 const HOME = path.resolve(process.env.ASDF_INSTALL_HOME ?? os.homedir());
 
 const BEGIN = "<!-- BEGIN EXECUTION CONTRACT (managed by asdf bootstrap/install.mjs) -->";
+const LEGACY_BEGIN = "<!-- BEGIN EXECUTION CONTRACT (managed by asdf bootstrap/install.py) -->";
 const END = "<!-- END EXECUTION CONTRACT -->";
+const HOOK_BEGIN = "# BEGIN ASDF AGENT LOOP HOOKS (managed by asdf bootstrap/install.mjs)";
+const HOOK_END = "# END ASDF AGENT LOOP HOOKS";
+const LEGACY_HOOK_MARKERS = [
+  [
+    "# BEGIN ASDF AGENT WORKFLOW HOOKS (managed by asdf bootstrap/install.mjs)",
+    "# END ASDF AGENT WORKFLOW HOOKS",
+  ],
+];
 const ACTIONS = [];
+const WORKFLOW_SKILLS = ["converge", "fixloop", "land", "loop"];
+const LOOP_HOOK_RE = /agent-(?:workflow-hook|loop)\.(?:py|mjs)/i;
+const LEGACY_WORKFLOW_HASHES = {
+  claude: {
+    converge: new Set(["36ac6f3314effe80c8790c2297fda6c03f9b15cbac6eec2c1083e6ad05f5b648"]),
+    fixloop: new Set(["6d2b90078aa1f7b94b530eb2604153b28fe3f193ff5a38c0078fc03d2b9e5cde"]),
+    land: new Set(["beec6d97c889de8720cd210f22d5630c1fdfdc370962dc9d15be81a0d289e572"]),
+    loop: new Set(["9afea4122562e6edbbf2a523e62f923cbcdf882dc02a6ff730df7d27bede0ed6"]),
+  },
+  codex: {
+    converge: new Set(["e7cf11a6e2212a6c9ad4885941e190ba939971190522c55b5bd11e4eb95c232a"]),
+    fixloop: new Set(["a8d0f52533fc486924de471ae024656973cf232dbb1ed9577e1784f98bd7e304"]),
+    land: new Set(["722fe6556bccedc4a0cc0a08273b2ee6f205fc124bf81481f5341f50f7581289"]),
+    loop: new Set(["8793bd11d24445e21ca5d1152f70369940e444cd9c3a4bb3ec03e7000b45f310"]),
+  },
+};
 
 function plan(kind, detail) {
   ACTIONS.push([kind, detail]);
@@ -54,6 +80,18 @@ function sameContent(a, b) {
   } catch {
     return false;
   }
+}
+
+function normalizedHash(text) {
+  return crypto.createHash("sha256").update(text.replace(/\r\n/g, "\n"), "utf8").digest("hex");
+}
+
+function backupPath(target, suffix) {
+  const candidate = `${target}.${suffix}`;
+  if (!exists(candidate)) return candidate;
+  let i = 2;
+  while (exists(`${candidate}.${i}`)) i += 1;
+  return `${candidate}.${i}`;
 }
 
 function copyFile(src, dst, dry) {
@@ -94,46 +132,6 @@ function copyTree(src, dst, dry) {
   }
 }
 
-function parseFrontmatter(src) {
-  const text = readText(src);
-  const lines = text.split(/(?<=\n)/);
-  if (!lines.length || lines[0].trim() !== "---") return [{}, text];
-  const end = lines.findIndex((line, i) => i > 0 && line.trim() === "---");
-  if (end < 0) return [{}, text];
-  const meta = {};
-  for (const line of lines.slice(1, end).join("").split(/\r?\n/)) {
-    if (!line.trim() || !line.includes(":")) continue;
-    const [key, ...rest] = line.split(":");
-    const raw = rest.join(":").trim();
-    let value = raw;
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      value = raw.replace(/^['"]|['"]$/g, "");
-    }
-    meta[key.trim()] = String(value);
-  }
-  return [meta, lines.slice(end + 1).join("").replace(/^\s+/, "")];
-}
-
-function codexCommandSkill(src) {
-  const [meta, body] = parseFrontmatter(src);
-  const name = path.basename(src, ".md");
-  const description = meta.description ?? `${name} workflow command`;
-  return [
-    "---",
-    `name: ${name}`,
-    `description: ${JSON.stringify(description)}`,
-    "---",
-    "",
-    `# ${name}`,
-    "",
-    "Follow this command contract. Treat the user's current prompt after the skill name as the command input.",
-    "",
-    body,
-  ].join("\n");
-}
-
 function writeTextIfChanged(dst, text, dry) {
   if (exists(dst)) {
     const existing = readText(dst);
@@ -148,14 +146,264 @@ function writeTextIfChanged(dst, text, dry) {
   if (!dry) writeText(dst, text);
 }
 
+function isKnownManagedLegacyWorkflowText(text, name, kind) {
+  return Boolean(LEGACY_WORKFLOW_HASHES[kind]?.[name]?.has(normalizedHash(text)));
+}
+
+function removeManagedLegacyWorkflowFile(target, name, kind, dry) {
+  if (!exists(target)) return;
+  const text = readText(target);
+  if (!isKnownManagedLegacyWorkflowText(text, name, kind)) {
+    plan("ok", `${target} (preserved non-managed legacy file)`);
+    return;
+  }
+  const backup = backupPath(target, "bak-asdf-skill-first");
+  plan("remove", `${target} (backup: ${backup})`);
+  if (!dry) {
+    fs.copyFileSync(target, backup);
+    fs.rmSync(target, { force: true });
+  }
+}
+
+function pruneEmptyDir(dir, dry) {
+  if (!exists(dir)) return;
+  try {
+    if (fs.readdirSync(dir).length) return;
+    plan("remove", dir);
+    if (!dry) fs.rmdirSync(dir);
+  } catch {
+    // Directory is not empty or not removable; keeping it is harmless.
+  }
+}
+
+function workflowHookCommand() {
+  return `node "${path.join(HOME, "bin", "agent-loop.mjs")}"`;
+}
+
+function pruneWorkflowHookGroups(groups) {
+  if (!Array.isArray(groups)) return [];
+  const next = [];
+  for (const group of groups) {
+    if (!group || typeof group !== "object") continue;
+    const hooks = Array.isArray(group.hooks) ? group.hooks : [];
+    const kept = hooks.filter((hook) => !LOOP_HOOK_RE.test(String(hook.command ?? "")));
+    if (kept.length) next.push({ ...group, hooks: kept });
+  }
+  return next;
+}
+
+function addClaudeHook(settings, event, matcher, command) {
+  settings.hooks ??= {};
+  settings.hooks[event] = pruneWorkflowHookGroups(settings.hooks[event]);
+  settings.hooks[event].push({
+    matcher,
+    hooks: [{ type: "command", command }],
+  });
+}
+
+function configureClaudeHooks(dry) {
+  const target = path.join(HOME, ".claude", "settings.json");
+  const hadTarget = exists(target);
+  const original = hadTarget ? readText(target) : "";
+  let settings = {};
+  if (hadTarget) {
+    try {
+      settings = JSON.parse(original);
+    } catch (err) {
+      plan("error", `${target}: cannot parse JSON (${err.message})`);
+      return;
+    }
+  }
+  const command = workflowHookCommand();
+  addClaudeHook(settings, "PreToolUse", "Write|Edit|MultiEdit|Bash|PowerShell|mcp__.*", command);
+  addClaudeHook(settings, "Stop", "*", command);
+  const next = JSON.stringify(settings, null, 2) + "\n";
+  writeTextIfChanged(target, next, dry);
+  if (!dry && hadTarget && original !== next) {
+    writeText(`${target}.bak-agent-loop-hook`, original);
+  }
+}
+
+function prunedWorkflowHookJson(value) {
+  if (Array.isArray(value)) {
+    let changed = false;
+    const next = [];
+    for (const item of value) {
+      const pruned = prunedWorkflowHookJson(item);
+      changed ||= pruned.changed;
+      if (pruned.drop) {
+        changed = true;
+        continue;
+      }
+      next.push(pruned.value);
+    }
+    return { value: next, changed };
+  }
+  if (value && typeof value === "object") {
+    if (LOOP_HOOK_RE.test(String(value.command ?? ""))) {
+      return { drop: true, changed: true };
+    }
+    let changed = false;
+    const next = {};
+    for (const [key, child] of Object.entries(value)) {
+      const pruned = prunedWorkflowHookJson(child);
+      changed ||= pruned.changed;
+      if (!pruned.drop) next[key] = pruned.value;
+      else changed = true;
+    }
+    return { value: next, changed };
+  }
+  return { value, changed: false };
+}
+
+function configureCodexHooksJson(dry) {
+  const target = path.join(HOME, ".codex", "hooks.json");
+  if (!exists(target)) return;
+  const before = readText(target);
+  if (!LOOP_HOOK_RE.test(before)) {
+    plan("ok", `${target} (legacy loop hooks absent)`);
+    return;
+  }
+  let data;
+  try {
+    data = JSON.parse(before);
+  } catch (err) {
+    plan("error", `${target}: cannot parse JSON while removing legacy loop hook (${err.message})`);
+    return;
+  }
+  const pruned = prunedWorkflowHookJson(data);
+  if (!pruned.changed) {
+    plan("ok", `${target} (legacy loop hooks absent)`);
+    return;
+  }
+  const next = JSON.stringify(pruned.value, null, 2) + "\n";
+  writeTextIfChanged(target, next, dry);
+  if (!dry && before !== next) writeText(`${target}.bak-agent-loop-hook`, before);
+}
+
+function stripManagedHookBlock(text) {
+  let next = text;
+  const markers = [[HOOK_BEGIN, HOOK_END], ...LEGACY_HOOK_MARKERS];
+  for (;;) {
+    let found = null;
+    for (const [begin, endMarker] of markers) {
+      const start = next.indexOf(begin);
+      if (start >= 0 && (found === null || start < found.start)) found = { begin, endMarker, start };
+    }
+    if (found === null) return next;
+    const end = next.indexOf(found.endMarker, found.start + found.begin.length);
+    if (end < 0) return next;
+    next = next.slice(0, found.start).trimEnd() + "\n" + next.slice(end + found.endMarker.length).replace(/^\s+/, "");
+  }
+}
+
+function pruneWorkflowTomlHookGroup(lines, event) {
+  const childHeader = new RegExp(`^\\s*\\[\\[hooks\\.${event}\\.hooks\\]\\]\\s*$`);
+  const prefix = [];
+  const keptChildren = [];
+  let sawChild = false;
+  for (let i = 0; i < lines.length;) {
+    if (!childHeader.test(lines[i])) {
+      prefix.push(lines[i]);
+      i += 1;
+      continue;
+    }
+    sawChild = true;
+    let j = i + 1;
+    while (j < lines.length && !/^\s*\[\[/.test(lines[j])) j += 1;
+    const child = lines.slice(i, j);
+    if (!LOOP_HOOK_RE.test(child.join("\n"))) keptChildren.push(child);
+    i = j;
+  }
+  if (!sawChild) return LOOP_HOOK_RE.test(lines.join("\n")) ? [] : lines;
+  if (!keptChildren.length) return [];
+  return [...prefix, ...keptChildren.flat()];
+}
+
+function stripWorkflowTomlHookBlocks(text) {
+  const lines = stripManagedHookBlock(text).split(/\r?\n/);
+  const out = [];
+  for (let i = 0; i < lines.length;) {
+    const header = lines[i].match(/^\s*\[\[hooks\.(PreToolUse|Stop)\]\]\s*$/);
+    if (!header) {
+      out.push(lines[i]);
+      i += 1;
+      continue;
+    }
+    const event = header[1];
+    let j = i + 1;
+    while (j < lines.length) {
+      const line = lines[j];
+      const isHeader = /^\s*\[/.test(line);
+      const isChild = new RegExp(`^\\s*\\[\\[hooks\\.${event}\\.hooks\\]\\]\\s*$`).test(line);
+      if (isHeader && !isChild) break;
+      j += 1;
+    }
+    out.push(...pruneWorkflowTomlHookGroup(lines.slice(i, j), event));
+    i = j;
+  }
+  return out.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";
+}
+
+function managedCodexHookBlock() {
+  const command = workflowHookCommand();
+  const commandToml = JSON.stringify(command);
+  return [
+    HOOK_BEGIN,
+    '[[hooks.PreToolUse]]',
+    'matcher = ".*"',
+    '',
+    '[[hooks.PreToolUse.hooks]]',
+    'type = "command"',
+    `command = ${commandToml}`,
+    'timeout = 30',
+    'statusMessage = "Checking agent loop run contract"',
+    '',
+    '[[hooks.Stop]]',
+    'matcher = ".*"',
+    '',
+    '[[hooks.Stop.hooks]]',
+    'type = "command"',
+    `command = ${commandToml}`,
+    'timeout = 30',
+    'statusMessage = "Checking agent loop stop gate"',
+    HOOK_END,
+    '',
+  ].join("\n");
+}
+
+function configureCodexHooks(dry) {
+  const target = path.join(HOME, ".codex", "config.toml");
+  const before = exists(target) ? readText(target) : "";
+  const body = stripWorkflowTomlHookBlocks(before);
+  const prefix = body.trimEnd();
+  const next = `${prefix ? `${prefix}\n\n` : ""}${managedCodexHookBlock()}`;
+  writeTextIfChanged(target, next, dry);
+  if (!dry && before && before !== next) writeText(`${target}.bak-agent-loop-hook`, before);
+}
+
 function beginPositions(text) {
   const positions = [];
-  let at = text.indexOf(BEGIN);
-  while (at >= 0) {
-    positions.push([at, BEGIN]);
-    at = text.indexOf(BEGIN, at + BEGIN.length);
+  for (const marker of [BEGIN, LEGACY_BEGIN]) {
+    let at = text.indexOf(marker);
+    while (at >= 0) {
+      positions.push([at, marker]);
+      at = text.indexOf(marker, at + marker.length);
+    }
   }
-  return positions;
+  return positions.sort((a, b) => a[0] - b[0]);
+}
+
+function jsonConfigProblem(target, options = {}) {
+  if (!exists(target)) return null;
+  const text = readText(target);
+  if (options.onlyIfMatches && !options.onlyIfMatches.test(text)) return null;
+  try {
+    JSON.parse(text);
+    return null;
+  } catch (err) {
+    return `${target}: cannot parse JSON (${err.message}); fix it by hand, then re-run`;
+  }
 }
 
 function contractProblem(target) {
@@ -225,6 +473,10 @@ function main() {
   const problems = [
     contractProblem(path.join(HOME, ".claude", "CLAUDE.md")),
     contractProblem(path.join(HOME, ".codex", "AGENTS.md")),
+    jsonConfigProblem(path.join(HOME, ".claude", "settings.json")),
+    jsonConfigProblem(path.join(HOME, ".codex", "hooks.json"), {
+      onlyIfMatches: LOOP_HOOK_RE,
+    }),
   ].filter(Boolean);
   if (problems.length) {
     process.stdout.write(`asdf agent OS install aborted (nothing written) from ${REPO}\n\n`);
@@ -238,23 +490,24 @@ function main() {
     }
   }
 
-  for (const cmd of walkFiles(path.join(REPO, "bootstrap", "commands")).filter((p) => p.endsWith(".md")).sort()) {
-    copyFile(cmd, path.join(HOME, ".claude", "commands", path.basename(cmd)), dry);
-    writeTextIfChanged(
-      path.join(HOME, ".agents", "skills", path.basename(cmd, ".md"), "SKILL.md"),
-      codexCommandSkill(cmd),
-      dry,
-    );
+  for (const name of WORKFLOW_SKILLS) {
+    removeManagedLegacyWorkflowFile(path.join(HOME, ".claude", "commands", `${name}.md`), name, "claude", dry);
+    const legacyCodexSkillDir = path.join(HOME, ".agents", "skills", name);
+    removeManagedLegacyWorkflowFile(path.join(legacyCodexSkillDir, "SKILL.md"), name, "codex", dry);
+    pruneEmptyDir(legacyCodexSkillDir, dry);
   }
 
   mergeContract(path.join(REPO, "bootstrap", "contract", "claude.md"), path.join(HOME, ".claude", "CLAUDE.md"), dry);
   mergeContract(path.join(REPO, "bootstrap", "contract", "codex.md"), path.join(HOME, ".codex", "AGENTS.md"), dry);
 
   copyFile(path.join(REPO, "bootstrap", "bin", "agent-doctor.mjs"), path.join(HOME, "bin", "agent-doctor.mjs"), dry);
-  copyFile(path.join(REPO, "bootstrap", "bin", "agent-workflow-hook.mjs"), path.join(HOME, "bin", "agent-workflow-hook.mjs"), dry);
+  copyFile(path.join(REPO, "bootstrap", "bin", "agent-loop.mjs"), path.join(HOME, "bin", "agent-loop.mjs"), dry);
   copyFile(path.join(REPO, "bootstrap", "bin", "meta-loop.mjs"), path.join(HOME, "bin", "meta-loop.mjs"), dry);
+  configureClaudeHooks(dry);
+  configureCodexHooks(dry);
+  configureCodexHooksJson(dry);
 
-  const order = ["new", "update", "append", "ok", "same", "error"];
+  const order = ["new", "update", "append", "remove", "ok", "same", "error"];
   const counts = Object.fromEntries(order.map((k) => [k, 0]));
   process.stdout.write(`asdf agent OS install ${dry ? "(dry run) " : ""}from ${REPO}\n\n`);
   for (const kind of order) {
@@ -267,7 +520,7 @@ function main() {
   process.stdout.write(`\nsummary: ${order.map((k) => `${counts[k]} ${k}`).join(", ")}  (ok=unchanged, same=linked install)\n`);
 
   const modes = [];
-  for (const skill of dirs(path.join(REPO, "skills"))) {
+  for (const skill of dirs(path.join(REPO, "skills")).filter((p) => exists(path.join(p, "SKILL.md")))) {
     const probe = path.join(skill, "SKILL.md");
     const row = [];
     for (const [tag, rt] of [["claude", path.join(HOME, ".claude", "skills")], ["codex", path.join(HOME, ".codex", "skills")]]) {
@@ -283,10 +536,10 @@ function main() {
   }
 
   process.stdout.write(
-    "\nmanual wiring to verify on a new machine (not automated):\n" +
-      "  - PATH contains ~/bin (for agent-doctor.mjs and agent-workflow-hook.mjs)\n" +
-      "  - PreToolUse/Stop hooks call: node ~/bin/agent-workflow-hook.mjs\n" +
-      "  - run: node ~/bin/agent-doctor.mjs  - verifies versions, contract presence, hooks, skill drift\n",
+    "\nmanual checks after install:\n" +
+      "  - PATH contains ~/bin (for agent-doctor.mjs and agent-loop.mjs)\n" +
+      "  - PreToolUse/Stop hooks were written to ~/.claude/settings.json and ~/.codex/config.toml\n" +
+      "  - run: node ~/bin/agent-doctor.mjs  - verifies versions, contract presence, hooks, skill drift, and legacy hook drift\n",
   );
 
   return counts.error ? 1 : 0;

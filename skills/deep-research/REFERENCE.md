@@ -274,7 +274,7 @@ For unresolved contradictions in Chinese requests:
 
 A compressed Standard run. What transfers is the decisions — what was skipped, what earned a second check, when it stopped — not the sequence; a real run follows uncertainty, not these paragraphs in order.
 
-Request: "为什么订单创建偶尔超时？" No reproduction or fix was asked, so this stays in deep-research; had the user said "帮我修一下", it would route to the /fixloop diagnose-fix loop instead.
+Request: "为什么订单创建偶尔超时？" No reproduction or fix was asked, so this stays in deep-research; had the user said "帮我修一下", it would route to the fixloop diagnose-fix skill instead.
 
 Standard, not Deep: several components and a causal question, but no irreversible decision rides on the answer. No written plan either — the whole investigation hangs on one unknown, stated in one line: is event publishing inside the transaction boundary?
 

@@ -52,6 +52,12 @@ const SINGLETON_FILE_PATTERNS = [
 // loop (cap reds in a row) releases. gate_blocks_total is lifetime telemetry
 // only, never a release trigger.
 const GATE_BLOCK_CAP = 8;
+// Same failure repeated this many consecutive stop attempts releases the gate
+// as `stalled` before the blunt GATE_BLOCK_CAP does. A stuck loop that reds the
+// identical way is not making progress; releasing early saves wasted criterion
+// re-runs and turns the prose "stalled" terminal state into a machine verdict.
+// Override per run contract with budget.max_stall_repeats.
+const STALL_SIGNATURE_CAP = 3;
 const CRITERION_TIMEOUT_SECONDS = 300;
 
 const FILE_FIELD_NAMES = [
@@ -1164,6 +1170,21 @@ function outputTail(text, limit = 2000) {
   return trimmed.length > limit ? "..." + trimmed.slice(-limit) : trimmed;
 }
 
+// Stable, dependency-free signature of a failure verdict. Two consecutive red
+// stops with the same exit and same output tail are "the same failure"; a
+// changed signature means the loop moved and the stall counter resets. FNV-1a
+// over exit + tail keeps this deterministic across platforms without importing
+// a hash module.
+function failureSignature(exit, tail) {
+  const input = `${exit ?? "n/a"} ${String(tail ?? "")}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i += 1) {
+    hash ^= input.charCodeAt(i) & 0xff;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
 // Criterion gate: the machine-side stop verdict. Prose contracts stay
 // advisory; this makes "green before stop" deterministic in strict mode.
 // warn mode runs the criterion and records the verdict without blocking
@@ -1221,6 +1242,8 @@ function checkStop(payload, repo, touch) {
 
   if (verdict.verdict === "pass") {
     touch.gate_blocks = 0;
+    touch.stall_count = 0;
+    touch.stall_signature = null;
     touch.status = "closed";
     touch.closed_at = utcNow();
     touch.closed_reason = "criterion passed";
@@ -1249,16 +1272,28 @@ function checkStop(payload, repo, touch) {
   touch.gate_blocks = (Number.parseInt(String(touch.gate_blocks), 10) || 0) + 1;
   touch.gate_blocks_total = (Number.parseInt(String(touch.gate_blocks_total), 10) || 0) + 1;
   const failureLabel = verdict.detail ?? `exit ${verdict.exit ?? "n/a"}`;
+  const reasonTail = outputTail(verdict.output);
+
+  // Stall detection: an identical failure signature on consecutive stops is not
+  // progress. Reset the counter whenever the signature changes so a loop that is
+  // actually moving (different failure each round) is never marked stalled.
+  const signature = failureSignature(verdict.exit, reasonTail);
+  if (touch.stall_signature === signature) {
+    touch.stall_count = (Number.parseInt(String(touch.stall_count), 10) || 0) + 1;
+  } else {
+    touch.stall_signature = signature;
+    touch.stall_count = 1;
+  }
+  const stallCap = intField(budgetValue(touch, "max_stall_repeats", STALL_SIGNATURE_CAP), STALL_SIGNATURE_CAP);
+
   setLastFailure(touch, {
     summary: `criterion failed (${failureLabel})`,
     criterion,
     exit: verdict.exit,
-    output_tail: outputTail(verdict.output),
+    output_tail: reasonTail,
   });
   writeJson(runContractPath(repo), touch);
 
-  const released = touch.gate_blocks >= cap;
-  const reasonTail = outputTail(verdict.output);
   if (mode !== "strict") {
     appendEvent(repo, {
       ...base,
@@ -1268,19 +1303,30 @@ function checkStop(payload, repo, touch) {
     });
     return 0;
   }
-  if (released) {
+  // Prefer `stalled` over `exhausted`: stallCap < cap, so a loop reding the
+  // identical way releases early with the more informative terminal state; a
+  // loop whose failure keeps changing only ever hits the blunt cap.
+  const stalled = touch.stall_count >= stallCap;
+  const exhausted = touch.gate_blocks >= cap;
+  if (stalled || exhausted) {
+    const state = stalled ? "stalled" : "exhausted";
     touch.status = "closed";
     touch.closed_at = utcNow();
-    touch.closed_reason = "criterion gate exhausted";
-    setTerminalState(touch, "exhausted");
+    touch.closed_reason = stalled
+      ? `criterion gate stalled: same failure repeated ${touch.stall_count} times`
+      : "criterion gate exhausted";
+    setTerminalState(touch, state);
     writeJson(runContractPath(repo), touch);
     appendEvent(repo, {
       ...base,
       decision: "release",
+      terminal_state: state,
       reason:
-        `criterion gate released after ${touch.gate_blocks} consecutive blocks ` +
-        `(${touch.gate_blocks_total} total this session); ` +
-        "produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
+        (stalled
+          ? `criterion gate released as stalled after ${touch.stall_count} identical consecutive failures`
+          : `criterion gate released after ${touch.gate_blocks} consecutive blocks ` +
+            `(${touch.gate_blocks_total} total this session)`) +
+        "; produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
       criterion_exit: verdict.exit,
     });
     return 0;
@@ -1294,7 +1340,8 @@ function checkStop(payload, repo, touch) {
   return block(
     `completion criterion not met (${failureLabel}): ${criterion}\n` +
       (reasonTail ? `--- criterion output (tail) ---\n${reasonTail}\n` : "") +
-      `Fix the failure and re-verify; the stop gate releases after ${cap} consecutive blocks. ` +
+      `Fix the failure and re-verify; the stop gate releases as stalled after ${stallCap} identical ` +
+      `consecutive failures or as exhausted after ${cap} consecutive blocks. ` +
       `If the criterion itself is wrong, update it via ${STATE_DIR}/${RUN_CONTRACT} or close the run contract.`,
   );
 }
@@ -1404,12 +1451,45 @@ function cmdInit(values) {
     for (const error of errors) process.stderr.write(`error: ${error}\n`);
     return 1;
   }
+
+  // Red-at-init gate: a done-when criterion for a task with work to do must be
+  // RED before the work starts. A criterion that is already green cannot tell
+  // "done" from "not started", so it proves nothing — the whole point of the
+  // stop gate is that "green" is discriminating. Run it once here (the only
+  // cheap moment to catch a non-discriminating criterion) with no semantic
+  // judgment. Legitimately-green loops (noop verify, keep-green guard) declare
+  // intent with --allow-green-init. A non-executable criterion is not judged
+  // here; the stop gate degrades on it at run time.
+  const timeoutSec = intField(values["criterion-timeout-seconds"], CRITERION_TIMEOUT_SECONDS);
+  const initVerdict = runCriterion(data.criterion, repo, timeoutSec);
+  data.evidence.init_criterion = {
+    verdict: initVerdict.verdict,
+    exit: initVerdict.exit ?? null,
+    checked_at: now,
+    allow_green_init: Boolean(values["allow-green-init"]),
+  };
+  if (initVerdict.verdict === "pass" && !values["allow-green-init"]) {
+    const mustBlock = String(data.enforcement).toLowerCase() === "strict";
+    const message =
+      `criterion is already green before any work: ${data.criterion}\n` +
+      "a done-when criterion for a task with work to do must be red at init; " +
+      "an already-green criterion cannot prove this loop. Fix the criterion so it " +
+      "fails until the work is done, or pass --allow-green-init --reason <why> for " +
+      "an intentional noop/keep-green loop.\n";
+    if (mustBlock) {
+      process.stderr.write(message);
+      return 1;
+    }
+    process.stderr.write(`warning: ${message}`);
+  }
+
   writeJson(file, data);
   appendEvent(repo, {
     event: "Init",
-    decision: "observe",
+    decision: initVerdict.verdict === "pass" && !values["allow-green-init"] ? "warn" : "observe",
     evidence_kind: "loop_runtime",
     repo: String(repo),
+    init_criterion: initVerdict.verdict,
     ...(values.steal ? { reason: `stolen: ${values.reason}`, previous_session_id: ownerSessionId(existing) || null } : {}),
   });
   process.stdout.write(`created ${file}\n`);
@@ -1585,6 +1665,8 @@ const CLI_OPTIONS = {
     tables: { type: "string", multiple: true },
     interfaces: { type: "string", multiple: true },
     criterion: { type: "string" },
+    "criterion-timeout-seconds": { type: "string" },
+    "allow-green-init": { type: "boolean", default: false },
     goal: { type: "string" },
     session: { type: "string" },
     "concurrency-mode": { type: "string", default: "exclusive" },

@@ -11,7 +11,10 @@ Shared reference for the `converge`, `land`, `fixloop`, and `loop` skills. This 
 - **Done when**: a machine-checkable completion criterion such as a test command,
   SQL assertion, expected response, diff condition, or deployment fingerprint.
   A trivial single-file change with no data or interface impact may use one
-  current-vs-expected sentence.
+  current-vs-expected sentence. The criterion must be **red before the work and
+  idempotent**: it has to fail until the task is done (an already-green criterion
+  proves nothing — see red-at-init below), and the stop gate re-runs it on every
+  stop, so it must be read-only and side-effect-free.
 - **Evidence**: real tool output, status/diff, command output, SQL/API response,
   read-only verification, or an execution report. Prose alone is not evidence.
 - **Runtime state**: local agent state under `.agent-loop/`. It is
@@ -29,6 +32,12 @@ Use v2 `run-contract.json`; v1 state is invalid and must be re-initialized.
 `.agent-loop/loop-events.jsonl` proves only scope/process observations.
 It does not prove business correctness and cannot replace tests, SQL, API
 responses, screenshots, logs, or diff review.
+
+`init` runs the criterion once (**red-at-init**): a done-when criterion for a
+task with work to do must be red before the work starts. If it is already green,
+strict mode refuses `init` because the criterion cannot discriminate "done" from
+"not started". Declare an intentional already-green loop (noop verify,
+keep-green regression guard) with `--allow-green-init --reason <why>`.
 
 Abandoned state does not trap Stop, but write operations still require `close`,
 `steal`, or a separate worktree. Take over only with:
@@ -61,6 +70,15 @@ Use one terminal state in every closeout:
 `success` and `noop` are normal closures. `blocked`, `stalled`, and `exhausted`
 are not success and require a resumable state snapshot.
 
+**Which states the machine holds.** The Stop hook enforces three of these
+mechanically from the criterion verdict and its counters: `success` (criterion
+green), `stalled` (the same failure signature repeats — default three consecutive
+stops), and `exhausted` (the consecutive-block cap). `noop` and `blocked` are
+about *why* there was nothing to do or what is missing; the machine cannot derive
+them from a verdict, so they remain agent-declared and must be justified in the
+closeout. Do not read a machine-held state as more than "the criterion was
+green / kept failing the same way / never went green in budget."
+
 ## Budget And Rework
 
 - The default cap is eight iterations unless the user states a different cap or
@@ -69,7 +87,10 @@ are not success and require a resumable state snapshot.
 - Stop as `stalled` when the same failure repeated twice, or when two
   consecutive rounds change neither the failure nor the evidence. Stop as
   `exhausted` when the eight-iteration default cap, explicit user cap, or
-  runtime budget is reached before success.
+  runtime budget is reached before success. The Stop hook releases `stalled`
+  automatically after the same failure signature repeats (default three
+  consecutive stops; override with `budget.max_stall_repeats`), which caps the
+  criterion re-runs a genuinely stuck loop pays before it stops.
 - Treat a loop as rework when it repairs previously delivered work or resumes a
   prior `blocked`, `stalled`, or `exhausted` closeout. If the target repo has
   `docs/rework-log.md` or its workflow contract names that file, append a

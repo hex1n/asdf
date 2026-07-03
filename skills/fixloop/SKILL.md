@@ -23,8 +23,22 @@ concurrency, git, or closeout details.
 Identify the original input, command, request, scenario, or failure scene, plus
 the pass criterion. If either is missing, ask for it before editing.
 
+When the input is an `e2e-test-executor` execution report (provisional; scoped
+to this intake), do not degrade it to "read one error and patch." Take intake
+from the report's own structure: its `failed` and `blocked` scenario rows and
+their linked `issues/ISSUE-*.md` documents, and carry its Environment State
+Ledger as the resume snapshot (what persists, what must not be cleaned). Derive
+the reproduction from the failing scenario row and its issue document, not from
+memory. The rerun scope is the failed and blocked scenarios plus their DAG
+dependents — whatever consumed the fixed behavior — not the single scenario and
+not the whole plan; the loaded-build freshness gate (step 4) and that rerun
+scope (step 5) then apply. Do not restate the executor's report contract here;
+consume it.
+
 Completion criterion: the reproduction input and pass criterion are explicit
-enough to replay.
+enough to replay; when the input is an execution report, the intake set is its
+failed/blocked scenarios plus DAG dependents, sourced from the report rather
+than re-derived.
 
 ### 2. Diagnose With Evidence
 

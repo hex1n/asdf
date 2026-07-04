@@ -549,9 +549,16 @@ function main() {
     }
   }
 
+  // ~/.agents/skills is legacy residue only when it is NOT the live shared
+  // cache; when ~/.claude/skills or ~/.codex/skills resolves into it, the
+  // installer just wrote the current skills there and must not prune them.
+  const agentsSkills = path.join(HOME, ".agents", "skills");
+  const agentsIsLiveCache = [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]
+    .some((rt) => sameFile(rt, agentsSkills));
   for (const name of WORKFLOW_SKILLS) {
     removeManagedLegacyWorkflowFile(path.join(HOME, ".claude", "commands", `${name}.md`), name, "claude", dry);
-    const legacyCodexSkillDir = path.join(HOME, ".agents", "skills", name);
+    if (agentsIsLiveCache) continue;
+    const legacyCodexSkillDir = path.join(agentsSkills, name);
     removeManagedLegacyWorkflowFile(path.join(legacyCodexSkillDir, "SKILL.md"), name, "codex", dry);
     pruneEmptyDir(legacyCodexSkillDir, dry);
   }

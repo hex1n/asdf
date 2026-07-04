@@ -174,12 +174,34 @@ function installedSkillStatus(root, name) {
   return hasName && hasDescription ? { ok: true, label: "ok" } : { ok: false, label: "malformed" };
 }
 
-function legacyWorkflowEntryStatus(name) {
+// ~/.agents/skills counts as legacy residue only when it is NOT the live
+// shared cache: on machines where ~/.claude/skills or ~/.codex/skills is a
+// symlink resolving into ~/.agents/skills, that directory IS the install
+// target, so its workflow skills are current managed copies, not leftovers.
+function agentsSkillsIsLiveCache() {
+  const agents = path.join(HOME, ".agents", "skills");
+  let agentsReal;
+  try {
+    agentsReal = fs.realpathSync.native(agents);
+  } catch {
+    return false;
+  }
+  for (const rt of [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]) {
+    try {
+      if (fs.realpathSync.native(rt) === agentsReal) return true;
+    } catch {
+      // runtime skills dir missing; keep checking the other runtime
+    }
+  }
+  return false;
+}
+
+function legacyWorkflowEntryStatus(name, agentsIsLiveCache) {
   const claudeCommand = path.join(HOME, ".claude", "commands", `${name}.md`);
   const codexWrapper = path.join(HOME, ".agents", "skills", name, "SKILL.md");
   const leftovers = [];
   if (exists(claudeCommand)) leftovers.push(path.relative(HOME, claudeCommand));
-  if (exists(codexWrapper)) leftovers.push(path.relative(HOME, codexWrapper));
+  if (exists(codexWrapper) && !agentsIsLiveCache) leftovers.push(path.relative(HOME, codexWrapper));
   return leftovers.length
     ? { ok: false, label: `legacy entries remain (${leftovers.join(", ")})` }
     : { ok: true, label: "ok" };
@@ -453,13 +475,14 @@ async function main() {
   } else {
     failItem("workflow-core support", `claude=${workflowCoreClaude ? "ok" : "MISSING"} codex=${workflowCoreCodex ? "ok" : "MISSING"}`);
   }
+  const agentsIsLiveCache = agentsSkillsIsLiveCache();
   for (const f of ["loop", "land", "fixloop", "converge"]) {
     const claudeSkill = installedSkillStatus(path.join(HOME, ".claude", "skills"), f);
     const codexSkill = installedSkillStatus(path.join(HOME, ".codex", "skills"), f);
     const skillStatus = `claude=${claudeSkill.label} codex=${codexSkill.label}`;
     if (claudeSkill.ok && codexSkill.ok) item(`skill ${f}`, skillStatus);
     else failItem(`skill ${f}`, skillStatus);
-    const legacy = legacyWorkflowEntryStatus(f);
+    const legacy = legacyWorkflowEntryStatus(f, agentsIsLiveCache);
     if (legacy.ok) item(`legacy ${f}`, legacy.label);
     else failItem(`legacy ${f}`, legacy.label);
   }

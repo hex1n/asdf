@@ -1,10 +1,13 @@
 ---
 name: converge
 description: >
-  Plan convergence for explicit or high-risk unresolved decisions. Use when the
-  user asks to compare options, first-principles plan, 最佳方案, 先给方案,
-  先不写代码, or when irreversible/high-risk work needs falsification before
-  implementation.
+  Multi-view plan convergence for explicitly requested or irreversible/high-risk
+  unresolved decisions. Use when the user asks to 收敛方案, 多视角审查方案,
+  证伪方案, compare and falsify competing options, or when irreversible or
+  high-risk work needs falsification before implementation. For a bare
+  best-plan or first-principles request (最佳方案, 给出方案, 先不写代码)
+  without a convergence or falsification ask, use first-principles-planner
+  instead.
 argument-hint: "[problem, decision, or plan to converge]"
 ---
 

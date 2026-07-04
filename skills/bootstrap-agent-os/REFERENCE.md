@@ -34,6 +34,53 @@ Do not include:
 - Long tool runbooks.
 - Local run state, active checkpoints, or temporary loop counters.
 
+#### Boundary Entry Template
+
+Source template for the "always-on safety boundaries" section of a project
+startup file (`AGENTS.md` / `CLAUDE.md` Boundaries-style section). Before
+adding entries, inventory the project's existing rules and add only what is
+missing — tool mappings (e.g. MCP-vs-CLI), git boundaries, behavioral
+equivalence, and loop caps often already exist at the project level; duplicating
+them creates two drifting copies. For Chinese startup files, translate the
+entries; trim to the target project's actual risks.
+
+```markdown
+- Preserve run/test data by default; capture the diagnostic scene before any cleanup.
+- Before landing a plan, restate the run contract (target repo/working directory plus
+  files, tables, interfaces); stop and confirm before touching anything outside it.
+- If the repo has `.agent-loop/`, mirror the active run contract into
+  `.agent-loop/run-contract.json` v2 runtime contract with
+  `agent-loop.mjs init` and use `.agent-loop/loop-events.jsonl`
+  as local hook evidence; this state is gitignored and non-authoritative. The
+  event log proves scope/process observations only, not business correctness. A
+  stale run contract will not trap Stop, but write operations still require
+  `close`, `steal`, or a separate worktree.
+- Do not run two active writer loops in the same worktree by default: the active
+  run contract binds the first session. Use a separate git worktree, deliberately
+  take over with `init --force --steal --reason <why>`, or only when explicitly
+  requested use `agent-loop.mjs claim` to enter `partitioned` mode with
+  non-overlapping file claims and a single integrator session.
+- Only run git add/commit/push/reset/restore/checkout/clean after the user asks
+  for that operation; before running it, create or update the active run contract
+  with `--git-allowed <op>`, `--git-reason <why>`, and enough git budget.
+- Treat explicit user approval as execution permission; do not add another
+  convergence/planning gate unless new blocking evidence appears.
+- Completion claims must cite real tool output, status/diff, command output, or
+  SQL assertions; failed or skipped tools cannot support success claims.
+- Keep terminal states explicit: `success` and `noop` are normal closures;
+  `blocked`, `stalled`, and `exhausted` are not success and require a resumable
+  state snapshot.
+- If a landing or debugging task lacks a machine-checkable completion criterion
+  (test command, SQL assertion, expected response), ask for one before editing;
+  a trivial single-file change with no data/interface impact may use a one-line
+  current-vs-expected statement instead.
+- Keep a project glossary: when a domain term's semantics are corrected twice,
+  record the term before further landing (e.g. via a domain-modeling pass).
+- Run parallel agent loops in separate git worktrees; never share one working
+  directory between concurrent loops.
+- When asked to commit, reuse the repo's historical commit author identity.
+```
+
 ### Direction Anchor
 
 Purpose: preserve durable WHAT/WHY direction that prevents locally valid but strategically wrong changes.

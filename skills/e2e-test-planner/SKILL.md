@@ -98,7 +98,7 @@ Lead each detailed scenario with a one-line **index/handle** — its DAG node id
 - In `Setup`, include target surfaces, environment assumptions, and any required stubs or test hooks.
 - In `Steps`, include the named-variable dependency chain: what each step consumes from previous steps and what it produces.
 - In `Expected`, include probes, waits, and invariants at user, API, data, event, external-system, and async levels.
-- In `Automation`, name the level: E2E, API integration, contract, load/performance, chaos/recovery, or manual exploratory.
+- In `Automation`, name the level: E2E, API integration, contract, load/performance, chaos/recovery, or manual exploratory. The level classifies coverage; it does not direct an executor to author test code.
 - In `Isolation/Cleanup`, name the retention policy, owner marker, TTL, cleanup command, determinism, and flake risks; default to preserving self-owned traces for local/test executor runs unless explicitly overridden, and match any cleanup command to real transaction boundaries rather than assuming outer test rollback works for committed end-to-end calls.
 - `Side-effect Class`: classify each scenario by what it does to shared state — `read-only`, `additive-retained`, `soft-delete`, `destructive-delete`, `config-change`, `external-file`, or `async-replay`. A `soft-delete`, `destructive-delete`, or scope-mutating scenario requires explicit user authorization or a dedicated fixture before an executor may run it, and is re-risked whenever a data-retention override is in force ([REFERENCE.md](REFERENCE.md#side-effect-class)). Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized field labels.
 

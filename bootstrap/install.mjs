@@ -69,6 +69,14 @@ function readText(p) {
   return fs.readFileSync(p, "utf8");
 }
 
+function isSymlink(p) {
+  try {
+    return fs.lstatSync(p).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 function writeText(p, text) {
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, text, "utf8");
@@ -466,6 +474,45 @@ function mergeContract(blockFile, target, dry) {
   }
 }
 
+// The Claude-side contract now ships as a whole-file user rule
+// (~/.claude/rules/work-loop.md); any marker block a previous installer merged
+// into ~/.claude/CLAUDE.md is stale and gets removed here. Never write through
+// a symlink: a symlinked CLAUDE.md is owned by another system (e.g. a memory
+// vault), so a block inside it must be moved out by hand.
+function removeContractBlock(target, dry) {
+  if (!exists(target)) return;
+  const text = readText(target);
+  const begins = beginPositions(text);
+  if (!begins.length) return;
+  if (isSymlink(target)) {
+    plan("error", `${target}: symlink contains a managed contract block; remove it from the link target by hand`);
+    return;
+  }
+  const [start, marker] = begins[0];
+  const endStart = text.indexOf(END, start + marker.length);
+  const endAfter = endStart + END.length;
+  const next = (text.slice(0, start) + text.slice(endAfter)).replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+  plan("remove", `${target} (contract block moved to ~/.claude/rules/work-loop.md)`);
+  if (!dry) {
+    writeText(`${target}.bak`, text);
+    writeText(target, next);
+  }
+}
+
+// Codex has no user-level rules directory, so the marker merge stays — but a
+// symlinked AGENTS.md is owned elsewhere and is never written through.
+function guardedMergeContract(blockFile, target, dry) {
+  if (isSymlink(target)) {
+    if (beginPositions(readText(target)).length) {
+      plan("error", `${target}: symlink contains a managed contract block; remove it from the link target by hand`);
+    } else {
+      plan("ok", `${target} (symlink; contract managed elsewhere, merge skipped)`);
+    }
+    return;
+  }
+  mergeContract(blockFile, target, dry);
+}
+
 function dirs(root) {
   if (!exists(root)) return [];
   return fs.readdirSync(root).sort().map((name) => path.join(root, name)).filter((p) => fs.statSync(p).isDirectory());
@@ -478,9 +525,13 @@ function main() {
     return 2;
   }
 
+  const claudeMdPath = path.join(HOME, ".claude", "CLAUDE.md");
+  const codexAgentsPath = path.join(HOME, ".codex", "AGENTS.md");
   const problems = [
-    contractProblem(path.join(HOME, ".claude", "CLAUDE.md")),
-    contractProblem(path.join(HOME, ".codex", "AGENTS.md")),
+    // Symlinked startup files are never written through, so malformed markers
+    // inside a link target are reported at merge time, not as a preflight abort.
+    isSymlink(claudeMdPath) ? null : contractProblem(claudeMdPath),
+    isSymlink(codexAgentsPath) ? null : contractProblem(codexAgentsPath),
     jsonConfigProblem(path.join(HOME, ".claude", "settings.json")),
     jsonConfigProblem(path.join(HOME, ".codex", "hooks.json"), {
       onlyIfMatches: LOOP_HOOK_RE,
@@ -505,12 +556,14 @@ function main() {
     pruneEmptyDir(legacyCodexSkillDir, dry);
   }
 
-  mergeContract(path.join(REPO, "bootstrap", "contract", "claude.md"), path.join(HOME, ".claude", "CLAUDE.md"), dry);
-  mergeContract(path.join(REPO, "bootstrap", "contract", "codex.md"), path.join(HOME, ".codex", "AGENTS.md"), dry);
+  // Claude: the work-loop card is a user-level rules file (loaded every
+  // session, same priority as user CLAUDE.md); Codex keeps the marker merge.
+  copyFile(path.join(REPO, "bootstrap", "contract", "claude.md"), path.join(HOME, ".claude", "rules", "work-loop.md"), dry);
+  removeContractBlock(claudeMdPath, dry);
+  guardedMergeContract(path.join(REPO, "bootstrap", "contract", "codex.md"), codexAgentsPath, dry);
 
   copyFile(path.join(REPO, "bootstrap", "bin", "agent-doctor.mjs"), path.join(HOME, "bin", "agent-doctor.mjs"), dry);
   copyFile(path.join(REPO, "bootstrap", "bin", "agent-loop.mjs"), path.join(HOME, "bin", "agent-loop.mjs"), dry);
-  copyFile(path.join(REPO, "bootstrap", "bin", "meta-loop.mjs"), path.join(HOME, "bin", "meta-loop.mjs"), dry);
   copyFile(path.join(REPO, "bootstrap", "bin", "e2e-report-check.mjs"), path.join(HOME, "bin", "e2e-report-check.mjs"), dry);
   configureClaudeHooks(dry);
   configureCodexHooks(dry);

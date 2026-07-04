@@ -38,7 +38,7 @@ jobs:
           node --version
 
       - name: Node bootstrap contract tests
-        run: node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs tests/e2e_report_check.test.mjs
+        run: node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
       - name: Python repo-level contract tests
         run: python -m unittest discover -s tests

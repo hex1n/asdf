@@ -2,7 +2,8 @@
 
 装的核心是**个人 agent 工作循环**（判据 → 收敛 → 落地 → 排查 → 判停），在任意项目
 零配置生效；skills、doctor、hook 都是这个流程的配套件。项目级操作层不在此分发，
-需要时用 bootstrap-agent-os skill 按项目生成。
+需要时用 bootstrap-agent-os skill 按项目生成（项目级边界条目的源模板随该 skill
+分发，任意机器装完即可用；先盘点目标项目已有规则，只加缺失条目）。
 
 在任意新电脑上装齐：
 
@@ -20,8 +21,8 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 | 目录 | 内容 | 安装目标 |
 |---|---|---|
 | `../skills/` | 全部源技能；`workflow-core/` 是不可触发支持目录 | `~/.claude/skills/`、`~/.codex/skills/` |
-| `contract/` | **工作循环 + Execution Contract**（[设计说明](../docs/execution-contract.md)） | 合并进 `~/.claude/CLAUDE.md`、`~/.codex/AGENTS.md`（标记块内替换，不重复追加） |
-| `bin/` | `agent-doctor.mjs` 只读环境自检、`agent-loop.mjs` run contract / loop event log / 判据闸门 hook（Node，零额外依赖） | `~/bin/`；安装器同时注册 Claude/Codex PreToolUse/Stop hooks |
+| `contract/` | **工作循环契约（默认值卡）**—— 用户级分发的单一源，机器可读源即人读源；双端同义由 `tests/test_bootstrap_contract_parity.py` 守护；循环机制细节不在卡内，由 skills 与 hook 在使用点承载 | Claude：整文件分发为 `~/.claude/rules/work-loop.md`（官方 user rules 机制，每会话加载）；Codex：标记块合并进 `~/.codex/AGENTS.md`。启动文件为 symlink 时一律不写穿，跳过并提示 |
+| `bin/` | `agent-doctor.mjs` 只读环境自检、`agent-loop.mjs` run contract / loop event log / 判据闸门 hook、`e2e-report-check.mjs` E2E 报告判据检查器——均 Node，零额外依赖 | `~/bin/`；安装器同时注册 Claude/Codex PreToolUse/Stop hooks |
 
 ## 日常使用：接一个新需求
 
@@ -102,8 +103,42 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
   取值是否在官方合法值内）
 - 业务仓库的项目级合同条目走各仓库 git，不由本安装器分发
 
+## 边界与威胁模型
+
+- **判据闸门是协作式兜底，不是对抗性防线**：Stop hook 执行 `criterion` 防的是
+  "看着像完成了就想停"这类无意提前判停——红判据会真的拦住、失败输出回注，判据通过才
+  写入 `terminal_state=success`；无需改动为 `noop`；缺外部输入为 `blocked`；重复无进展为
+  `stalled`；预算耗尽为 `exhausted`，非成功终态要求可续跑快照。`.agent-loop/` 是 agent 的
+  合法工作区（run contract 本就靠 CLI 写入其中），一个刻意规避的 agent 能用普通被许可的
+  写操作改 `status`/`enforcement`/`criterion`、抬高计数器、删除 run contract 或清空未签名的
+  event log，从而在真实判据仍红时放行——这类绕过超出本 hook 的能力范围，需要签名/树外
+  状态才能防，本仓不做。闸门与 event log 定位同源：证明协作过程，不证明业务正确、
+  也不防篡改。
+- **降级永不困死**：状态不可解析/判据不可执行/超时/写盘失败一律放行。
+- **会话绑定只防遗弃 run contract 误伤 Stop**；写操作仍由 PreToolUse 的会话绑定拦截，
+  需要 `close`、`steal` 或独立 worktree，不防同会话内的主动改写。
+- **Guardian 准则的生效边界**（Codex）：写在 `~/.codex/AGENTS.md` 的"Guardian 审批准则"
+  面向主代理自律；要机制化拦截，还需在 `config.toml` 审批配置侧接入（官方文档口径的
+  reviewer 取值/`[auto_review].policy`）——机器级配置不由本仓分发，doctor 会自检当前
+  取值是否在官方合法值内。审批层自带的连续拒绝熔断与任务层"8 轮判停"是两个独立维度，
+  互不替代。
+
 ## 维护纪律
 
-改动先改本目录的源，再跑 `install.mjs` 分发；不要直接改安装副本
-（与 skill 分发同一防 Cache Drift 纪律）。新增规则先过
-[docs/execution-contract.md](../docs/execution-contract.md) 的 Rule Harvest Gate。
+- 改动先改本目录的源，再跑 `install.mjs` 分发；不要直接改安装副本
+  （与 skill 分发同一防 Cache Drift 纪律）。
+- 新增规则先过 [AGENTS.md](../AGENTS.md) 的 Rule Harvest Gate（≥2 次重复纠正或明确
+  认可的不变量），写明语料证据；分发后用冷启动会话做证伪验证（不重申约束，诱导违规，
+  观察默认行为）。
+- 与 workflow skills（converge/land/fixloop/loop）的循环契约保持同义：skills 是
+  "每次任务显式声明"，契约是"不声明时的默认值"；默认档必须保持轻量，不把 `converge`
+  变成用户拍板后的隐式回退步骤。同义由 `tests/test_bootstrap_contract_parity.py`
+  机器守护。
+- 机器可读运行状态只落目标仓库的 `.agent-loop/`（gitignored、非权威）：v2
+  `run-contract.json` 是当前循环的单一 runtime contract，承载
+  `goal/criterion/touch/budget/session/terminal_state/evidence/review/concurrency`；
+  旧 v1 清单不兼容，需重新 `init`。`loop-events.jsonl` 只支撑范围/过程声明，不替代
+  测试、SQL、API 响应、diff 等业务验证证据。
+- 项目级条目不由本安装器分发：用 bootstrap-agent-os 的边界条目模板按项目生成，
+  先盘点已有规则、只加缺失，由各仓库自己的 git 管理。用户级契约不放工具映射
+  （MCP-vs-CLI 这类属于项目层）。

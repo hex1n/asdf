@@ -261,11 +261,6 @@ function daysSinceMtime(p) {
   return Math.floor(ms / 86400000);
 }
 
-function parseUtc(ts) {
-  const ms = Date.parse(String(ts));
-  return Number.isNaN(ms) ? null : ms / 1000;
-}
-
 function normalizePatterns(values) {
   if (!Array.isArray(values)) return [];
   return values
@@ -410,9 +405,22 @@ async function main() {
   const codexHooksJson = path.join(HOME, ".codex", "hooks.json");
   const workflowHook = path.join(HOME, "bin", "agent-loop.mjs");
   item("~/.claude/settings.json", exists(claudeSettings) ? "ok" : "MISSING");
-  item("~/.claude/CLAUDE.md", fileHas(claudeMd, /Execution Contract/) ? "ok (contract present)" : "WARN: no Execution Contract section");
+  const claudeRules = path.join(HOME, ".claude", "rules", "work-loop.md");
+  item("~/.claude/rules/work-loop.md", fileHas(claudeRules, /工作循环/) ? "ok (work-loop card present)" : "WARN: work-loop card missing; run node bootstrap/install.mjs");
+  if (fileHas(claudeMd, /BEGIN EXECUTION CONTRACT/)) {
+    item("~/.claude/CLAUDE.md", "WARN: stale managed contract block; run node bootstrap/install.mjs to migrate it to rules/work-loop.md");
+  }
   item("~/.codex/config.toml", exists(codexCfg) ? "ok" : "MISSING");
-  item("~/.codex/AGENTS.md", fileHas(codexAgents, /Execution Contract/) ? "ok (contract present)" : "WARN: no Execution Contract section");
+  const codexAgentsIsLink = (() => {
+    try {
+      return fs.lstatSync(codexAgents).isSymbolicLink();
+    } catch {
+      return false;
+    }
+  })();
+  item("~/.codex/AGENTS.md", codexAgentsIsLink
+    ? "ok (symlink; contract managed elsewhere)"
+    : fileHas(codexAgents, /工作循环/) ? "ok (contract present)" : "WARN: no work-loop contract; run node bootstrap/install.mjs");
   item("~/bin/agent-loop.mjs", exists(workflowHook) ? "ok" : "MISSING");
   const nodePaths = whichAll("node");
   item("node runtime (for hook)", nodePaths[0] || "MISSING (agent-loop.mjs needs node)");
@@ -513,35 +521,6 @@ async function main() {
   } else {
     item("loop-health.txt", "missing - run docs/research/2026-07-02-analyze-sessions.py to create the baseline");
   }
-  const metaCli = path.join(HOME, "bin", "meta-loop.mjs");
-  item("~/bin/meta-loop.mjs", exists(metaCli) ? "ok" : "MISSING (run install.mjs)");
-  const backlog = path.join(repo, "docs", "meta-loop", "backlog.jsonl");
-  if (exists(backlog)) {
-    const counts = {};
-    let stale = 0;
-    for (const raw of readText(backlog).split(/\r?\n/)) {
-      const line = raw.trim();
-      if (!line) continue;
-      let row;
-      try {
-        row = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      const st = String(row.status ?? "pending");
-      counts[st] = (counts[st] ?? 0) + 1;
-      if (st === "in_progress") {
-        const claimed = parseUtc(row.claimed_at);
-        if (claimed !== null && Date.now() / 1000 - claimed > 6 * 3600) stale += 1;
-      }
-    }
-    const summary = Object.keys(counts).sort().map((k) => `${k}:${counts[k]}`).join(" ") || "empty";
-    const note = stale ? ` - WARN: ${stale} stale claim(s), a prior round likely crashed` : "";
-    item("meta-loop backlog", `${summary}${note}`);
-  } else {
-    item("meta-loop backlog", "absent (no candidates enqueued yet)");
-  }
-
   section("Agent loop runtime contract");
   const workflowState = path.join(repo, STATE_DIR, RUN_CONTRACT);
   if (exists(workflowState)) {

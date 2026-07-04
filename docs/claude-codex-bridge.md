@@ -4,4 +4,4 @@
 
 https://github.com/hex1n/claude-codex-bridge
 
-Historical design notes remain under `docs/plans/` in this repository, but the plugin source, tests, install scripts, and CI belong to the standalone repository.
+The plugin source, tests, install scripts, CI, and design history all belong to the standalone repository.

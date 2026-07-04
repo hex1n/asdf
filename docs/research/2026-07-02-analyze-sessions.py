@@ -4,6 +4,17 @@ import json, os, re, sys, glob, io
 from collections import Counter, defaultdict
 
 HOME = os.path.expanduser("~")
+# Scrub the *current user's* home from project labels in emitted corpora, in
+# both the flattened session-dir form (path separators / drive colons become
+# dashes) and the native form, so outputs never carry a machine-local username.
+HOME_FLAT = re.sub(r"[:\\/]", "-", HOME)
+
+def scrub_project(proj):
+    s = str(proj)
+    s = s.replace(HOME_FLAT + "-", "").replace(HOME_FLAT, "~")
+    s = s.replace(HOME + "\\", "~\\").replace(HOME + "/", "~/")
+    return s
+
 OUT = os.path.dirname(os.path.abspath(__file__))
 if "--out" in sys.argv:
     OUT = os.path.abspath(sys.argv[sys.argv.index("--out") + 1])
@@ -203,7 +214,7 @@ for f in files:
 def dump_prompts(path, rows):
     with w(path) as fo:
         for date, proj, sid, txt in rows:
-            proj_s = str(proj).replace("C--Users-hexin-", "").replace("C:\\Users\\hexin\\", "~\\")
+            proj_s = scrub_project(proj)
             fo.write("[%s] [%s] %s\n" % (date, proj_s[:40], txt))
 
 dump_prompts("corpus_claude.txt", claude_prompts)
@@ -211,9 +222,9 @@ dump_prompts("corpus_codex.txt", codex_prompts)
 
 with w("first_prompts.txt") as fo:
     for sid, (proj, date, txt) in sorted(claude_first.items(), key=lambda kv: kv[1][1]):
-        fo.write("[claude %s] [%s] %s\n" % (date, str(proj).replace("C--Users-hexin-", "")[:40], txt))
+        fo.write("[claude %s] [%s] %s\n" % (date, scrub_project(proj)[:40], txt))
     for sid, (proj, date, txt) in sorted(codex_first.items(), key=lambda kv: kv[1][1]):
-        fo.write("[codex %s] [%s] %s\n" % (date, str(proj).replace("C:\\Users\\hexin\\", "~\\")[:40], txt))
+        fo.write("[codex %s] [%s] %s\n" % (date, scrub_project(proj)[:40], txt))
 
 # corrections & verification
 with w("corrections.txt") as fo:

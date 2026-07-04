@@ -22,14 +22,14 @@ node bootstrap/install.mjs         # distribute the loop to ~/.claude and ~/.cod
 node ~/bin/agent-doctor.mjs         # post-install self-check
 ```
 
-- [`bootstrap/`](bootstrap/) — machine-level install: the work-loop + Execution
-  Contract blocks, agent-doctor self-check, optional `.agent-loop` hook,
-  and an idempotent installer. Its
-  [README](bootstrap/README.md) documents the **new-requirement workflow**.
+- [`bootstrap/`](bootstrap/) — machine-level install: the work-loop contract
+  card (sourced in [`bootstrap/contract/`](bootstrap/contract/); installed as
+  a Claude user rule and a Codex AGENTS.md block), agent-doctor self-check,
+  optional `.agent-loop` hook, and an idempotent installer. Its
+  [README](bootstrap/README.md) documents the **new-requirement workflow**,
+  the distribution manifest, and the maintenance discipline.
 - [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — the
   day-to-day playbook (six work families, loop starters, stop conditions).
-- [`docs/execution-contract.md`](docs/execution-contract.md) — how the work loop
-  and Execution Contract are sourced and distributed to both runtimes.
 
 ## Skills — components the loop calls
 
@@ -61,7 +61,7 @@ not an invocable skill.
 ```
 bootstrap/   # machine install: work-loop contract, doctor, hook, installer
 skills/      # source skills and non-invocable support directories
-docs/        # loop-engineering playbook, execution-contract spec, design notes
+docs/        # loop-engineering playbook, design notes, plans, research
 tests/       # repo-level contract tests for the installer, contracts, and skills
 AGENTS.md    # skill-authoring and maintenance conventions
 CONTEXT.md   # canonical domain terms for skill distribution
@@ -81,7 +81,7 @@ runs the full suite on every push and pull request with both runtimes provisione
 
 ```bash
 # Node bootstrap contract tests (installer, doctor)
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
 # Python repo-level contract tests (contract parity, skill structure)
 python -m unittest discover -s tests

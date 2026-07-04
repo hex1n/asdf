@@ -18,13 +18,13 @@ node bootstrap/install.mjs         # 把循环分发到 ~/.claude 与 ~/.codex
 node ~/bin/agent-doctor.mjs         # 安装后自检
 ```
 
-- [`bootstrap/`](bootstrap/) — 机器级安装：工作循环 + Execution Contract 契约块、
-  agent-doctor 自检、可选的 `.agent-loop` hook、幂等安装器。
-  其 [README](bootstrap/README.md) 内含**接新需求的工作流程**。
+- [`bootstrap/`](bootstrap/) — 机器级安装：工作循环契约卡
+  （源在 [`bootstrap/contract/`](bootstrap/contract/)；Claude 侧装为 user rule，
+  Codex 侧合并进 AGENTS.md）、agent-doctor 自检、可选的 `.agent-loop` hook、
+  幂等安装器。其 [README](bootstrap/README.md) 内含**接新需求的工作流程**、
+  分发清单与维护纪律。
 - [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — 日常打法
   手册（六类工作、循环启动语、判停条件）。
-- [`docs/execution-contract.md`](docs/execution-contract.md) — 工作循环与 Execution
-  Contract 的源与双端分发说明。
 
 ## 技能 —— 循环调用的组件
 
@@ -54,7 +54,7 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 ```
 bootstrap/   # 机器安装：工作循环契约、doctor、hook、安装器
 skills/      # 源技能与不可触发支持目录
-docs/        # loop-engineering 手册、execution-contract 规范、设计笔记
+docs/        # loop-engineering 手册、设计笔记、计划与调研
 tests/       # 仓库级契约测试：安装器、契约一致性、技能结构
 AGENTS.md    # 技能编写与维护约定
 CONTEXT.md   # 技能分发的领域术语
@@ -72,7 +72,7 @@ bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能�
 
 ```bash
 # Node bootstrap 契约测试（安装器、doctor）
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
 # Python 仓库级契约测试（契约一致性、技能结构）
 python -m unittest discover -s tests

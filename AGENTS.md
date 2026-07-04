@@ -1,6 +1,15 @@
 # AGENTS.md for asdf-skills
 
-This repository contains portable agent skills under `skills/`.
+This repository builds a portable **agent work loop**; the loop is the
+product. Skills under `skills/` are the components the loop calls; the loop
+machinery (contract sources, hooks, installer) lives under `bootstrap/`.
+
+This file governs the **skill asset family**: authoring, evolution, and
+distribution discipline for `skills/`. The loop subsystem's maintenance
+discipline and semantic boundaries live in
+[bootstrap/README.md](bootstrap/README.md), which reuses this file's Rule
+Harvest Gate. Canonical domain terms for both families live in
+[CONTEXT.md](CONTEXT.md).
 
 ## Skill Evolution
 
@@ -31,7 +40,7 @@ This makes the optional "second sample" in the loop below the default for any te
 
 When the user asks to improve a skill, treat it as an evidence loop rather than a wording edit:
 
-Before changing any skill, load and apply `writing-great-skills` as the authoring frame for predictability, information hierarchy, context pointers, leading words, progressive disclosure, and pruning. Load it by reading its file: a user-invoked skill (`disable-model-invocation`) is absent from the model-invocable list but still available, so `unavailable` means it cannot be loaded from disk at all — not merely that it is not auto-invocable. Only when `writing-great-skills` truly cannot be loaded, apply the authoring criteria listed above directly and record the fallback in the round notes before editing.
+Before changing any skill, load and apply `writing-great-skills` (a user-level skill outside this repo) as the authoring frame for predictability, information hierarchy, context pointers, leading words, progressive disclosure, and pruning. Load it by reading its file: a user-invoked skill (`disable-model-invocation`) is absent from the model-invocable list but still available, so `unavailable` means it cannot be loaded from disk at all — not merely that it is not auto-invocable. Only when `writing-great-skills` truly cannot be loaded, apply the authoring criteria listed above directly and record the fallback in the round notes before editing.
 
 1. Capture a baseline output from the existing skill on a real task or fixture. For a net-new skill with no prior output, write an expected-behavior spec and use it as the baseline instead; the spec must include success criteria, failure modes, and negative or non-trigger examples, not just the happy path, so the baseline is not an optimistic softball.
 2. Name the observed failure mode and the candidate Leitwoerter or rule that should change behavior.

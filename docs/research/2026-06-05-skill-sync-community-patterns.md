@@ -81,5 +81,5 @@ This is stronger than a single `.managed-skills.json` because each skill has an 
 | GNU Stow keeps package trees separate and makes them appear in a target tree via symlinks; it was designed to administer independent packages safely | https://www.gnu.org/software/stow/manual/stow.html | fetched in this session |
 | VS Code auto-updates extensions by default and marks patched product installs unsupported | https://code.visualstudio.com/docs/supporting/faq | fetched in this session |
 | Ansible Galaxy exposes `--upgrade` and `--force`/force overwrite semantics | https://docs.ansible.com/projects/ansible/latest/cli/ansible-galaxy.html | fetched in this session |
-| Current Codex system skill installer aborts when destination exists | `/Users/hex1n/.agents/skills/.system/skill-installer/scripts/install-skill-from-github.py` | read in this session |
-| Claude Code uses the same installed skills on this machine | `/Users/hex1n/.claude/skills -> ../.agents/skills` | checked with `readlink` in this session |
+| Current Codex system skill installer aborts when destination exists | `~/.agents/skills/.system/skill-installer/scripts/install-skill-from-github.py` | read in this session |
+| Claude Code uses the same installed skills on this machine | `~/.claude/skills -> ../.agents/skills` | checked with `readlink` in this session |

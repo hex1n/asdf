@@ -1,24 +1,25 @@
-# Loop Engineering 实战手册（个人版）
+# Loop Engineering 实战手册
 
 > 本手册回答一个问题：**在每天的实际工作中怎么用 loop engineering**。
-> 分析依据是对本机 782 个会话、4,597 条人工提示的全量分析（分析文档含真实业务语料，
-> 留在本机、不入公开仓）；量化基线可用 `docs/research/2026-07-02-analyze-sessions.py`
-> 重跑得到。P0 机制建设已落入全局 Execution Contract、`land`/`fixloop` workflow skills，
-> 以及可选的 `agent-loop.mjs init/claim/status/close` + `.agent-loop/run-contract.json`
-> + `loop-events.jsonl` 本地 hook 状态。
-> 本手册只讲"用法"。
+> 机制本身（用户级契约、workflow skills、`.agent-loop/` hook、判据闸门）由
+> `bootstrap/install.mjs` 分发，语义与边界见 [bootstrap/README.md](../bootstrap/README.md)；
+> 本手册只讲"用法"。方法论从真实编码会话的语料分析中提炼；分析脚本
+> [`docs/research/2026-07-02-analyze-sessions.py`](research/2026-07-02-analyze-sessions.py)
+> 可对**你自己的**本机会话语料重跑（见第 4 节），输出含个人语料，始终留在本机
+> gitignore 文件里，不入仓。
 
 ---
 
-## 1. 核心结论：缺的不是循环，是把自己从三个角色中撤出来
+## 1. 核心结论：缺的不是循环，是把人从三个机械角色中撤出来
 
-五个环（触发/收敛/执行/验证/元循环）早已成型，但本人目前在循环里兼任三个机械角色：
+触发/收敛/执行/验证/元循环五个环成型之后，常见的漏气不在环本身，而在人仍在循环里
+兼任三个机械角色：
 
-| 现在充当的角色 | 语料证据 | Loop engineering 的替换 |
+| 机械角色 | 典型症状 | Loop engineering 的替换 |
 |---|---|---|
-| **人肉时钟**：每轮敲"继续"推进 | "继续"×56、"fix"×19 | 预授权循环：开场就授权"循环到 X 为止"，代理自己迭代 |
-| **人肉判停器**：什么时候算完靠人看 | 70% 会话开场无完成判据 | 开场给可验证判据，代理拿判据自己判停 |
-| **人肉守卫**：越界了事后纠正 | 范围漂移占纠正的 ~40% | 约束前置（Run Contract + Execution Contract），越界即停 |
+| **人肉时钟**：每轮敲"继续"推进 | 会话里高频出现"继续 / fix"类脉冲词 | 预授权循环：开场就授权"循环到 X 为止"，代理自己迭代 |
+| **人肉判停器**：什么时候算完靠人看 | 会话开场没有完成判据 | 开场给可验证判据，代理拿判据自己判停 |
+| **人肉守卫**：越界了事后纠正 | 纠正集中在范围漂移类 | 约束前置（Run Contract + Execution Contract），越界即停 |
 
 **一句话用法**：默认轻量推进；把完成判据和负向约束尽量前置，能直接做就直接做。
 只有用户显式要求、机制未收敛，或不可逆/高风险改动时，才启动完整循环。用户拍板后，
@@ -28,62 +29,55 @@
 
 > 每个循环的三要素——机器可查的判据、Run Contract、显式判停——与项目无关，
 > 已作为"工作循环"随 `bootstrap/install.mjs` 全局分发（见
-> [docs/execution-contract.md](execution-contract.md)），在任意项目零配置生效。仓库存在
+> [bootstrap/README.md](../bootstrap/README.md)），在任意项目零配置生效。仓库存在
 > `.agent-loop/` 时，Run Contract 还会通过 `agent-loop.mjs init` 落成机器可读的
-> v2 `run-contract.json` runtime contract；同一 worktree 多 session 只有显式 `claim`
-> 才进入 `partitioned`，否则默认独占。hook 证据写入 `loop-events.jsonl`。event log 只证明范围/过程，
-> 不证明业务正确性。
+> v2 `run-contract.json` runtime contract；并发、终态与 event log 的语义边界见
+> bootstrap README 的"边界与威胁模型"，此处不复述。
 
 ### 2.1 需求落地（业务代码仓库）
 
 - 旧模式：grill → 方案 → 落地 → "审查一下" → "fix" → "继续" → 部署 → 验证，
-  每步人工推一次，20+ 轮交互。
+  每步人工推一次。
 - 新模式：方案拍板后直接落地；需要长循环时再发一条 **落地循环启动语**（见第 3 节）。
   循环体 = 改 → 跑测试 → 子代理审查 → 修；判停 = 测试全绿 + 审查无新缺口；
   中途只在清单外触碰、判据不可达、新硬阻塞时回来找人。
 
 ### 2.2 排查 / 数据修复
 
-- 旧模式："我重新部署好了服务 你再用刚才的报文看看" ×十几次——
-  每次部署后的验证都靠人工触发。
+- 旧模式：每次部署后的验证都靠人工触发——"部署好了，你再用刚才的报文看看"来回十几轮。
 - 新模式：判据开场就给成机器可查的形式——"复现报文是 X，修好的标准是
   这条 SQL 返回 Y"。部署仍由人做（真约束），但部署后的
   **重发报文 + 逐字段对账 + 结论** 由代理一条龙跑完，人只看 diff。
-- 配套工装（P1）：固定报文集 + SQL 断言集自动 diff，让这个环彻底一条命令化。
+- 配套工装：固定报文集 + SQL 断言集自动 diff，让这个环彻底一条命令化。
 
 ### 2.3 方案收敛
 
-- 旧模式："还有更好的方案吗"串行问 2-3 轮（人工模拟退火，语料中 99 次探针）。
+- 旧模式："还有更好的方案吗"串行问 2-3 轮——人工模拟退火。
 - 新模式：按需并行。只有机制未收敛或高风险时，要求"给方案后并行开 coherence /
   feasibility / scope / adversarial 中最相关的 2-4 个只读视角审它，吸收后给终版"。
   串行 N 轮压成并行 1 轮，人只对终版拍板。
 
 ### 2.4 E2E 验证
 
-已经 skill 化（e2e-test-planner + e2e-test-executor 配对），是目前最成熟的循环。
-唯一升级：把"执行 → 报告 → 人看报告 → 让它修"改成
+已经 skill 化（e2e-test-planner + e2e-test-executor 配对），是最成熟的循环形态：
 **"执行 → 红场景自动修 → 复测 → 全绿才出报告"**——
 executor 的输出接回修复环，而不是接回人。
 
 ### 2.5 Skill 元工程（skills 源仓库）
 
-"分析 session → 改 skill" 已手动跑过 ≥3 次，最该定时化：
+"分析 session → 改 skill"是离线维护循环，按需或按月跑，不挤在业务会话里：
 
-- **文件态化（Ralph 形态）**：元循环状态落文件 + git，每轮 fresh context，不再挤在一个长会话里。
-  待办由 `node ~/bin/meta-loop.mjs` 管理（`docs/meta-loop/backlog.jsonl` 脱敏可评审，
-  私有语料仍在 gitignored 的 `docs/research/`）；一轮 = `next` 认领单个候选 → 跑一轮证据循环 →
-  `resolve` 记决策 → 退出，由 ralph-loop/automation 重喂新上下文。协议见
-  [docs/meta-loop/README.md](meta-loop/README.md)。
-- 每周/每月一次 cron 跑分析脚本（`docs/research/2026-07-02-analyze-sessions.py`），
-  drift 出的改进点用 `meta-loop.mjs enqueue`（脱敏措辞）入待办，而不是堆进对话。
-- 改动仍走已验证的三段式：改 → 独立证伪子代理 → 复查，
-  直到"独立反证未找到剩余缺口"；每个候选的轮次笔记落 `docs/meta-loop/rounds/`。
-- Claude Code v2.1.59+ 的原生 auto memory（会话内自动写入项目 MEMORY.md）与 Codex 的
+- 周期性跑分析脚本（见第 4 节），drift 出的改进点以**脱敏措辞**记为改进候选
+  （Generalization Gate：不带源项目标识），逐个用 fresh context 会话处理，
+  一次只做一个候选。
+- 每个候选跑一轮 AGENTS.md 证据循环：改 → 独立证伪子代理 → 复查，
+  直到"独立反证未找到剩余缺口"；决策按 AGENTS.md 的 Round 格式留痕。
+- Claude Code 的原生 auto memory（会话内自动写入项目 MEMORY.md）与 Codex 的
   内置 memories（后台整合已完成会话，写入 `~/.codex/memories/MEMORY.md`，需在
   config.toml `[features] memories = true` 开启）都是元循环的**候选池**而非直接采信源：
-  月度自审时两端各过一遍近期记忆，高频模式当 Rule Harvest Gate 的候选处理。
+  自审时两端各过一遍近期记忆，高频模式当 Rule Harvest Gate 的候选处理。
 
-### 2.6 环境运维（当前占 ~10-15% 会话）
+### 2.6 环境运维
 
 这类**根本不该进人工循环**——它是循环的摩擦力，不是工作本身。
 CLI 升级、进程残留、代理配置做成 doctor 自检脚本 + runbook；
@@ -91,7 +85,7 @@ CLI 升级、进程残留、代理配置做成 doctor 自检脚本 + runbook；
 
 ### 2.7 领域语义澄清（所有仓库）
 
-理解偏差类漏气点（基线 ~15%）的根因是领域词汇表未沉淀。打法：**同一术语的语义
+理解偏差类漏气点的根因是领域词汇表未沉淀。打法：**同一术语的语义
 被纠正两次即触发沉淀**——在方案环先澄清语义（必要时用 domain-modeling），把结论
 记入项目术语表/启动文件，再继续落地；不要在落地环里靠反复口头纠正消化语义分歧。
 
@@ -138,32 +132,22 @@ scope / adversarial 中最相关的视角独立审查，吸收所有确认的问
   启动语里可以省掉这部分。
 - 任何循环都带兜底：迭代超过 N 轮或预算超限 → 停下升级给人。
 
-## 4. 采纳路径（按投入排序）
+## 4. 校准你自己的基线
 
-| 阶段 | 动作 | 成本 |
-|---|---|---|
-| 本周 | 默认轻量推进；只给需要循环的任务贴启动语；新会话尽量带完成判据 | 零 |
-| 已落地 | P0 三件套：阶段 gate、Run Contract 交接物、Execution Contract 章节；有 `.agent-loop/` 时启用 hook 记账/拦截 | 已完成 |
-| 之后 | P1 工装（报文-SQL 回归 diff、doctor 扩展）；P2 定时化（元循环 cron、恢复 weekly automation） | 逐个推进 |
+打法是否被真正采用，靠数字说话——但数字是**你自己的**，不入仓：
 
-P2 定时化的可执行形态：文件态元循环（`docs/meta-loop/`，见
-[README](meta-loop/README.md)）由 Claude 端官方 ralph-loop 插件或 `claude -p "<驱动器提示>"`
-挂计划任务驱动，Codex 端用 standalone automation `codex exec "<驱动器提示>"`；每轮读 backlog、
-做一个候选、退出，重喂新上下文。前提与护栏：触发机需常驻开机、仓库路径可访问；
-每次运行设 wall-clock 与预算上限，超限升级给人而非静默重试。分析脚本本身保持 Python
-（它与 meta-loop.mjs 同属离线维护上下文，但解析本机会话语料，不进热路径）。
-
-## 5. 有效性对账（一个月后）
-
-对比机器口径基线，重点看四个数（四个指标均可由
-`docs/research/2026-07-02-analyze-sessions.py` 直接复算，输出在本机的 `loop-health.txt`）。
-**机器口径基线（2026-07-02 首跑）**：脉冲词 332、打断 claude=115/codex=1361、
-范围漂移纠正占比 13%、硬判据开场 4%。机器正则口径比当初的定性分析口径严格，
-数字天然偏低——月度对账用机器口径看**趋势**，不与定性估计直接比大小：
-
-1. "继续"类脉冲词频次（基线 56+）→ 应明显下降
-2. 人工打断（Claude 115 次 / Codex 1,357 个 abort）→ 下降
-3. 范围漂移类纠正占比（基线 ~40%）→ 目标 <10%
-4. 开场带硬判据的会话占比（基线 25-30%）→ 目标 >50%
-
-数字不动 = 打法没被真正采用，先查启动语是否用起来了，再考虑加机制。
+1. **首跑建基线**：`python docs/research/2026-07-02-analyze-sessions.py` 对本机
+   Claude Code / Codex 会话语料出量化基线，输出落 gitignored 的本地文件
+   （`docs/research/loop-health.txt` 与语料中间件），含个人提示语料，永不提交。
+2. **看四个指标**（均可由脚本直接复算）：
+   - "继续"类脉冲词频次 → 应明显下降
+   - 人工打断/abort 次数 → 下降
+   - 范围漂移类纠正占比 → 应压到低位
+   - 开场带硬判据的会话占比 → 应过半
+3. **只看趋势**：机器正则口径比定性回忆严格，绝对值天然偏低；月度重跑与上次
+   对账看方向，不与体感数字比大小。
+4. **数字不动 = 打法没被采用**：先查启动语是否用起来了，再考虑加机制。
+5. **定时化（可选）**：触发机常驻的机器上，用 cron/schedule 挂周期任务驱动元循环
+   （Claude 端 ralph-loop 插件或 `claude -p "<驱动器提示>"`，Codex 端
+   `codex exec "<驱动器提示>"`）；每轮认领一个候选、做完、退出，重喂新上下文。
+   每次运行设 wall-clock 与预算上限，超限升级给人而非静默重试。

@@ -4,33 +4,45 @@ Guidance for Claude Code (and other agent runtimes) when working in this reposit
 
 ## What this repo is
 
-`asdf-skills` is a collection of **portable agent skills** that can be distributed
-into local agent runtimes such as Codex and Claude Code. Each skill is a
-self-contained directory under `skills/` with Markdown instructions and, where
-needed, stdlib-only helper scripts and tests.
+`asdf-skills` builds a portable **personal agent work loop** — judge scope →
+converge when needed → land → verify → stop — installable on any machine and
+effective in any project with zero per-project config. **The loop is the
+product**; the repo ships two asset families:
 
-The authoritative conventions live in **[AGENTS.md](AGENTS.md)** — read it before
-adding or changing any skill. The domain language for skill distribution
-(Source Skill, Managed Installed Skill, Cache Drift, etc.) lives in
-**[CONTEXT.md](CONTEXT.md)**.
+- **Skills** (`skills/`) — portable components the loop calls at each stage:
+  self-contained directories with Markdown instructions and, where needed,
+  stdlib-only helper scripts and tests, distributed into local agent runtimes
+  such as Codex and Claude Code.
+- **Loop machinery** (`bootstrap/`) — the user-level contract blocks, hooks,
+  agent-loop/doctor CLIs, and the idempotent installer that distribute the
+  loop itself.
+
+The authoritative conventions for skill assets live in
+**[AGENTS.md](AGENTS.md)** — read it before adding or changing any skill. The
+loop machinery's maintenance discipline and semantic boundaries live in
+**[bootstrap/README.md](bootstrap/README.md)**. The canonical domain language
+(skill distribution and loop engineering) lives in **[CONTEXT.md](CONTEXT.md)**.
 
 ## Repository layout
 
 - `skills/` — source skills, one directory each. Current skills:
-  `bootstrap-agent-os`, `deep-research`, `e2e-test-executor`,
-  `e2e-test-planner`, `first-principles-planner`, `generating-api-docs`,
-  `generating-test-scope`, `java-stack-craft`.
+  `bootstrap-agent-os`, `converge`, `deep-research`, `e2e-test-executor`,
+  `e2e-test-planner`, `first-principles-planner`, `fixloop`,
+  `generating-api-docs`, `generating-test-scope`, `java-stack-craft`,
+  `land`, `loop`; `workflow-core` is a non-invocable shared support
+  directory for the workflow skills.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`).
   - `REFERENCE.md` / extra `.md` — progressive-disclosure detail loaded on demand.
   - `scripts/` — stdlib-only helper scripts.
   - `tests/` — stdlib `unittest` tests for that skill.
 - `tests/` — repo-level contract tests that validate skill structure and routing.
-- `bootstrap/` — machine-level install assets (Execution Contract blocks, `/land`
-  `/fixloop` `/converge` command templates, agent-doctor, hooks) plus the
-  idempotent `install.mjs`; see `bootstrap/README.md`.
+- `bootstrap/` — machine-level install assets (the work-loop contract card,
+  agent-doctor, agent-loop hook) plus the idempotent `install.mjs`; see
+  `bootstrap/README.md`.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
-- `AGENTS.md` — skill-authoring and maintenance conventions.
-- `CONTEXT.md` — canonical domain terms for skill distribution.
+- `AGENTS.md` — skill-authoring and maintenance conventions (skill assets).
+- `CONTEXT.md` — canonical domain language: skill distribution and loop
+  engineering.
 
 ## Commands
 
@@ -39,7 +51,7 @@ and Python `unittest` for the remaining repo and skill contracts.
 
 ```bash
 # Node bootstrap contract tests
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/meta_loop.test.mjs
+node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
 # Python repo-level contract tests
 python -m unittest discover -s tests

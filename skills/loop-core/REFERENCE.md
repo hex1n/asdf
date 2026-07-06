@@ -14,7 +14,9 @@ Shared reference for the `converge`, `land`, `fixloop`, and `loop` skills. This 
   current-vs-expected sentence. The criterion must be **red before the work and
   idempotent**: it has to fail until the task is done (an already-green criterion
   proves nothing — see red-at-init below), and the stop gate re-runs it on every
-  stop, so it must be read-only and side-effect-free.
+  stop (reusing the last red verdict only when nothing write-shaped ran in
+  between; green always comes from a fresh run), so it must be read-only and
+  side-effect-free.
 - **Evidence**: real tool output, status/diff, command output, SQL/API response,
   read-only verification, or an execution report. Prose alone is not evidence.
 - **Runtime state**: local agent state under `.agent-loop/`. It is

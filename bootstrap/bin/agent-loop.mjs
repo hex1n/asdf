@@ -1071,6 +1071,7 @@ function checkPretool(payload, repo, touch) {
   }
 
   if (!shouldEnforce(touch) || mode === "off") {
+    markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps);
     appendEvent(repo, { ...base, decision: "observe" });
     return 0;
   }
@@ -1117,13 +1118,37 @@ function checkPretool(payload, repo, touch) {
           `. Update ${STATE_DIR}/${RUN_CONTRACT} or narrow the tool call.`,
       );
     }
+    // warn mode lets the call through, so it may still mutate state.
+    markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps);
     return 0;
   }
 
   appendEvent(repo, { ...base, decision: "allow", targets });
   recordGitOps(touch, payload, gitOps);
-  if (gitOps.length) writeJson(runContractPath(repo), touch);
+  const flippedDirty = markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, { deferWrite: true });
+  if (gitOps.length || flippedDirty) writeJson(runContractPath(repo), touch);
   return 0;
+}
+
+// Red-verdict cache support: remember that something write-shaped ran since
+// the last criterion verdict. Only a write can turn a red criterion green, so
+// the Stop gate may reuse a red verdict while this flag is false. Marking is
+// deliberately over-approximate (any file/table/interface target, anything
+// that looks like a write, any command or git op counts) — a false "dirty"
+// merely costs one extra criterion run, while a false "clean" would hold a
+// stale red, which the stall release still bounds.
+function markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, opts = {}) {
+  const writeShaped =
+    gitOps.length > 0 ||
+    fileTargets(tool, mapping).length > 0 ||
+    sqlTargets(mapping).length > 0 ||
+    interfaceTargets(mapping).length > 0 ||
+    commandValues(mapping).length > 0 ||
+    looksLikeWrite(tool, mapping);
+  if (!writeShaped || touch.dirty_since_verdict === true) return false;
+  touch.dirty_since_verdict = true;
+  if (!opts.deferWrite) writeJson(runContractPath(repo), touch);
+  return true;
 }
 
 function intField(value, fallback) {
@@ -1304,10 +1329,24 @@ function checkStop(payload, repo, touch) {
   touch.criterion_hash = liveCriterionHash;
 
   let verdict;
+  const lastFailure = ensureEvidence(touch).last_failure;
+  const reusableRed =
+    touch.dirty_since_verdict === false &&
+    lastFailure &&
+    typeof lastFailure === "object" &&
+    String(lastFailure.criterion ?? "") === String(criterion ?? "");
   if (validationErrors.length) {
     verdict = { verdict: "fail", exit: null, output: "invalid run contract: " + validationErrors.join("; ") };
+  } else if (reusableRed) {
+    // Nothing write-shaped ran since the last red verdict, so the criterion
+    // cannot have turned green by itself — reuse the red instead of paying a
+    // full re-run. Green is never reused: a pass always comes from a fresh
+    // run. Counters still advance below, so a loop that keeps stopping
+    // without doing work still releases as stalled.
+    verdict = { verdict: "fail", exit: lastFailure.exit ?? null, output: String(lastFailure.output_tail ?? ""), cached: true };
   } else {
     verdict = runCriterion(criterion, repo, timeoutSec);
+    touch.dirty_since_verdict = false;
   }
 
   if (verdict.verdict === "pass") {
@@ -1343,7 +1382,9 @@ function checkStop(payload, repo, touch) {
   // and never gates a release (a long healthy loop reds many times overall).
   touch.gate_blocks = (Number.parseInt(String(touch.gate_blocks), 10) || 0) + 1;
   touch.gate_blocks_total = (Number.parseInt(String(touch.gate_blocks_total), 10) || 0) + 1;
-  const failureLabel = verdict.detail ?? `exit ${verdict.exit ?? "n/a"}`;
+  const failureLabel =
+    (verdict.detail ?? `exit ${verdict.exit ?? "n/a"}`) +
+    (verdict.cached ? "; cached verdict - nothing write-shaped ran since the last criterion run" : "");
   const reasonTail = outputTail(verdict.output);
 
   // Stall detection: an identical failure signature on consecutive stops is not
@@ -1548,8 +1589,9 @@ function cmdInit(values) {
   // stop gate is that "green" is discriminating. Run it once here (the only
   // cheap moment to catch a non-discriminating criterion) with no semantic
   // judgment. Legitimately-green loops (noop verify, keep-green guard) declare
-  // intent with --allow-green-init. A non-executable criterion is not judged
-  // here; the stop gate degrades on it at run time.
+  // intent with --allow-green-init. A criterion the machine cannot execute is
+  // refused in strict mode below: the stop gate would silently degrade to warn
+  // on every stop, leaving the whole loop gateless without the agent noticing.
   const timeoutSec = intField(values["criterion-timeout-seconds"], CRITERION_TIMEOUT_SECONDS);
   // Persist the budget so the Stop gate uses the same timeout as this init
   // check — checkStop reads criterion_timeout_seconds from the run contract.
@@ -1565,6 +1607,19 @@ function cmdInit(values) {
   };
   // Freeze the criterion baseline so a later goalpost move is recordable.
   data.criterion_hash = criterionHash(data.criterion);
+  if (initVerdict.verdict === "not_executable") {
+    const mustBlock = String(data.enforcement).toLowerCase() === "strict";
+    const message =
+      `criterion cannot run at init (${initVerdict.detail ?? "spawn error"}): ${data.criterion}\n` +
+      "a criterion the machine cannot execute leaves the loop gateless - the stop gate would " +
+      "silently degrade to warn on every stop. Fix the command (path, runtime, quoting) and " +
+      "re-run init; if this was a transient environment failure, re-running init is enough.\n";
+    if (mustBlock) {
+      process.stderr.write(message);
+      return 1;
+    }
+    process.stderr.write(`warning: ${message}`);
+  }
   if (initVerdict.verdict === "pass" && !values["allow-green-init"]) {
     const mustBlock = String(data.enforcement).toLowerCase() === "strict";
     const message =

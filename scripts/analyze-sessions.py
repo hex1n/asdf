@@ -129,13 +129,20 @@ def loop_history_metrics(history_path):
     terminal state (done / not_needed / abandoned), how many episodes it spanned,
     and whether its criterion inputs drifted. A task that took more than one
     episode is resumed work (it crossed a suspend/resume), read straight off the
-    row instead of joined across rows."""
+    row instead of joined across rows.
+
+    Opens are audited separately: the engine writes a state:"open" row at
+    birth and the terminal row carries the same task id. An open whose id
+    never reaches a close is a task that vanished without a closing verb —
+    surfaced as `unclosed`, never folded into the close distribution."""
     try:
         fh = io.open(history_path, "r", encoding="utf-8", errors="replace")
     except OSError:
         return None
     states = Counter()
     rows = []
+    open_ids = []
+    closed_ids = set()
     with fh:
         for line in fh:
             line = line.strip()
@@ -148,6 +155,11 @@ def loop_history_metrics(history_path):
             if not isinstance(e, dict):
                 continue
             state = str(e.get("state") or "?")
+            if state == "open":
+                open_ids.append(e.get("id"))
+                continue
+            if e.get("id") is not None:
+                closed_ids.add(e.get("id"))
             states[state] += 1
             try:
                 episodes = int(e.get("episodes") or 1)
@@ -156,7 +168,7 @@ def loop_history_metrics(history_path):
             review = str(e.get("review_level") or "none")
             rows.append((str(e.get("repo") or "?"), state, episodes,
                          bool(e.get("criterion_input_drift")), review))
-    if not rows:
+    if not rows and not open_ids:
         return None
     nonsuccess = [i for i, (_, s, _e, _d, _v) in enumerate(rows) if s in NONSUCCESS_STATES]
     resumed = sum(1 for _r, _s, episodes, _d, _v in rows if episodes > 1)
@@ -171,6 +183,8 @@ def loop_history_metrics(history_path):
         "review_levels": dict(review_levels),
         "reviewed_none": review_levels.get("none", 0),
         "repos": len({r for r, _s, _e, _d, _v in rows}),
+        "opened": len(open_ids),
+        "unclosed": sum(1 for oid in open_ids if oid not in closed_ids),
     }
 
 

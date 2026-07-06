@@ -79,6 +79,8 @@ A task closes exactly one of three ways; only the first is machine-written:
 | `not_needed` | Read-only verification showed no change was needed (`not-needed --evidence`). |
 | `abandoned` | Superseded or dropped (`abandon --reason`). |
 
+`taskloop open` also writes a `state: open` row to the outcome ledger, and the terminal row carries the same task id — so a task that vanishes without a closing verb (state dir deleted, work silently dropped) remains visible as an open with no matching close.
+
 The stop gate never writes success on a red criterion. `stuck` and `out_of_budget` are episode outcomes it assigns automatically, then suspends the task open; an `out_of_budget` run whose every round failed differently is reported as still-moving (resume it, or `amend --rounds --reason`).
 
 ## Concurrency

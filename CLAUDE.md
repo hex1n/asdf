@@ -26,10 +26,10 @@ loop machinery's maintenance discipline and semantic boundaries live in
 ## Repository layout
 
 - `skills/` — source skills, one directory each. Current skills:
-  `bootstrap-agent-os`, `converge`, `deep-research`, `e2e-test-executor`,
+  `converge`, `deep-research`, `e2e-test-executor`,
   `e2e-test-planner`, `first-principles-planner`,
   `generating-api-docs`, `generating-test-scope`, `java-stack-craft`,
-  `judgment-loop`, `meta-loop`, `workloop`; `loop-core` is a
+  `judgment-loop`, `meta-loop`, `project-docs-layer`, `workloop`; `loop-core` is a
   non-invocable shared support directory for the loop skills.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`).
   - `REFERENCE.md` / extra `.md` — progressive-disclosure detail loaded on demand.

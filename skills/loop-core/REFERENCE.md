@@ -67,7 +67,7 @@ Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only
 
 An **episode** is one continuous run of a task under a single session. A task suspends and resumes across episodes; budgets are task-level, so resuming never refills them — same failure repeated twice, or two rounds with no change, suspends as `stuck`; the round cap suspends as `out_of_budget`; missing input suspends as `needs_input`.
 
-Suspend is **not a closure** — the task stays open for the next episode. The snapshot has two halves: the machine records the changed files from its own observations; the human supplies the three judgment lines (remaining criterion, current failure, next safe action). A different session supersedes the previous episode rather than sharing it.
+Suspend is **not a closure** — the task stays open for the next episode. The snapshot has two halves: the machine records the changed files from its own observations; the human supplies the three judgment lines (remaining criterion, current failure, next safe action). The machine also keeps the **attempt ledger**: every failed close attempt leaves its failure signature and output head on the task, and the resume banner hands the dead-ends to the next episode so they are inherited, not rediscovered. A different session supersedes the previous episode rather than sharing it.
 
 ## Terminal States
 

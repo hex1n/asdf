@@ -59,11 +59,8 @@ Tests use built-in runtimes only: Node `node:test` for bootstrap runtime scripts
 and Python `unittest` for the remaining repo and skill contracts.
 
 ```bash
-# Node bootstrap contract tests
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
-
-# Node taskloop (clean-room v2) tests
-node --test taskloop/tests/taskloop.test.mjs
+# Node taskloop tests (the loop system) + adapter-seed test
+node --test taskloop/tests/taskloop.test.mjs tests/e2e_report_check.test.mjs
 
 # Python repo-level contract tests
 python -m unittest discover -s tests

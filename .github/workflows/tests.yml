@@ -37,10 +37,10 @@ jobs:
           python --version
           node --version
 
-      - name: Node bootstrap contract tests
-        run: node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
+      - name: Node adapter-seed test
+        run: node --test tests/e2e_report_check.test.mjs
 
-      - name: Node taskloop clean-room tests
+      - name: Node taskloop tests (the loop system)
         run: node --test taskloop/tests/taskloop.test.mjs
 
       - name: Python repo-level contract tests

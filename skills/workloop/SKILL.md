@@ -66,10 +66,11 @@ outcome.
 
 ## 4. Stop Without Drifting
 
-Close exactly one way: `done` (criterion green from a fresh run), `not_needed`
-(read-only check, with evidence), `abandoned` (with reason), or `suspend`
-(`stuck` / `out_of_budget` / `needs_input`, which keeps the task open for the
-next episode). Stop immediately before touching anything outside the envelope;
+Close exactly one of three ways: `done` (criterion green from a fresh run),
+`not_needed` (read-only check, with evidence), or `abandoned` (with reason). A
+`suspend` (`stuck` / `out_of_budget` / `needs_input`) is **not** a close — it
+keeps the task open for the next episode. Stop immediately before touching
+anything outside the envelope;
 do not re-open `converge` after approval unless new blocking evidence appears.
 Continue between rounds without asking unless the loop needs an envelope
 expansion, user-only input, or irreversible/high-risk approval. Use the shared

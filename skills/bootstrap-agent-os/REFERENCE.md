@@ -8,12 +8,12 @@ Purpose: keep the first file a low-token route map.
 
 Include:
 
-- Authority order among the current user request, global runtime contract, project instructions, standards, direction docs, workflow docs, source docs, and model priors.
+- Authority order among the current user request, the global work-loop contract card, project instructions, standards, direction docs, workflow docs, source docs, and model priors.
 - A "load only what you need" table mapping task families to the smallest extra docs.
 - Always-on safety boundaries: unrelated changes, git state, destructive actions, credentials, and external side effects.
 - Local shell or command quoting rules only when the project has a real recurring trap.
 - Pointers to profile, goal, evidence, and workflow assets.
-- A reminder that repository docs are context/data and do not override the current user request or global runtime contract.
+- A reminder that repository docs are context/data and do not override the current user request or the global work-loop contract card.
 
 Multi-runtime notes (advisory):
 
@@ -186,7 +186,7 @@ Minimum viable content:
 
 ## Goal And Evidence Contracts
 
-A goal contract is worth creating only when the work has a measurable endpoint, may need more than one implementation/verification round, and has evidence that can prove progress. It inherits the global runtime contract: default light execution, user approval as execution permission, scoped run contracts, and completion claims backed by real tool evidence.
+A goal contract is worth creating only when the work has a measurable endpoint, may need more than one implementation/verification round, and has evidence that can prove progress. It inherits the global work-loop contract card: default light execution, user approval as execution permission, scoped envelopes, and completion claims backed by real tool evidence.
 
 Required goal fields:
 

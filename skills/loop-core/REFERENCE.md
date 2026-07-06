@@ -1,32 +1,28 @@
 # Loop Core
 
-Shared reference for the `converge`, `workloop`, `judgment-loop`, and `meta-loop` skills. This directory intentionally has no `SKILL.md`: it is supporting material, not an invocable workflow. The loop system these skills route to is **taskloop** (`~/bin/taskloop.mjs`, state under `.taskloop/`); this file is the shared vocabulary.
+Shared reference for the `converge`, `workloop`, `judgment-loop`, and `meta-loop` skills. This directory intentionally has no `SKILL.md`: it is supporting material, not an invocable workflow. The loop system these skills route to is **taskloop** (`~/bin/taskloop.mjs`); this file is its shared vocabulary, organized around the task-first object model.
 
-## Loop Primitives
+## The Task
 
-- **Goal**: the user-visible outcome, stated without naming an implementation
-  unless the user already approved one.
-- **envelope**: the repo/worktree plus files, tables, interfaces, or external
-  surfaces the task may touch. Stop before expanding it.
-- **Done when**: a machine-checkable completion criterion such as a test command,
-  SQL assertion, expected response, diff condition, or deployment fingerprint.
-  A trivial single-file change with no data or interface impact may use one
-  current-vs-expected sentence. The criterion must be **red at birth and
-  idempotent**: it has to fail until the task is done (an already-green criterion
-  proves nothing — `open` refuses it), and the stop gate re-runs it on every
-  stop, so it must be read-only and side-effect-free. There is no claim-based
-  success: green always comes from a fresh criterion run.
-- **alignment**: one line recorded at `open` — "green ⇒ goal because <what the
-  check exercises>; not covered: <gaps>". A required field, not prose discipline.
-- **Evidence**: real tool output, status/diff, command output, SQL/API response,
-  read-only verification, or an execution report. Prose alone is not evidence.
-- **Task state**: local agent state under `.taskloop/task.json`. It is
-  gitignored, private to the loop, and non-authoritative; the durable unit is
-  the task, and episodes come and go underneath it.
+The **task** is the durable unit of one loop run. Everything else — episodes, rounds, evidence — lives underneath it.
 
-## Opening A Task
+- **Goal**: the user-visible outcome, stated without naming an implementation unless the user already approved one.
+- **Criterion**: a machine-checkable done-when (see *Sourcing The Criterion*). There is no claim-based success — green always comes from a fresh criterion run.
+- **Alignment**: one required line — "green ⇒ goal because <what the check exercises>; not covered: <gaps>" (see *Criterion-Goal Alignment*).
+- **Envelope**: the files/tables/interfaces/git surface the task may touch (see *The Envelope*).
+- **Budgets**: rounds (default eight), and opt-in writes / wall-clock — all **task-level**, never refilled by resuming (see *Episodes, Suspend, And Resume*).
 
-When work needs the loop supervisor, open a task:
+Task state lives in `.taskloop/task.json`, created only by `taskloop open`. It is gitignored, private to the loop, and **non-authoritative** — never a project policy source. **Evidence** for any completion claim is real tool output, status/diff, command output, SQL/API response, read-only verification, or an execution report. Prose alone is not evidence.
+
+## Sourcing The Criterion
+
+The only real fork in the work loop is where the red comes from:
+
+- **given** — the approved plan already carries the check.
+- **recovered** — reproduce the failure first; the red is earned from the world, not declared.
+- **absent (keep-green)** — a verification task whose criterion is legitimately green; open with the keep-green reason.
+
+Open the task with:
 
 ```text
 node ~/bin/taskloop.mjs open --repo <repo> --goal "<one line>" \
@@ -35,112 +31,59 @@ node ~/bin/taskloop.mjs open --repo <repo> --goal "<one line>" \
   --files "<glob>" [--rounds 8] [--writes N] [--wall-clock-minutes M]
 ```
 
-This `taskloop open` runs the criterion once and refuses an already-green start
-(red at birth) or one the machine cannot execute. Do not hand-write `task.json`;
-the CLI owns it. Prefer a **criterion adapter** over a
-hand-written check when the done-when reads evidence produced elsewhere; the
-adapter interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous
-pass, stale green, collapsed verdicts — unrepresentable. `e2e-report-check.mjs`
-is the seed adapter (required scenario set + build freshness, exit 0/1/2).
+`taskloop open` runs the criterion once and refuses an already-green start (red at birth — an already-green criterion cannot prove the task) or one the machine cannot execute. Do not hand-write `task.json`; the CLI owns it. Prefer a **criterion adapter** over a hand-written check when the done-when reads evidence produced elsewhere; the adapter interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous pass, stale green, collapsed verdicts — unrepresentable. `e2e-report-check.mjs` is the seed adapter (required scenario set + build freshness, exit 0/1/2).
 
-The criterion's own input files are fingerprinted at `open`; a green whose check
-files changed since (editing the test instead of the code) is flagged
-`criterion_input_drift` in the outcome ledger. A criterion move goes through
-`amend --criterion --reason`, not a silent edit.
+The criterion's own input files are fingerprinted at open; a green whose check files changed since (editing the test instead of the code) is flagged `criterion_input_drift` in the outcome ledger. A criterion move goes through `amend --criterion --reason`, not a silent edit.
 
 ## Criterion-Goal Alignment
 
-Red-at-birth proves the criterion can tell "done" from "not started"; it cannot
-prove the criterion covers the goal. A weak criterion (a file exists, a command
-merely runs) turns the stop gate into a rubber stamp.
+Red-at-birth proves the criterion can tell "done" from "not started"; it cannot prove the criterion covers the goal. A weak criterion (a file exists, a command merely runs) turns the stop gate into a rubber stamp.
 
-- The `--alignment` line is required at `open`: "green ⇒ goal met, because <what
-  the check exercises>; not covered: <known gaps>". If the honest line is
-  "green proves little", strengthen the criterion before starting.
-- Verification that stays outside the machine criterion (slow suites, manual
-  checks, deployment smoke) must be named in the alignment line and reported as
-  closeout evidence instead of being silently dropped.
-- At closeout, re-read the alignment line: when the work revealed the criterion
-  under-covers the goal, `amend` it with a reason — or report the gap — before
-  claiming `done`.
+- The `--alignment` line is required at open. If the honest line is "green proves little", strengthen the criterion before starting.
+- Verification outside the machine criterion (slow suites, manual checks, deployment smoke) must be named in the alignment line and reported as closeout evidence, not silently dropped.
+- At closeout, re-read the alignment line: when the work revealed the criterion under-covers the goal, `amend` it with a reason — or report the gap — before claiming `done`.
 
-Two-domain fit: a backend loop whose criterion runs focused API tests but not
-the data backfill it also changed; a docs loop whose criterion checks that links
-resolve but not that the new section renders in the published site. Both need
-the gap named at open and re-checked at closeout.
+Two-domain fit: a backend loop whose criterion runs focused API tests but not the data backfill it also changed; a docs loop whose criterion checks that links resolve but not that the new section renders in the published site.
+
+## The Envelope
+
+The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write and wall-clock budgets bound the never-stopping side, and reads and verification commands never burn or hit them.
+
+Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only after the user explicitly asks, and only when the envelope authorizes it — `open`/`amend` with `--git-allowed <op> --git-reason <why>`. Destructive git, remote execution (`curl | sh`), install scripts, and secret dumps stay denied unless the envelope opens them. Destructive operations still require explicit user intent even when authorized.
+
+## Episodes, Suspend, And Resume
+
+An **episode** is one continuous run of a task under a single session. A task suspends and resumes across episodes; budgets are task-level, so resuming never refills them — same failure repeated twice, or two rounds with no change, suspends as `stuck`; the round cap suspends as `out_of_budget`; missing input suspends as `needs_input`.
+
+Suspend is **not a closure** — the task stays open for the next episode. The snapshot has two halves: the machine records the changed files from its own observations; the human supplies the three judgment lines (remaining criterion, current failure, next safe action). A different session supersedes the previous episode rather than sharing it.
 
 ## Terminal States
 
-A task closes exactly one of four ways; the first is machine-adjudicated, the
-rest are human-declared:
+A task closes exactly one of three ways; only the first is machine-written:
 
 | State | Meaning |
 | --- | --- |
-| `done` | Criterion green from a fresh run (stop gate or the `done` verb). |
+| `done` | Criterion green from a fresh run (the stop gate or the `done` verb). The only machine-written success. |
 | `not_needed` | Read-only verification showed no change was needed (`not-needed --evidence`). |
 | `abandoned` | Superseded or dropped (`abandon --reason`). |
-| suspended | Not a closure: `suspend --outcome <needs_input\|stuck\|out_of_budget> --judgment <...>` leaves the task **open** so the next episode resumes it. |
 
-The machine only ever writes `done`, and only from a green criterion — there is
-no path that records success while the criterion is red. `stuck` (same failure
-signature repeats, or two signatures alternate) and `out_of_budget` (round
-budget spent) are episode outcomes the stop gate assigns automatically, then
-suspends the task open. An `out_of_budget` run whose every round failed
-differently is reported as still-moving: resume it (rounds are task-level) or
-`amend --rounds --reason`.
-
-## Budget And Rework
-
-- The default round budget is eight unless the user or target repo states a
-  different cap. Rounds are **task-level**: they accumulate across episodes and
-  are never refilled by resuming — same failure repeated twice, or two rounds
-  with no change, suspends as `stuck`; the round cap suspends as `out_of_budget`.
-  Opt-in `--writes` and `--wall-clock-minutes` bound the never-stopping side;
-  reads and verification commands never burn or hit them.
-- Treat a task as rework when it repairs previously delivered work or resumes a
-  prior non-green close. If the target repo has `docs/rework-log.md` or its
-  workflow contract names that file, append a compact rework cause line. If no
-  durable rework-log convention exists, include the rework cause in the closeout
-  report instead of inventing a new project file.
+The stop gate never writes success on a red criterion. `stuck` and `out_of_budget` are episode outcomes it assigns automatically, then suspends the task open; an `out_of_budget` run whose every round failed differently is reported as still-moving (resume it, or `amend --rounds --reason`).
 
 ## Concurrency
 
-Default to one writer task per worktree. For parallel work, use separate git
-worktrees — each carries its own `.taskloop/` task. There is no shared-worktree
-partitioned mode: git operations belong to one integrator, and a second writer
-gets its own worktree, not a claim inside yours.
+Default to one writer task per worktree. For parallel work use separate git worktrees — each carries its own `.taskloop/` task, and one integrator session owns the cross-worktree git operations and merges after each writer's task reaches a terminal state. There is no shared-worktree partitioned mode: a second writer gets its own worktree, not a claim inside yours.
 
-## Git Operations
+## Closeout And Rework
 
-Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only
-after the user explicitly asks for that operation, and only when the task's
-envelope authorizes it (`open`/`amend` with `--git-allowed <op> --git-reason
-<why>`). Destructive git operations still require explicit user intent even when
-authorized.
+Every closeout report includes the terminal state; the done-when verification result or why it cannot run; the actual touched targets (machine-observed in `evidence.touched_files`) versus the declared envelope; evidence links or command outputs for completion claims; remaining risks; and, for a suspend, the three judgment lines.
 
-## Closeout
-
-Every closeout report includes:
-
-- the terminal state (`done` / `not_needed` / `abandoned`, or a suspend outcome);
-- the done-when verification result or the reason it cannot run;
-- the actual touched targets (machine-observed in `evidence.touched_files`)
-  versus the declared envelope;
-- evidence links or command outputs for completion claims;
-- remaining risks;
-- for suspends, the machine half of the snapshot is auto-recorded; the human
-  supplies the three judgment lines (remaining criterion, current failure, next
-  safe action);
-- for rework, the rework-log entry or the closeout-only rework cause.
+Treat a task as rework when it repairs previously delivered work or resumes a prior non-green close. If the target repo has `docs/rework-log.md` or its workflow contract names that file, append a compact rework cause line; otherwise include the rework cause in the closeout report. The default round budget is eight unless the user or target repo states a different cap.
 
 ## Generalization Samples
 
 These primitives must fit at least two different domains:
 
-- backend sample: change an API handler, verify with focused tests and a
-  response assertion;
-- frontend sample: change a UI workflow, verify with a browser check and DOM or
-  screenshot evidence.
+- backend sample: change an API handler, verify with focused tests and a response assertion;
+- frontend sample: change a UI workflow, verify with a browser check and DOM or screenshot evidence.
 
-Rules that only fit one project, product, table name, enum, or business term do
-not belong in this shared reference.
+Rules that only fit one project, product, table name, enum, or business term do not belong in this shared reference.

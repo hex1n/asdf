@@ -59,6 +59,8 @@ Record the level reached with `taskloop review --level <second-model|fresh-conte
 
 The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write and wall-clock budgets bound the never-stopping side, and reads and verification commands never burn or hit them.
 
+Every authority expansion — destructive, network, install scripts, a git op, a whole-repo envelope — is recorded on the task as a **grant with provenance**: `self` unless the human's blessing is recorded with `--granted-by user`. The machine cannot verify the judgment behind an expansion, only who made it; the ledger's `self_granted` count makes self-authorized power visible to the meta loop. Provenance is a record, never a gate.
+
 Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only after the user explicitly asks, and only when the envelope authorizes it — `open`/`amend` with `--git-allowed <op> --git-reason <why>`. Destructive git, remote execution (`curl | sh`), install scripts, and secret dumps stay denied unless the envelope opens them. Destructive operations still require explicit user intent even when authorized.
 
 ## Episodes, Suspend, And Resume

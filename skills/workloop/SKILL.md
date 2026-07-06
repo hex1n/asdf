@@ -49,15 +49,17 @@ an already-green or non-executable criterion. Do not hand-write `task.json`.
 
 Completion criterion: the task is open, or the reason it is not used is stated.
 
-## 3. Change, Verify, Review, Fix
+## 3. Run The Body
 
 Make the narrowest change that can satisfy the criterion; run the smallest
-relevant verification after each meaningful change. For a recovered criterion,
-replay only against the changed build/process/config/data — a green on stale
-evidence does not count. For non-trivial changes, take an independent read-only
-review when the runtime supports it; otherwise record the downgrade and do a
-focused self-review. Keep at least two plausible causes alive until one
-distinguishing check separates them.
+relevant verification after each meaningful change; each round `status`-checks
+that nothing left the envelope. The body is identical across sources with one
+branch — **recovered adds a freshness gate**: replay only against the changed
+build/process/config/data, because a green on the old world's evidence does not
+count. For non-trivial changes, take an independent read-only review when the
+runtime supports it; otherwise record the downgrade and do a focused
+self-review. Keep at least two plausible causes alive until one distinguishing
+check separates them.
 
 Completion criterion: the criterion passes, or the task has a named non-`done`
 outcome.

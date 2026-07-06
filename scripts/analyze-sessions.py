@@ -81,6 +81,45 @@ HARD_PAT = re.compile(
 NONSUCCESS_STATES = ("blocked", "stalled", "exhausted")
 
 
+def load_last_jsonl_row(path):
+    """Last parseable JSON object line of a jsonl file, or None."""
+    try:
+        fh = io.open(path, "r", encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    last = None
+    with fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(row, dict):
+                last = row
+    return last
+
+
+def health_delta_line(prev, cur):
+    """One-line trend versus the previous loop-health run; None without one.
+    loop-health.txt is overwritten every run, so this history-backed delta is
+    what makes "compare with the previous run" possible."""
+    if not isinstance(prev, dict):
+        return None
+
+    def diff(key):
+        try:
+            return int(cur.get(key) or 0) - int(prev.get(key) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    return ("delta vs %s: pulse %+d, interrupts %+d, drift_corrections %+d, hard_openings %+d"
+            % (prev.get("generated", "?"), diff("pulse"), diff("interrupts"),
+               diff("drift"), diff("hard")))
+
+
 def loop_history_metrics(history_path):
     """Outcome metrics from the out-of-tree terminal history that
     agent-loop.mjs appends (one line per closed loop). Returns None when the
@@ -413,6 +452,31 @@ def main(argv=None):
     else:
         lh.append("5. terminal_states: no history yet (%s missing; requires an agent-loop.mjs with terminal history)"
                   % history_path)
+
+    # Trend series: loop-health.txt is truncated every run, so append each
+    # run's indicator values to a history file and print the delta versus the
+    # previous run. Same directory as the other outputs, gitignored.
+    run_row = {
+        "generated": datetime.date.today().isoformat(),
+        "since": since,
+        "pulse": pulse,
+        "prompts": len(win_prompts),
+        "interrupts": win_claude_int + win_codex_aborts,
+        "drift": drift,
+        "corrections": win_corr,
+        "hard": hard_first,
+        "sessions": len(win_firsts),
+        "states": (hist or {}).get("states"),
+        "nonsuccess": (hist or {}).get("nonsuccess"),
+        "resumed": (hist or {}).get("resumed"),
+    }
+    health_history = os.path.join(out_dir, "loop-health-history.jsonl")
+    delta = health_delta_line(load_last_jsonl_row(health_history), run_row)
+    if delta:
+        lh.append(delta)
+    with io.open(health_history, "a", encoding="utf-8") as fo:
+        fo.write(json.dumps(run_row, ensure_ascii=False) + "\n")
+
     lh_text = "\n".join(lh)
     with w("loop-health.txt") as fo:
         fo.write(lh_text + "\n")

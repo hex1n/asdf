@@ -88,6 +88,11 @@ node ~/bin/agent-loop.mjs amend --repo <repo> --criterion <new check> --reason <
 `amend` records the change with its reason and resets stall tracking (failures
 now belong to a different check) but does **not** refill the block budget —
 amend fixes the target, it does not buy more iterations; re-init resets budget.
+Re-init is not an anonymous budget refill either: initializing over a
+non-success close of the **same criterion** is the same task continuing, so
+`init` records the lineage (`resume_of`, a cumulative `resume_count`, carried
+gate telemetry) and resurfaces the prior close's snapshot. Severing that
+lineage on purpose requires `--fresh --reason <why>`.
 Changing the criterion by direct file edit still works but is flagged at the
 next stop as an unrecorded goalpost move: the machine cannot judge whether the
 change is legitimate, only that "defining green" and "passing green" stayed

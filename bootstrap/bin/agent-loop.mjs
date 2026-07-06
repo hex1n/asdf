@@ -569,6 +569,7 @@ function appendTerminalHistory(repo, touch, via) {
       stall_count: Number.parseInt(String(touch.stall_count), 10) || 0,
       iteration: evidence.iteration ?? null,
       writes: Number.parseInt(String(evidence.writes), 10) || 0,
+      resume_count: Number.parseInt(String(touch.resume_count), 10) || 0,
       snapshot: evidence.snapshot ?? null,
       session: ownerSessionId(touch) ?? null,
     };
@@ -1865,6 +1866,35 @@ function cmdInit(values) {
   // fingerprints (the check itself must not be silently rewritable mid-loop).
   data.criterion_hash = criterionHash(data.criterion);
   data.criterion_inputs = criterionInputPaths(data.criterion, repo);
+  // Task lineage: budgets are per-contract and contracts are cheap to
+  // recreate, so a re-init over a non-success close of the same criterion is
+  // the same task continuing, not a new one. Record the lineage and resurface
+  // the prior snapshot; severing it on purpose (--fresh) must leave a reason.
+  const priorNonSuccess =
+    isPlainObject(existing) &&
+    lifecycleStatus(existing) === "closed" &&
+    ["blocked", "stalled", "exhausted"].includes(terminalState(existing));
+  const sameCriterion =
+    isPlainObject(existing) &&
+    String(existing.criterion_hash ?? criterionHash(existing.criterion)) === data.criterion_hash;
+  if (priorNonSuccess && sameCriterion && !values.fresh) {
+    const priorEvidence = isPlainObject(existing.evidence) ? existing.evidence : {};
+    const priorFailure = isPlainObject(priorEvidence.last_failure)
+      ? String(priorEvidence.last_failure.summary ?? "").trim()
+      : "";
+    const priorSnapshot = String(priorEvidence.snapshot ?? "").trim() || priorFailure;
+    data.resume_of = {
+      closed_at: existing.closed_at ?? null,
+      terminal_state: terminalState(existing),
+    };
+    data.resume_count = (Number.parseInt(String(existing.resume_count), 10) || 0) + 1;
+    data.gate_blocks_total = Number.parseInt(String(existing.gate_blocks_total), 10) || 0;
+    process.stdout.write(
+      `resuming task: same criterion closed ${terminalState(existing)}` +
+        `${existing.closed_at ? ` at ${existing.closed_at}` : ""} (resume #${data.resume_count}); ` +
+        `prior snapshot: ${priorSnapshot || "none recorded"}\n`,
+    );
+  }
   if (initVerdict.verdict === "not_executable") {
     const mustBlock = String(data.enforcement).toLowerCase() === "strict";
     const message =
@@ -1902,6 +1932,10 @@ function cmdInit(values) {
     init_criterion: initVerdict.verdict,
     ...(values["allow-green-init"] ? { green_init_reason: String(values.reason ?? "").trim() } : {}),
     ...(values.steal ? { reason: `stolen: ${values.reason}`, previous_session_id: ownerSessionId(existing) || null } : {}),
+    ...(data.resume_of
+      ? { resume_count: data.resume_count, resume_of_terminal_state: data.resume_of.terminal_state }
+      : {}),
+    ...(values.fresh ? { fresh_start: true, fresh_reason: String(values.reason ?? "").trim() } : {}),
   });
   process.stdout.write(`created ${file}\n`);
   return 0;
@@ -2252,6 +2286,7 @@ const CLI_OPTIONS = {
     "unknown-write-policy": { type: "string", default: "warn" },
     force: { type: "boolean", default: false },
     steal: { type: "boolean", default: false },
+    fresh: { type: "boolean", default: false },
     reason: { type: "string" },
   },
   status: {
@@ -2336,6 +2371,9 @@ function runCli(command, argv) {
     }
     if (values["allow-green-init"] && !String(values.reason ?? "").trim()) {
       return cliError("--allow-green-init requires --reason <why a green start is intentional>");
+    }
+    if (values.fresh && !String(values.reason ?? "").trim()) {
+      return cliError("--fresh requires --reason <why the same-criterion lineage is severed>");
     }
     return cmdInit(values);
   }

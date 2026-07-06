@@ -72,9 +72,12 @@ node ~/bin/agent-loop.mjs close --repo <repo> --terminal-state <success|noop|blo
 criterion and refuses on red — success always comes from a fresh green run,
 on the stop-gate path and the close path alike. `blocked`, `stalled`, and
 `exhausted` additionally require
-`--snapshot "<changed files; remaining criterion; current failure; next safe action>"`;
-the snapshot is stored in the contract (`evidence.snapshot`) so the next loop
-resumes from machine-held state instead of rediscovering the failure scene.
+`--snapshot "<remaining criterion; current failure; next safe action>"` —
+three judgment lines only: the changed-files half of the snapshot is
+machine-observed (`evidence.touched_files`, accumulated by the PreToolUse
+hook) and resurfaces automatically at resume. Both halves are stored in the
+contract so the next loop resumes from machine-held state instead of
+rediscovering the failure scene.
 `noop` needs neither: it is a normal closure whose criterion is legitimately
 still red.
 

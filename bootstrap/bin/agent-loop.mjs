@@ -570,6 +570,7 @@ function appendTerminalHistory(repo, touch, via) {
       iteration: evidence.iteration ?? null,
       writes: Number.parseInt(String(evidence.writes), 10) || 0,
       resume_count: Number.parseInt(String(touch.resume_count), 10) || 0,
+      touched_files: Array.isArray(evidence.touched_files) ? evidence.touched_files.length : 0,
       snapshot: evidence.snapshot ?? null,
       session: ownerSessionId(touch) ?? null,
     };
@@ -1273,6 +1274,20 @@ function countsAsWrite(tool, mapping, gitOps) {
   return gitOps.length > 0 || looksLikeWrite(tool, mapping);
 }
 
+// Cap on the machine-observed changed-files list: enough for any sane loop,
+// bounded so a mass rewrite cannot bloat the contract file.
+const TOUCHED_FILES_CAP = 50;
+
+function repoRelative(repo, raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return null;
+  const root = path.resolve(String(repo));
+  const abs = path.resolve(root, s.replace(/\\/g, "/"));
+  if (abs === root) return null;
+  if (abs.startsWith(root + path.sep)) return abs.slice(root.length + 1).replace(/\\/g, "/");
+  return s;
+}
+
 function markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, opts = {}) {
   if (!touch || typeof touch !== "object") return false;
   const counted = countsAsWrite(tool, mapping, gitOps);
@@ -1290,10 +1305,34 @@ function markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, opts = {}) {
   if (counted) {
     const evidence = ensureEvidence(touch);
     evidence.writes = (Number.parseInt(String(evidence.writes), 10) || 0) + 1;
+    // The machine half of the resumable snapshot: the hook observes every
+    // write target, so "changed files" is generated state, never something
+    // the agent is asked to remember.
+    const touched = Array.isArray(evidence.touched_files) ? evidence.touched_files.map(String) : [];
+    for (const raw of fileTargets(tool, mapping)) {
+      const rel = repoRelative(repo, raw);
+      if (!rel || touched.includes(rel)) continue;
+      if (touched.length >= TOUCHED_FILES_CAP) {
+        evidence.touched_files_truncated = true;
+        break;
+      }
+      touched.push(rel);
+    }
+    evidence.touched_files = touched;
     changed = true;
   }
   if (changed && !opts.deferWrite) writeJson(runContractPath(repo), touch);
   return changed;
+}
+
+function touchedFilesSummary(touch, limit = 10) {
+  const evidence = ensureEvidence(touch);
+  const touched = Array.isArray(evidence.touched_files) ? evidence.touched_files.map(String) : [];
+  if (!touched.length) return null;
+  const shown = touched.slice(0, limit).join(", ");
+  const extra = touched.length > limit ? `, +${touched.length - limit} more` : "";
+  const truncated = evidence.touched_files_truncated ? ", list capped" : "";
+  return `(${touched.length}): ${shown}${extra}${truncated}`;
 }
 
 // Runaway-side budget: the stop gate bounds a loop that keeps trying to stop,
@@ -1722,7 +1761,9 @@ function checkStop(payload, repo, touch) {
                 "budget ran out; if the progress is real, re-init with the same criterion (lineage is recorded) " +
                 "and continue from the snapshot"
               : "")) +
-        "; produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
+        (touchedFilesSummary(touch) ? `; machine-observed changed files ${touchedFilesSummary(touch)}` : "") +
+        "; produce a resumable state snapshot (remaining criterion, current failure, next action — " +
+        "changed files are machine-observed) before handing back",
       criterion_exit: verdict.exit,
     });
     return 0;
@@ -1902,10 +1943,13 @@ function cmdInit(values) {
     };
     data.resume_count = (Number.parseInt(String(existing.resume_count), 10) || 0) + 1;
     data.gate_blocks_total = Number.parseInt(String(existing.gate_blocks_total), 10) || 0;
+    const priorTouched = touchedFilesSummary(existing);
     process.stdout.write(
       `resuming task: same criterion closed ${terminalState(existing)}` +
         `${existing.closed_at ? ` at ${existing.closed_at}` : ""} (resume #${data.resume_count}); ` +
-        `prior snapshot: ${priorSnapshot || "none recorded"}\n`,
+        `prior snapshot: ${priorSnapshot || "none recorded"}` +
+        (priorTouched ? `; machine-observed changed files ${priorTouched}` : "") +
+        "\n",
     );
   }
   if (initVerdict.verdict === "not_executable") {
@@ -2123,7 +2167,8 @@ function cmdClose(values) {
   if (["blocked", "stalled", "exhausted"].includes(requestedTerminalState) && !snapshot) {
     process.stderr.write(
       `--snapshot is required for terminal-state ${requestedTerminalState}: ` +
-        '"<changed files; remaining criterion; current failure; next safe action>"\n',
+        '"<remaining criterion; current failure; next safe action>" ' +
+        "(changed files are machine-observed in evidence.touched_files)\n",
     );
     return 2;
   }

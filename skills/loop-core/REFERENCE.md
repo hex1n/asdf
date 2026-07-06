@@ -162,6 +162,12 @@ green / kept failing the same way / never went green in budget."
   failure signatures strictly alternate across twice the stall cap (fix A
   breaks B, fix B breaks A), which caps the criterion re-runs a genuinely
   stuck loop pays before it stops.
+- The stop gate bounds a loop that keeps trying to stop; a loop that never
+  stops consumes no gate budget. The opt-in runaway budgets bound that side:
+  `init --max-writes <n>` and `--max-wall-clock-minutes <m>` (both default
+  off) make the PreToolUse hook deny further write-shaped calls once crossed —
+  reads and verification commands always still run, so an over-budget loop can
+  always verify, stop, or close honestly.
 - Treat a loop as rework when it repairs previously delivered work or resumes a
   prior `blocked`, `stalled`, or `exhausted` closeout. If the target repo has
   `docs/rework-log.md` or its workflow contract names that file, append a

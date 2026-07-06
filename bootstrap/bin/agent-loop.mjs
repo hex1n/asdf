@@ -455,6 +455,11 @@ function validateTouchList(touch) {
   if (budget.max_git_ops !== undefined && Number.parseInt(String(budget.max_git_ops), 10) < 0) {
     errors.push("budget.max_git_ops must be a non-negative integer");
   }
+  for (const field of ["max_writes", "max_wall_clock_minutes"]) {
+    if (budget[field] !== undefined && Number.parseInt(String(budget[field]), 10) < 0) {
+      errors.push(`budget.${field} must be a non-negative integer`);
+    }
+  }
   const secretsPolicy = String(budget.secrets_policy ?? "deny_env_dump");
   if (!VALID_SECRETS_POLICIES.has(secretsPolicy)) {
     errors.push(`budget.secrets_policy must be one of ${JSON.stringify([...VALID_SECRETS_POLICIES].sort())}`);
@@ -563,6 +568,7 @@ function appendTerminalHistory(repo, touch, via) {
       gate_blocks_total: Number.parseInt(String(touch.gate_blocks_total), 10) || 0,
       stall_count: Number.parseInt(String(touch.stall_count), 10) || 0,
       iteration: evidence.iteration ?? null,
+      writes: Number.parseInt(String(evidence.writes), 10) || 0,
       snapshot: evidence.snapshot ?? null,
       session: ownerSessionId(touch) ?? null,
     };
@@ -1171,6 +1177,27 @@ function checkPretool(payload, repo, touch) {
     return 0;
   }
 
+  const runaway = runawayBudgetFailures(touch, tool, mapping, gitOps);
+  if (runaway.length) {
+    const reason = `run contract runaway budget reached: ${runaway.join("; ")}`;
+    if (mode === "strict") {
+      const cli = process.argv[1] ?? "agent-loop.mjs";
+      appendEvent(repo, { ...base, decision: "deny", runaway_budget: true, reason });
+      return deny(
+        reason +
+          ". Reads and verification commands still run: verify and let the criterion gate adjudicate the stop, " +
+          "close with an honest terminal state:\n" +
+          `  node "${cli}" close --repo "${repo}" --terminal-state <blocked|stalled|exhausted> --reason "<why>" --snapshot "<changed; remaining; failure; next>"\n` +
+          "or re-init with a larger budget and a reason.",
+      );
+    }
+    if (touch.runaway_budget_warned !== true) {
+      touch.runaway_budget_warned = true;
+      appendEvent(repo, { ...base, decision: "warn", runaway_budget: true, reason });
+      writeJson(runContractPath(repo), touch);
+    }
+  }
+
   const failures = [];
   failures.push(...safetyFailures(touch, mapping));
   const fileResults = [];
@@ -1236,19 +1263,66 @@ function checkPretool(payload, repo, touch) {
 // that looks like a write, any command or git op counts) — a false "dirty"
 // merely costs one extra criterion run, while a false "clean" would hold a
 // stale red, which the stall release still bounds.
+// A "counted write" is narrower than "dirty-making": the red-verdict cache
+// must be invalidated by anything that could mutate state (any shell command,
+// any file-target tool including reads), but the write budget must count only
+// genuine writes — reads and verification runs never burn it, so a loop over
+// budget can always still verify and stop.
+function countsAsWrite(tool, mapping, gitOps) {
+  return gitOps.length > 0 || looksLikeWrite(tool, mapping);
+}
+
 function markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, opts = {}) {
   if (!touch || typeof touch !== "object") return false;
+  const counted = countsAsWrite(tool, mapping, gitOps);
   const writeShaped =
-    gitOps.length > 0 ||
+    counted ||
     fileTargets(tool, mapping).length > 0 ||
     sqlTargets(mapping).length > 0 ||
     interfaceTargets(mapping).length > 0 ||
-    commandValues(mapping).length > 0 ||
-    looksLikeWrite(tool, mapping);
-  if (!writeShaped || touch.dirty_since_verdict === true) return false;
-  touch.dirty_since_verdict = true;
-  if (!opts.deferWrite) writeJson(runContractPath(repo), touch);
-  return true;
+    commandValues(mapping).length > 0;
+  let changed = false;
+  if (writeShaped && touch.dirty_since_verdict !== true) {
+    touch.dirty_since_verdict = true;
+    changed = true;
+  }
+  if (counted) {
+    const evidence = ensureEvidence(touch);
+    evidence.writes = (Number.parseInt(String(evidence.writes), 10) || 0) + 1;
+    changed = true;
+  }
+  if (changed && !opts.deferWrite) writeJson(runContractPath(repo), touch);
+  return changed;
+}
+
+// Runaway-side budget: the stop gate bounds a loop that keeps trying to stop,
+// but a loop that never stops consumes no gate budget at all. These checks
+// bound it at the only point the machine observes work — write-shaped tool
+// calls. Both budgets default to 0 (off): a false trip costs more than the
+// rare runaway in a collaborative setting, so the bound is opt-in.
+function runawayBudgetFailures(touch, tool, mapping, gitOps) {
+  const failures = [];
+  if (!countsAsWrite(tool, mapping, gitOps)) return failures;
+  const maxWrites = intField(budgetValue(touch, "max_writes", 0), 0);
+  if (maxWrites > 0) {
+    const writes = Number.parseInt(String(ensureEvidence(touch).writes), 10) || 0;
+    if (writes >= maxWrites) {
+      failures.push(`write budget exhausted (${writes} write-shaped calls, max_writes ${maxWrites})`);
+    }
+  }
+  const maxMinutes = intField(budgetValue(touch, "max_wall_clock_minutes", 0), 0);
+  if (maxMinutes > 0) {
+    const started = Date.parse(String(runtimeSession(touch).started_at ?? ""));
+    if (Number.isFinite(started)) {
+      const elapsedMinutes = (Date.now() - started) / 60000;
+      if (elapsedMinutes > maxMinutes) {
+        failures.push(
+          `wall-clock budget exhausted (${Math.floor(elapsedMinutes)}m since init, max_wall_clock_minutes ${maxMinutes})`,
+        );
+      }
+    }
+  }
+  return failures;
 }
 
 function intField(value, fallback) {
@@ -1713,6 +1787,8 @@ function cmdInit(values) {
     budget: {
       max_iterations: intField(values["max-iterations"], GATE_BLOCK_CAP),
       max_git_ops: Number.parseInt(String(values["max-git-ops"] ?? "0"), 10) || 0,
+      max_writes: Number.parseInt(String(values["max-writes"] ?? "0"), 10) || 0,
+      max_wall_clock_minutes: Number.parseInt(String(values["max-wall-clock-minutes"] ?? "0"), 10) || 0,
       network_allowed: Boolean(values["network-allowed"]),
       network_allowlist: [],
       install_scripts_allowed: Boolean(values["install-scripts-allowed"]),
@@ -2164,6 +2240,8 @@ const CLI_OPTIONS = {
     "integrator-session": { type: "string" },
     "max-iterations": { type: "string", default: String(GATE_BLOCK_CAP) },
     "max-git-ops": { type: "string", default: "0" },
+    "max-writes": { type: "string", default: "0" },
+    "max-wall-clock-minutes": { type: "string", default: "0" },
     "network-allowed": { type: "boolean", default: false },
     "install-scripts-allowed": { type: "boolean", default: false },
     "destructive-allowed": { type: "boolean", default: false },
@@ -2241,6 +2319,11 @@ function runCli(command, argv) {
     }
     if (Number.parseInt(String(values["max-git-ops"]), 10) < 0) {
       return cliError("--max-git-ops must be a non-negative integer");
+    }
+    for (const flag of ["max-writes", "max-wall-clock-minutes"]) {
+      if (Number.parseInt(String(values[flag]), 10) < 0) {
+        return cliError(`--${flag} must be a non-negative integer`);
+      }
     }
     for (const op of values["git-allowed"] ?? []) {
       const normalized = String(op).trim().toLowerCase();

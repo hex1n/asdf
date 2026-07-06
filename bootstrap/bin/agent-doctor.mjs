@@ -543,6 +543,20 @@ async function main() {
   } else {
     item("drift scan", `WARN: source repo not found at ${srcRoot} (set ASDF_REPO env var); scan skipped`);
   }
+  // Commit-time distribution: post-commit re-runs install.mjs so the drift
+  // window collapses to the commit boundary. Read-only wiring check.
+  if (exists(path.join(repo, ".git"))) {
+    const hooksPath = run(["git", "-C", repo, "config", "--get", "core.hooksPath"]).split(/\r?\n/)[0].trim();
+    const wired = hooksPath === "hooks" && exists(path.join(repo, "hooks", "post-commit"));
+    item(
+      "commit distribution",
+      wired
+        ? "ok (post-commit re-runs install.mjs on every commit)"
+        : "WARN: not wired - run node bootstrap/install.mjs to route git hooks through hooks/",
+    );
+  } else {
+    item("commit distribution", "unknown - source repo is not a git work tree");
+  }
 
   section("Loop health review");
   const loopHealth = path.join(repo, "docs", "research", "loop-health.txt");

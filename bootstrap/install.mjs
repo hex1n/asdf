@@ -9,6 +9,7 @@ import crypto from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -95,6 +96,100 @@ function sameContent(a, b) {
     return fs.readFileSync(a).equals(fs.readFileSync(b));
   } catch {
     return false;
+  }
+}
+
+function sameInode(a, b) {
+  try {
+    const sa = fs.statSync(a, { bigint: true });
+    const sb = fs.statSync(b, { bigint: true });
+    return sa.dev === sb.dev && sa.ino === sb.ino && sa.ino !== 0n;
+  } catch {
+    return false;
+  }
+}
+
+// A linked install (dir symlink or hardlinked file into the working tree)
+// lets uncommitted edits leak into live sessions before they pass the
+// evidence loop. Its content equals the source by definition, so replacing
+// it with a real copy loses nothing.
+function delinkInstalledSkill(src, dst, dry) {
+  if (!exists(dst)) return;
+  const probes = ["SKILL.md", "REFERENCE.md"].map((name) => [path.join(src, name), path.join(dst, name)]);
+  const linked =
+    isSymlink(dst) ||
+    probes.some(([a, b]) => exists(a) && exists(b) && (sameFile(a, b) || sameInode(a, b)));
+  if (!linked) return;
+  plan("update", `${dst} (delink: linked install becomes a managed copy)`);
+  if (dry) return;
+  if (isSymlink(dst)) {
+    try {
+      fs.unlinkSync(dst);
+    } catch {
+      fs.rmdirSync(dst);
+    }
+  } else {
+    fs.rmSync(dst, { recursive: true, force: true });
+  }
+}
+
+function git(args) {
+  return execFileSync("git", ["-C", REPO, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+// Distribution rides the commit boundary: a commit is the point where a
+// change has passed the evidence loop, so hooks/post-commit re-runs this
+// installer and the drift window collapses to zero. Local repo config only;
+// anything unexpected degrades to a note and the doctor stays the backstop.
+function registerCommitDistribution(dry) {
+  if (!exists(path.join(REPO, "hooks", "post-commit"))) {
+    plan("ok", "commit-time distribution skipped (no hooks/post-commit in this source tree)");
+    return;
+  }
+  let isRepo = false;
+  try {
+    isRepo = git(["rev-parse", "--is-inside-work-tree"]) === "true";
+  } catch {
+    isRepo = false;
+  }
+  if (!isRepo) {
+    plan("ok", `commit-time distribution skipped (${REPO} is not a git work tree)`);
+    return;
+  }
+  try {
+    const gitDir = git(["rev-parse", "--git-dir"]);
+    const legacyHooks = path.join(path.isAbsolute(gitDir) ? gitDir : path.join(REPO, gitDir), "hooks");
+    const custom = fs.readdirSync(legacyHooks).filter((f) => !f.endsWith(".sample"));
+    if (custom.length) {
+      plan("error", `.git/hooks has custom hooks (${custom.join(", ")}); switching core.hooksPath would bypass them - merge them into hooks/ first`);
+      return;
+    }
+  } catch {
+    /* no legacy hooks dir to protect */
+  }
+  let current = "";
+  try {
+    current = git(["config", "--get", "core.hooksPath"]);
+  } catch {
+    current = "";
+  }
+  if (current === "hooks") {
+    plan("ok", "core.hooksPath already points at hooks/ (commit-time distribution wired)");
+    return;
+  }
+  if (current) {
+    plan("error", `core.hooksPath is '${current}'; not overwriting a foreign hooks dir - merge hooks/post-commit yourself`);
+    return;
+  }
+  plan("update", "git config core.hooksPath hooks (post-commit re-runs install.mjs)");
+  if (dry) return;
+  try {
+    git(["config", "core.hooksPath", "hooks"]);
+  } catch (err) {
+    plan("error", `failed to set core.hooksPath: ${String(err?.message ?? err)}`);
   }
 }
 
@@ -552,9 +647,13 @@ function main() {
 
   for (const skill of dirs(path.join(REPO, "skills"))) {
     for (const rt of [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]) {
-      copyTree(skill, path.join(rt, path.basename(skill)), dry);
+      const dest = path.join(rt, path.basename(skill));
+      delinkInstalledSkill(skill, dest, dry);
+      copyTree(skill, dest, dry);
     }
   }
+
+  registerCommitDistribution(dry);
 
   // ~/.agents/skills is legacy residue only when it is NOT the live shared
   // cache; when ~/.claude/skills or ~/.codex/skills resolves into it, the

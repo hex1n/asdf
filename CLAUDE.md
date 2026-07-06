@@ -39,6 +39,10 @@ loop machinery's maintenance discipline and semantic boundaries live in
 - `bootstrap/` — machine-level install assets (the work-loop contract card,
   agent-doctor, agent-loop hook) plus the idempotent `install.mjs`; see
   `bootstrap/README.md`.
+- `scripts/` — repo-level maintenance tooling (e.g. `analyze-sessions.py`,
+  the monthly loop-health analyzer).
+- `hooks/` — in-repo git hooks (`core.hooksPath` target); `post-commit`
+  re-runs `install.mjs` so distribution rides the commit boundary.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
 - `AGENTS.md` — skill-authoring and maintenance conventions (skill assets).
 - `CONTEXT.md` — canonical domain language: skill distribution and loop

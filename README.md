@@ -10,7 +10,7 @@ Skills are one component the loop calls; **the loop is the product**.
 ## The loop
 
 The work loop drives a task from intake to delivery — **judge scope → converge
-only when needed → land → verify → log**. Its default is light: small and clear
+only when needed → work → verify → log**. Its default is light: small and clear
 work moves straight to implementation with a checkable criterion. The
 `converge` skill is reserved for explicit requests, unresolved mechanism
 choices, or irreversible high-risk changes. Once you approve a plan, approval

@@ -72,7 +72,7 @@ under [bootstrap/contract/](bootstrap/contract/).
 ### Language
 
 **Work Loop**:
-The product of this repository: the judge-scope → converge-when-needed → land → verify → stop cycle, distributed into user-level runtime files by `bootstrap/install.mjs`.
+The product of this repository: the judge-scope → converge-when-needed → work → verify → stop cycle, distributed into user-level runtime files by `bootstrap/install.mjs`.
 _Avoid_: workflow automation, skill collection
 
 **Task**:

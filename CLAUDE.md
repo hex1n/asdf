@@ -5,7 +5,7 @@ Guidance for Claude Code (and other agent runtimes) when working in this reposit
 ## What this repo is
 
 `asdf-skills` builds a portable **personal agent work loop** — judge scope →
-converge when needed → land → verify → stop — installable on any machine and
+converge when needed → work → verify → stop — installable on any machine and
 effective in any project with zero per-project config. **The loop is the
 product**; the repo ships two asset families:
 

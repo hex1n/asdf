@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Read-only E2E execution-report checker, usable as an agent-loop Stop-gate
+// Read-only E2E execution-report checker, usable as a taskloop Stop-gate
 // criterion. It answers one question with an exit code: did the selected
 // scenarios pass on the current build? It NEVER re-runs the executor — the Stop
 // gate re-runs its criterion on every stop, so a criterion that re-ran the E2E

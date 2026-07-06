@@ -427,7 +427,7 @@ def main(argv=None):
     # Indicators 1-4 are behavior metrics from the session corpora,
     # computed over the rolling window so monthly re-runs show direction;
     # 5-6 are outcome metrics from the out-of-tree terminal history that
-    # agent-loop.mjs appends on every loop close (all-time, coverage annotated).
+    # taskloop appends on every task close (all-time, coverage annotated).
     win_prompts = [p for p in claude_prompts + codex_prompts if date_in_window(p[0], since)]
     pulse = sum(1 for _, _, _, x in win_prompts
                 if x.strip().lower() in PULSE_SET or x.strip().startswith("继续"))

@@ -756,7 +756,13 @@ function safetyFailures(touch, mapping) {
     }
     if (
       !destructiveAllowed &&
-      /\b(Remove-Item|rm|del|erase|rmdir|rd)\b/i.test(command) &&
+      // Command-position anchored: `rm`/`del`/... only counts at the start of
+      // a command (string/line start or after |;&). Embedded content — a Java
+      // `void del(...)`, prose mentioning `rd` — must not trip the budget
+      // (observed false denies on both runtimes). A content LINE that starts
+      // with a destructive token still matches; collaborative model accepts
+      // that residual over missing `cmd && rm -rf x`.
+      /(?:^|[|;&\n(])\s*(?:sudo\s+)?(?:Remove-Item|rm|del|erase|rmdir|rd)(?:\.exe)?\b/i.test(command) &&
       !/\b(Get-ChildItem|ls|dir)\b/i.test(command)
     ) {
       failures.push("destructive command requires budget.destructive_allowed");
@@ -1200,10 +1206,14 @@ function checkPretool(payload, repo, touch) {
     const decision = mode === "strict" ? "deny" : "warn";
     appendEvent(repo, { ...base, decision, reason: failures.join("; "), targets });
     if (mode === "strict") {
+      // Teach the blessed path only: narrow first; widen scope with a
+      // recorded reason. Never point at the contract file itself.
+      const cli = process.argv[1] ?? "agent-loop.mjs";
       return deny(
         "agent loop run contract denied target(s): " +
           failures.join("; ") +
-          `. Update ${STATE_DIR}/${RUN_CONTRACT} or narrow the tool call.`,
+          ". Narrow the tool call to the declared scope, or if the target genuinely belongs to this loop's goal:\n" +
+          `  node "${cli}" amend --repo "${repo}" --files "<missing glob>" --reason "<why it belongs>"`,
       );
     }
     // warn mode lets the call through, so it may still mutate state.
@@ -1562,7 +1572,9 @@ function checkStop(payload, repo, touch) {
       (reasonTail ? `--- criterion output (tail) ---\n${reasonTail}\n` : "") +
       `Fix the failure and re-verify; the stop gate releases as stalled after ${stallCap} identical ` +
       `consecutive failures or as exhausted after ${cap} consecutive blocks. ` +
-      `If the criterion itself is wrong, update it via ${STATE_DIR}/${RUN_CONTRACT} or close the run contract.`,
+      "If the criterion itself is wrong, change it with a recorded reason:\n" +
+      `  node "${process.argv[1] ?? "agent-loop.mjs"}" amend --repo "${repo}" --criterion "<corrected check>" --reason "<why the goalpost moved>"\n` +
+      "or close the run contract.",
   );
 }
 
@@ -1910,10 +1922,13 @@ function cmdClose(values) {
   return 0;
 }
 
-// Blessed criterion change: the only path that attaches a reason to a moved
-// goalpost. Amending resets the stall identity (failures now belong to a new
-// check) but deliberately does NOT refill the block budget — amend fixes the
-// target, it does not buy more iterations. Re-init is the way to reset budget.
+// Blessed contract evolution: the only path that attaches a reason to a moved
+// goalpost (criterion) or a widened scope (files). Amending a criterion resets
+// the stall identity (failures now belong to a new check); amending scope does
+// not (the check is unchanged). Neither refills the block budget — amend fixes
+// the target, it does not buy more iterations. Re-init is the way to reset
+// budget. Scope amend only appends: narrowing scope is rare enough that
+// re-init is the honest path for it.
 function cmdAmend(values) {
   const repo = repoFromArg(values.repo);
   const touch = loadTouchList(repo);
@@ -1927,8 +1942,9 @@ function cmdAmend(values) {
     return 1;
   }
   const next = String(values.criterion ?? "").trim();
-  if (!next) {
-    process.stderr.write("amend requires --criterion <new check>\n");
+  const addFiles = normalizePatterns(values.files ?? []);
+  if (!next && !addFiles.length) {
+    process.stderr.write("amend requires --criterion <new check> and/or --files <glob>\n");
     return 2;
   }
   const reason = String(values.reason ?? "").trim();
@@ -1936,31 +1952,42 @@ function cmdAmend(values) {
     process.stderr.write("amend requires --reason <why the goalpost moved>\n");
     return 2;
   }
-  const previous = criterionValue(touch);
-  const previousHash = touch.criterion_hash ?? criterionHash(previous);
-  touch.criterion = next;
-  touch.criterion_hash = criterionHash(next);
-  touch.stall_signature = null;
-  touch.stall_count = 0;
-  touch.stall_history = [];
+  const event = {
+    event: "Amend",
+    decision: "observe",
+    evidence_kind: "loop_runtime",
+    repo: String(repo),
+    reason,
+    via: "amend",
+  };
+  if (next) {
+    const previous = criterionValue(touch);
+    const previousHash = touch.criterion_hash ?? criterionHash(previous);
+    touch.criterion = next;
+    touch.criterion_hash = criterionHash(next);
+    touch.stall_signature = null;
+    touch.stall_count = 0;
+    touch.stall_history = [];
+    event.criterion_amended = true;
+    event.previous_hash = previousHash;
+    event.new_hash = touch.criterion_hash;
+  }
+  if (addFiles.length) {
+    if (!isPlainObject(touch.touch)) touch.touch = {};
+    touch.touch.files = dedupe([...scopeEntries(touch, "files"), ...addFiles]);
+    event.scope_amended = true;
+    event.added_files = addFiles;
+  }
   const errors = validateTouchList(touch);
   if (errors.length) {
     for (const error of errors) process.stderr.write(`error: ${error}\n`);
     return 1;
   }
   writeJson(file, touch);
-  appendEvent(repo, {
-    event: "Amend",
-    decision: "observe",
-    evidence_kind: "loop_runtime",
-    repo: String(repo),
-    reason,
-    criterion_amended: true,
-    via: "amend",
-    previous_hash: previousHash,
-    new_hash: touch.criterion_hash,
-  });
-  process.stdout.write(`amended criterion in ${file}\n`);
+  appendEvent(repo, event);
+  process.stdout.write(
+    `amended ${[next ? "criterion" : null, addFiles.length ? "scope" : null].filter(Boolean).join(" and ")} in ${file}\n`,
+  );
   return 0;
 }
 
@@ -2015,6 +2042,7 @@ const CLI_OPTIONS = {
   amend: {
     repo: { type: "string" },
     criterion: { type: "string" },
+    files: { type: "string", multiple: true },
     reason: { type: "string" },
   },
 };
@@ -2090,7 +2118,7 @@ function cmdHelp() {
       "\n" +
       "other commands:\n" +
       "  status --repo <repo> [--limit N]                       read-only state + recent events\n" +
-      '  amend  --repo <repo> --criterion "<new>" --reason "<why>"   change the goalpost with a record\n' +
+      '  amend  --repo <repo> [--criterion "<new>"] [--files "<glob>"] --reason "<why>"   move the goalpost / widen scope, recorded\n' +
       '  claim  --repo <repo> --session <id> --files "<glob>"   partitioned same-worktree concurrency\n' +
       "  close  --repo <repo> --terminal-state <success|noop|blocked|stalled|exhausted> --reason \"<why>\"\n" +
       "  validate --repo <repo>                                 schema check only\n" +

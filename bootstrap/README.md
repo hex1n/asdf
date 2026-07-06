@@ -78,8 +78,6 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 完成声明：必须有工具结果/命令输出/diff-status/SQL 断言
 ```
 
-日常打法的分类展开（六类工作、循环启动语）见
-[docs/loop-engineering-playbook.md](../docs/loop-engineering-playbook.md)。
 
 ## 装完手动核对一次
 

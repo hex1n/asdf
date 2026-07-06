@@ -28,8 +28,6 @@ node ~/bin/agent-doctor.mjs         # post-install self-check
   optional `.agent-loop` hook, and an idempotent installer. Its
   [README](bootstrap/README.md) documents the **new-requirement workflow**,
   the distribution manifest, and the maintenance discipline.
-- [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — the
-  day-to-day playbook (six work families, loop starters, stop conditions).
 
 ## Skills — components the loop calls
 
@@ -61,7 +59,7 @@ not an invocable skill.
 ```
 bootstrap/   # machine install: work-loop contract, doctor, hook, installer
 skills/      # source skills and non-invocable support directories
-docs/        # loop-engineering playbook, design notes, plans, research
+docs/        # design notes, plans, research
 tests/       # repo-level contract tests for the installer, contracts, and skills
 AGENTS.md    # skill-authoring and maintenance conventions
 CONTEXT.md   # canonical domain terms for skill distribution

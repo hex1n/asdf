@@ -69,7 +69,7 @@ CORRECTION_PAT = re.compile(
 VERIFY_PAT = re.compile(
     r"(测试|验证|跑一下|跑下|运行一下|执行一下|test|verify|检查一下|确认一下|自测|回归|校验|复测|验一下)", re.I)
 
-# loop-health metric patterns (playbook §4 indicators)
+# loop-health metric patterns (behavior indicators 1-4)
 PULSE_SET = {"继续", "fix", "改", "落地", "改进", "可以", "要", "确认", "同意", "认可",
              "按这个来", "按这个落地", "go", "ok", "1", "2", "3"}
 DRIFT_PAT = re.compile(
@@ -414,7 +414,7 @@ def main(argv=None):
     print(out)
 
     # ---------------- loop-health ----------------
-    # Indicators 1-4 are behavior metrics from the session corpora (playbook §4),
+    # Indicators 1-4 are behavior metrics from the session corpora,
     # computed over the rolling window so monthly re-runs show direction;
     # 5-6 are outcome metrics from the out-of-tree terminal history that
     # agent-loop.mjs appends on every loop close (all-time, coverage annotated).

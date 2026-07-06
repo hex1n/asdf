@@ -23,8 +23,6 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
   Codex 侧合并进 AGENTS.md）、agent-doctor 自检、可选的 `.agent-loop` hook、
   幂等安装器。其 [README](bootstrap/README.md) 内含**接新需求的工作流程**、
   分发清单与维护纪律。
-- [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — 日常打法
-  手册（六类工作、循环启动语、判停条件）。
 
 ## 技能 —— 循环调用的组件
 
@@ -54,7 +52,7 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 ```
 bootstrap/   # 机器安装：工作循环契约、doctor、hook、安装器
 skills/      # 源技能与不可触发支持目录
-docs/        # loop-engineering 手册、设计笔记、计划与调研
+docs/        # 设计笔记、计划与调研
 tests/       # 仓库级契约测试：安装器、契约一致性、技能结构
 AGENTS.md    # 技能编写与维护约定
 CONTEXT.md   # 技能分发的领域术语

@@ -13,9 +13,9 @@ product**; the repo ships two asset families:
   self-contained directories with Markdown instructions and, where needed,
   stdlib-only helper scripts and tests, distributed into local agent runtimes
   such as Codex and Claude Code.
-- **Loop machinery** (`bootstrap/`) — the user-level contract blocks, hooks,
-  agent-loop/doctor CLIs, and the idempotent installer that distribute the
-  loop itself.
+- **Loop machinery** (`taskloop/` + `bootstrap/`) — the taskloop CLI/hooks
+  (the loop system), the user-level contract blocks, and the idempotent
+  installer that distributes the loop itself.
 
 The authoritative conventions for skill assets live in
 **[AGENTS.md](AGENTS.md)** — read it before adding or changing any skill. The
@@ -37,8 +37,8 @@ loop machinery's maintenance discipline and semantic boundaries live in
   - `tests/` — stdlib `unittest` tests for that skill.
 - `tests/` — repo-level contract tests that validate skill structure and routing.
 - `bootstrap/` — machine-level install assets (the work-loop contract card,
-  agent-doctor, agent-loop hook) plus the idempotent `install.mjs`; see
-  `bootstrap/README.md`.
+  the e2e-report-check adapter seed) plus the idempotent `install.mjs` that
+  distributes the taskloop CLI and registers its hooks; see `bootstrap/README.md`.
 - `taskloop/` — clean-room task-first v2 implementation (own CLI, state dir
   `.taskloop/`, outcome ledger, program cards, tests), parallel to and
   independent of the v1 loop machinery; see `taskloop/README.md` and the

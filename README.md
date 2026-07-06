@@ -19,15 +19,18 @@ evidence appears.
 
 ```bash
 node bootstrap/install.mjs         # distribute the loop to ~/.claude and ~/.codex
-node ~/bin/agent-doctor.mjs         # post-install self-check
+node ~/bin/taskloop.mjs status      # post-install check (reads task state, or 'no task')
 ```
 
+- [`taskloop/`](taskloop/) — the loop system: the task-first CLI, PreToolUse/
+  Stop hooks (envelope + criterion gate), outcome ledger, and program cards.
+  See its [README](taskloop/README.md).
 - [`bootstrap/`](bootstrap/) — machine-level install: the work-loop contract
   card (sourced in [`bootstrap/contract/`](bootstrap/contract/); installed as
-  a Claude user rule and a Codex AGENTS.md block), agent-doctor self-check,
-  optional `.agent-loop` hook, and an idempotent installer. Its
-  [README](bootstrap/README.md) documents the **new-requirement workflow**,
-  the distribution manifest, and the maintenance discipline.
+  a Claude user rule and a Codex AGENTS.md block), the e2e-report-check adapter
+  seed, and an idempotent installer that distributes taskloop and registers its
+  hooks. Its [README](bootstrap/README.md) documents the **new-requirement
+  workflow**, the distribution manifest, and the maintenance discipline.
 
 ## Skills — components the loop calls
 

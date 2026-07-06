@@ -15,14 +15,16 @@
 
 ```bash
 node bootstrap/install.mjs         # 把循环分发到 ~/.claude 与 ~/.codex
-node ~/bin/agent-doctor.mjs         # 安装后自检
+node ~/bin/taskloop.mjs status      # 安装后检查（读任务状态，或 'no task'）
 ```
 
+- [`taskloop/`](taskloop/) — 循环系统：task-first CLI、PreToolUse/Stop hook
+  （envelope + 判据闸门）、结局账、程序卡。见其 [README](taskloop/README.md)。
 - [`bootstrap/`](bootstrap/) — 机器级安装：工作循环契约卡
   （源在 [`bootstrap/contract/`](bootstrap/contract/)；Claude 侧装为 user rule，
-  Codex 侧合并进 AGENTS.md）、agent-doctor 自检、可选的 `.agent-loop` hook、
-  幂等安装器。其 [README](bootstrap/README.md) 内含**接新需求的工作流程**、
-  分发清单与维护纪律。
+  Codex 侧合并进 AGENTS.md）、e2e-report-check 适配器种子、幂等安装器
+  （分发 taskloop 并注册其 hook）。其 [README](bootstrap/README.md) 内含
+  **接新需求的工作流程**、分发清单与维护纪律。
 
 ## 技能 —— 循环调用的组件
 

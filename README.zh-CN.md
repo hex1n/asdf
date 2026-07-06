@@ -74,6 +74,9 @@ bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能�
 # Node bootstrap 契约测试（安装器、doctor）
 node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
+# Node taskloop（净室 v2）测试
+node --test taskloop/tests/taskloop.test.mjs
+
 # Python 仓库级契约测试（契约一致性、技能结构）
 python -m unittest discover -s tests
 

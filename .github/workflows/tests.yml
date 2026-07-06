@@ -40,6 +40,9 @@ jobs:
       - name: Node bootstrap contract tests
         run: node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
+      - name: Node taskloop clean-room tests
+        run: node --test taskloop/tests/taskloop.test.mjs
+
       - name: Python repo-level contract tests
         run: python -m unittest discover -s tests
 

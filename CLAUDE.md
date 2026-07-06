@@ -62,6 +62,9 @@ and Python `unittest` for the remaining repo and skill contracts.
 # Node bootstrap contract tests
 node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
 
+# Node taskloop (clean-room v2) tests
+node --test taskloop/tests/taskloop.test.mjs
+
 # Python repo-level contract tests
 python -m unittest discover -s tests
 

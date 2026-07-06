@@ -143,19 +143,31 @@ def loop_history_metrics(history_path):
                 continue
             state = str(e.get("terminal_state") or "?")
             states[state] += 1
-            rows.append((str(e.get("repo") or "?"), state))
+            rows.append((str(e.get("repo") or "?"), state, str(e.get("criterion") or "")))
     if not rows:
         return None
-    nonsuccess = [i for i, (_, s) in enumerate(rows) if s in NONSUCCESS_STATES]
-    resumed = sum(
-        1 for i in nonsuccess if any(r == rows[i][0] for r, _ in rows[i + 1:])
-    )
+    nonsuccess = [i for i, (_, s, _c) in enumerate(rows) if s in NONSUCCESS_STATES]
+
+    def _resumed(i):
+        # Task identity is the criterion string the runtime stamps on every
+        # row: a resume is a later row in the same repo with the same
+        # criterion. Legacy rows without a criterion keep the coarse
+        # same-repo proxy rather than dropping out of the metric.
+        repo_i, _state_i, crit_i = rows[i]
+        for repo_j, _state_j, crit_j in rows[i + 1:]:
+            if repo_j != repo_i:
+                continue
+            if not crit_i or not crit_j or crit_i == crit_j:
+                return True
+        return False
+
+    resumed = sum(1 for i in nonsuccess if _resumed(i))
     return {
         "states": dict(states),
         "total": len(rows),
         "nonsuccess": len(nonsuccess),
         "resumed": resumed,
-        "repos": len({r for r, _ in rows}),
+        "repos": len({r for r, _s, _c in rows}),
     }
 
 

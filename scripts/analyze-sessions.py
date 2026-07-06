@@ -6,6 +6,7 @@ docs/research/ path; a shim remains there for old cron entries). Outputs
 contain personal prompt corpora and default into docs/research/, where they
 are gitignored — only loop-health.txt aggregates are safe to share.
 """
+import datetime
 import json, os, re, sys, glob, io
 from collections import Counter, defaultdict
 
@@ -20,6 +21,32 @@ HOME_FLAT = re.sub(r"[:\\/]", "-", HOME)
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_OUT = os.path.join(REPO, "docs", "research")
 DEFAULT_HISTORY = os.path.join(HOME, ".agent-loop", "history.jsonl")
+
+# Behavior indicators (loop-health 1-4) are computed over a rolling window so
+# monthly re-runs can actually move: an all-time denominator freezes the trend.
+DEFAULT_WINDOW_DAYS = 90
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}")
+
+
+def default_since(today):
+    return (today - datetime.timedelta(days=DEFAULT_WINDOW_DAYS)).isoformat()
+
+
+def date_in_window(date_str, since):
+    s = str(date_str or "")
+    return bool(DATE_RE.match(s)) and s[:10] >= since
+
+
+def arg_value(argv, flag, default):
+    """Value of `flag` in argv, or `default`. A flag given without a value is
+    a usage error, not an IndexError crash."""
+    if flag not in argv:
+        return default
+    i = argv.index(flag)
+    if i + 1 >= len(argv):
+        sys.stderr.write("%s requires a value\n" % flag)
+        raise SystemExit(2)
+    return argv[i + 1]
 
 
 def scrub_project(proj):
@@ -89,6 +116,7 @@ def loop_history_metrics(history_path):
         "total": len(rows),
         "nonsuccess": len(nonsuccess),
         "resumed": resumed,
+        "repos": len({r for r, _ in rows}),
     }
 
 
@@ -112,12 +140,16 @@ def codex_user_text(txt):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    out_dir = DEFAULT_OUT
-    if "--out" in argv:
-        out_dir = os.path.abspath(argv[argv.index("--out") + 1])
-    history_path = DEFAULT_HISTORY
-    if "--history" in argv:
-        history_path = os.path.abspath(argv[argv.index("--history") + 1])
+    # Windows consoles often run a non-UTF-8 codepage; the output files are
+    # always UTF-8, keep the console mirror readable too.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    out_dir = os.path.abspath(arg_value(argv, "--out", DEFAULT_OUT))
+    history_path = os.path.abspath(arg_value(argv, "--history", DEFAULT_HISTORY))
+    since = arg_value(argv, "--since", default_since(datetime.date.today()))
+    if not DATE_RE.match(since):
+        sys.stderr.write("--since requires YYYY-MM-DD\n")
+        raise SystemExit(2)
     os.makedirs(out_dir, exist_ok=True)
 
     def w(path):
@@ -220,7 +252,7 @@ def main(argv=None):
         m = re.search(r"rollout-(\d{4}-\d{2}-\d{2})", base)
         date = m.group(1) if m else "?"
         sid = base[:-6]
-        n_user = 0; n_tools = 0; first_prompt = None; cwd = None
+        n_user = 0; n_tools = 0; n_abort = 0; first_prompt = None; cwd = None
         seen = set()
         try:
             fh = io.open(f, "r", encoding="utf-8", errors="replace")
@@ -228,7 +260,7 @@ def main(argv=None):
             continue
         for line in fh:
             if "turn_aborted" in line:
-                codex_aborts += 1
+                n_abort += 1
             # cheap pre-filter
             if ('"role":"user"' not in line and '"role": "user"' not in line
                     and 'session_meta' not in line and '"function_call"' not in line
@@ -268,8 +300,9 @@ def main(argv=None):
                 n_tools += 1
                 codex_fn_counter[payload.get("name", "?")] += 1
         fh.close()
+        codex_aborts += n_abort
         codex_sessions.append(dict(src="codex", project=cwd or "?", sid=sid, start=date, end=date,
-                                   user_turns=n_user, tools=n_tools, interrupts=0, cwd=cwd))
+                                   user_turns=n_user, tools=n_tools, interrupts=n_abort, cwd=cwd))
         if first_prompt:
             codex_first[sid] = (cwd or "?", date, first_prompt)
 
@@ -342,31 +375,40 @@ def main(argv=None):
     print(out)
 
     # ---------------- loop-health ----------------
-    # Indicators 1-4 are behavior metrics from the session corpora (playbook §4);
+    # Indicators 1-4 are behavior metrics from the session corpora (playbook §4),
+    # computed over the rolling window so monthly re-runs show direction;
     # 5-6 are outcome metrics from the out-of-tree terminal history that
-    # agent-loop.mjs appends on every loop close.
-    import datetime
-    _all_prompts = claude_prompts + codex_prompts
-    pulse = sum(1 for _, _, _, x in _all_prompts
+    # agent-loop.mjs appends on every loop close (all-time, coverage annotated).
+    win_prompts = [p for p in claude_prompts + codex_prompts if date_in_window(p[0], since)]
+    pulse = sum(1 for _, _, _, x in win_prompts
                 if x.strip().lower() in PULSE_SET or x.strip().startswith("继续"))
-    drift = sum(1 for _, _, _, x in _all_prompts
+    win_corr = sum(1 for _, _, _, x in win_prompts if CORRECTION_PAT.search(x))
+    drift = sum(1 for _, _, _, x in win_prompts
                 if CORRECTION_PAT.search(x) and DRIFT_PAT.search(x))
     _firsts = list(claude_first.values()) + list(codex_first.values())
-    hard_first = sum(1 for _, _, x in _firsts if HARD_PAT.search(x))
+    win_firsts = [f for f in _firsts if date_in_window(f[1], since)]
+    hard_first = sum(1 for _, _, x in win_firsts if HARD_PAT.search(x))
+    win_claude_int = sum(s["interrupts"] for s in claude_sessions
+                         if date_in_window(s.get("start"), since))
+    win_codex_aborts = sum(s["interrupts"] for s in codex_sessions
+                           if date_in_window(s.get("start"), since))
     lh = []
     lh.append("generated: %s" % datetime.date.today().isoformat())
-    lh.append("1. pulse_prompts (继续/fix/落地类脉冲): %d" % pulse)
-    lh.append("2. interrupts: claude=%d codex_aborts=%d" % (claude_interrupts, codex_aborts))
+    lh.append("window: since %s for indicators 1-4 (default rolling %d days; --since overrides)"
+              % (since, DEFAULT_WINDOW_DAYS))
+    lh.append("1. pulse_prompts (继续/fix/落地类脉冲): %d / %d prompts" % (pulse, len(win_prompts)))
+    lh.append("2. interrupts: claude=%d codex_aborts=%d" % (win_claude_int, win_codex_aborts))
     lh.append("3. scope_drift_corrections: %d / %d corrections (%.0f%%)"
-              % (drift, n_corr, 100.0 * drift / n_corr if n_corr else 0))
+              % (drift, win_corr, 100.0 * drift / win_corr if win_corr else 0))
     lh.append("4. hard_criteria_openings: %d / %d sessions (%.0f%%)"
-              % (hard_first, len(_firsts), 100.0 * hard_first / len(_firsts) if _firsts else 0))
+              % (hard_first, len(win_firsts), 100.0 * hard_first / len(win_firsts) if win_firsts else 0))
     hist = loop_history_metrics(history_path)
     if hist:
         dist = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["states"].items()))
-        lh.append("5. terminal_states (loop closes): %s (total %d)" % (dist, hist["total"]))
+        lh.append("5. terminal_states (loop closes, all-time): %s (total %d across %d opted-in repos)"
+                  % (dist, hist["total"], hist["repos"]))
         rate = (100.0 * hist["resumed"] / hist["nonsuccess"]) if hist["nonsuccess"] else 0.0
-        lh.append("6. nonsuccess_resumed (rework resumes): %d / %d nonsuccess closes (%.0f%%)"
+        lh.append("6. nonsuccess_resumed (rework resumes, all-time): %d / %d nonsuccess closes (%.0f%%)"
                   % (hist["resumed"], hist["nonsuccess"], rate))
     else:
         lh.append("5. terminal_states: no history yet (%s missing; requires an agent-loop.mjs with terminal history)"

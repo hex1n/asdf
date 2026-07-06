@@ -24,11 +24,15 @@ candidates, and evidence-gated rule changes at the narrowest level.
 The loop's own record is the primary signal: read `~/.taskloop/outcomes.jsonl`
 (one row per task close) for the terminal-state distribution
 (`done`/`not_needed`/`abandoned`), the rounds and episodes each task spent, the
-`criterion_input_drift` rate (a green whose check files were edited), and the
+`criterion_input_drift` rate (a green whose check files were edited), the
+`review_level` (how independently each task was checked before closing), and the
 `abandon --reason` clusters. Rising `abandoned` or a repeated reason names a
 loop stage that keeps failing; drift names a sensor being weakened; many
-episodes per task names resume friction. `python scripts/analyze-sessions.py`
-computes these as indicators 5–6; the ledger is the source, not a byproduct.
+episodes per task names resume friction; **`review_level: none` correlating with
+reopened/reworked tasks names criterion-weak work that closed on a rubber-stamp
+criterion without an independent second sensor**. `python
+scripts/analyze-sessions.py` computes these as indicators 5–6; the ledger is the
+source, not a byproduct.
 
 Completion criterion: each ledger signal that moved has a named loop-stage
 hypothesis, sourced from the ledger rows, not from recollection.

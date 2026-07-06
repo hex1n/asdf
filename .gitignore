@@ -7,6 +7,7 @@ __pycache__/
 .codex/
 .agent-loop/
 .agent-workflows/
+.taskloop/
 .tmp/
 tmp/
 # Local eval run artifacts can carry real-project identifiers; keep them out of the repo.

@@ -39,6 +39,10 @@ loop machinery's maintenance discipline and semantic boundaries live in
 - `bootstrap/` — machine-level install assets (the work-loop contract card,
   agent-doctor, agent-loop hook) plus the idempotent `install.mjs`; see
   `bootstrap/README.md`.
+- `taskloop/` — clean-room task-first v2 implementation (own CLI, state dir
+  `.taskloop/`, outcome ledger, program cards, tests), parallel to and
+  independent of the v1 loop machinery; see `taskloop/README.md` and the
+  probe-gated rollout plan in `docs/plans/2026-07-06-loop-v2-task-first.md`.
 - `scripts/` — repo-level maintenance tooling (e.g. `analyze-sessions.py`,
   the monthly loop-health analyzer).
 - `hooks/` — in-repo git hooks (`core.hooksPath` target); `post-commit` and

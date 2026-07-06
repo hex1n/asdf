@@ -39,11 +39,12 @@ distributed into runtimes as a *managed installed skill* — see
 | Skill | Loop stage | Purpose |
 | --- | --- | --- |
 | [`converge`](skills/converge/) | converge | Planning-only convergence for explicit or high-risk unresolved decisions. |
-| [`land`](skills/land/) | land | Approved implementation loop: Goal, run contract, Done when, change, verify, review, stop. |
-| [`fixloop`](skills/fixloop/) | land/verify | Reproduce-driven diagnose-fix loop for live failures and failing checks. |
-| [`loop`](skills/loop/) | driver | Self-driving loop driver that runs until a machine-checkable criterion reaches a terminal state. |
+| [`workloop`](skills/workloop/) | land/verify | The one work loop for machine-verifiable work: source the criterion (given/recovered/absent), open a taskloop task, change–verify–review–fix, stop at a named terminal state. |
 | [`judgment-loop`](skills/judgment-loop/) | land/verify | Rubric-gated production loop for judgment-verified deliverables: pre-registered rubric, fresh-context review, human acceptance. |
 | [`meta-loop`](skills/meta-loop/) | meta | Improvement loop for the loop itself: loop-health metrics, candidate harvest, one evidence-gated change per round. |
+
+The loop system these skills drive is **taskloop** (`taskloop/`); see its
+[README](taskloop/README.md).
 | [`first-principles-planner`](skills/first-principles-planner/) | converge | Reframe the root problem and return the current-best plan with failure conditions. |
 | [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
 | [`java-stack-craft`](skills/java-stack-craft/) | land | Write and review Java/Spring code with profile detection, quality gates, and the landing-contract loop discipline. |

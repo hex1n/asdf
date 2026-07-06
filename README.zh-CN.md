@@ -33,9 +33,7 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 | 技能 | 循环阶段 | 用途 |
 | --- | --- | --- |
 | [`converge`](skills/converge/) | 收敛 | 显式或高风险未收敛决策的只读方案收敛。 |
-| [`land`](skills/land/) | 落地 | 已拍板实现循环：Goal、run contract、Done when、改、验、审、判停。 |
-| [`fixloop`](skills/fixloop/) | 落地/验证 | 面向真实失败和红色检查的复现驱动诊断修复循环。 |
-| [`loop`](skills/loop/) | 驱动器 | 自驱循环驱动器，围绕机器可查判据运行到明确终态。 |
+| [`workloop`](skills/workloop/) | 落地/验证 | 唯一的工作环：判据溯源（given/recovered/absent）→ 开 taskloop 任务 → 改-验-审-修 → 停在明确终态。 |
 | [`judgment-loop`](skills/judgment-loop/) | 落地/验证 | 品味类交付物的评分表环：先注册 rubric 再动笔，fresh-context 评审，人验收。 |
 | [`meta-loop`](skills/meta-loop/) | 元层 | 循环自身的改进环：loop-health 指标、候选收割、每轮一个证据闸改动。 |
 | [`first-principles-planner`](skills/first-principles-planner/) | 收敛 | 重构根本问题，给出当前最佳方案及其失效条件。 |

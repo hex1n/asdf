@@ -28,7 +28,7 @@ const LEGACY_HOOK_MARKERS = [
   ],
 ];
 const ACTIONS = [];
-const WORKFLOW_SKILLS = ["converge", "fixloop", "land", "loop"];
+const WORKFLOW_SKILLS = ["converge", "workloop"];
 const LOOP_HOOK_RE = /agent-(?:workflow-hook|loop)\.(?:py|mjs)/i;
 // The Stop gate re-runs the done-when criterion, which is budgeted
 // CRITERION_TIMEOUT_SECONDS inside taskloop/bin/taskloop.mjs. The runtime's

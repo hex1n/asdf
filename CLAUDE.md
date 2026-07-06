@@ -29,7 +29,7 @@ loop machinery's maintenance discipline and semantic boundaries live in
   `bootstrap-agent-os`, `converge`, `deep-research`, `e2e-test-executor`,
   `e2e-test-planner`, `first-principles-planner`, `fixloop`,
   `generating-api-docs`, `generating-test-scope`, `java-stack-craft`,
-  `judgment-loop`, `land`, `loop`, `meta-loop`; `loop-core` is a
+  `judgment-loop`, `meta-loop`, `workloop`; `loop-core` is a
   non-invocable shared support directory for the loop skills.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`).
   - `REFERENCE.md` / extra `.md` — progressive-disclosure detail loaded on demand.

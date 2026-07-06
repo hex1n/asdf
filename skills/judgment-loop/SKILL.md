@@ -5,7 +5,7 @@ description: >
   not a machine check — documents, plans, reports, designs, 写作, 方案文档,
   分析报告. Use when asked to produce taste-judged work and iterate until it
   holds up. Requires pre-registering a rubric before drafting. For
-  machine-checkable outcomes use land or fixloop; for falsifying a decision
+  machine-checkable outcomes use workloop; for falsifying a decision
   use converge.
 argument-hint: "[deliverable request; optional rubric or audience]"
 ---

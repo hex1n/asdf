@@ -41,8 +41,9 @@ loop machinery's maintenance discipline and semantic boundaries live in
   `bootstrap/README.md`.
 - `scripts/` — repo-level maintenance tooling (e.g. `analyze-sessions.py`,
   the monthly loop-health analyzer).
-- `hooks/` — in-repo git hooks (`core.hooksPath` target); `post-commit`
-  re-runs `install.mjs` so distribution rides the commit boundary.
+- `hooks/` — in-repo git hooks (`core.hooksPath` target); `post-commit` and
+  `post-merge` re-run `install.mjs` so distribution rides the commit and
+  pull boundaries.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
 - `AGENTS.md` — skill-authoring and maintenance conventions (skill assets).
 - `CONTEXT.md` — canonical domain language: skill distribution and loop

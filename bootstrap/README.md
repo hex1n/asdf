@@ -132,7 +132,8 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 - 改动先改本目录的源，再跑 `install.mjs` 分发；不要直接改安装副本
   （与 skill 分发同一防 Cache Drift 纪律）。装齐后分发跟着提交走：安装器把
   `core.hooksPath` 指向仓内 `hooks/`，`hooks/post-commit` 在每次 commit 后静默重跑
-  `install.mjs`（失败不阻塞提交，只留一行提示）；提交时点即证据循环通过时点，
+  `install.mjs`（失败不阻塞提交，只留一行提示），`hooks/post-merge` 让 `git pull`
+  进来的源同样即刻分发；提交时点即证据循环通过时点，
   doctor 的 drift 扫描与 `commit distribution` 检查退居兜底。安装副本一律是真实
   拷贝——安装器会把历史遗留的 symlink/硬链接装机原地转正（delink），防止未提交的
   WIP 泄漏进活跃会话。

@@ -89,7 +89,7 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
   安装器写入，调用 `node ~/bin/agent-loop.mjs`；旧 `~/.codex/hooks.json` 中的
   agent loop hook 会被移除；doctor 会检查是否已注册并对旧入口漂移硬失败
 - `node ~/bin/agent-loop.mjs status --repo <repo>` 可只读查看当前 v2 runtime contract、
-  最近 hook event log 和 schema 有效性；`claim --repo <repo> --session <id> --files <glob>` 用于显式 partitioned 并发；`close --repo <repo>` 用于结束当前循环
+  最近 hook event log 和 schema 有效性；`claim --repo <repo> --session <id> --files <glob>` 用于显式 partitioned 并发；`close --repo <repo> --terminal-state <state> --reason <why>` 用于结束当前循环（终态必填；`success` 会复跑判据，红则拒绝；非成功终态需 `--snapshot` 落可续跑快照）
 - 仓库若不在 `~/Desktop/asdf`，给 doctor 设 `ASDF_REPO` 环境变量指向仓库根
 - 周期性任务不会自动注册：元循环（月度跑 `scripts/analyze-sessions.py` 产出
   `loop-health.txt`）与 weekly automation 需自行挂 cron/schedule；doctor 会在

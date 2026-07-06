@@ -563,6 +563,7 @@ function appendTerminalHistory(repo, touch, via) {
       gate_blocks_total: Number.parseInt(String(touch.gate_blocks_total), 10) || 0,
       stall_count: Number.parseInt(String(touch.stall_count), 10) || 0,
       iteration: evidence.iteration ?? null,
+      snapshot: evidence.snapshot ?? null,
       session: ownerSessionId(touch) ?? null,
     };
     fs.appendFileSync(path.join(dir, LOOP_HISTORY), jsonSorted(row) + "\n", "utf8");
@@ -1888,7 +1889,16 @@ function cmdClose(values) {
     process.stderr.write(`${file} does not exist\n`);
     return 1;
   }
-  const requestedTerminalState = String(values["terminal-state"] ?? "success").trim();
+  // No default terminal state: `success` by omission would let an unfinished
+  // loop close green without anyone choosing that, and close is the one
+  // success-writing path the stop gate does not adjudicate.
+  const requestedTerminalState = String(values["terminal-state"] ?? "").trim();
+  if (!requestedTerminalState) {
+    process.stderr.write(
+      "--terminal-state is required: success|noop|blocked|stalled|exhausted\n",
+    );
+    return 2;
+  }
   if (requestedTerminalState === "active" || !VALID_TERMINAL_STATES.has(requestedTerminalState)) {
     process.stderr.write(
       `terminal-state must be one of ${[...VALID_TERMINAL_STATES].filter((s) => s !== "active").sort().join(", ")}\n`,
@@ -1903,6 +1913,57 @@ function cmdClose(values) {
       `${file} is already closed (terminal_state ${terminalState(touch)}); re-init to start a new loop\n`,
     );
     return 1;
+  }
+  // Non-success closes must leave a machine-held resumable snapshot: the next
+  // loop resumes from it instead of rediscovering the failure scene.
+  const snapshot = String(values.snapshot ?? "").trim();
+  if (["blocked", "stalled", "exhausted"].includes(requestedTerminalState) && !snapshot) {
+    process.stderr.write(
+      `--snapshot is required for terminal-state ${requestedTerminalState}: ` +
+        '"<changed files; remaining criterion; current failure; next safe action>"\n',
+    );
+    return 2;
+  }
+  // Success through close gets the same adjudication the stop gate applies:
+  // green must come from a fresh criterion run. `off` observes nothing, and a
+  // criterion the machine cannot execute degrades to a loud warning instead of
+  // trapping the close (mirroring the gate's not_executable release).
+  if (requestedTerminalState === "success" && enforcementMode(touch) !== "off") {
+    const criterion = criterionValue(touch);
+    const timeoutSec = intField(touch.criterion_timeout_seconds, CRITERION_TIMEOUT_SECONDS);
+    const verdict = runCriterion(criterion, repo, timeoutSec);
+    if (verdict.verdict === "fail") {
+      const tail = outputTail(verdict.output);
+      process.stderr.write(
+        `close to success refused: criterion is red (${verdict.detail ?? `exit ${verdict.exit ?? "n/a"}`}): ${criterion}\n` +
+          (tail ? `--- criterion output (tail) ---\n${tail}\n` : "") +
+          "success must come from a green criterion. Fix the failure and retry, amend the " +
+          "criterion with a recorded reason, or close with the honest state " +
+          '(blocked|stalled|exhausted) plus --snapshot "<changed; remaining; failure; next>".\n',
+      );
+      appendEvent(repo, {
+        event: "Close",
+        decision: "deny",
+        evidence_kind: "loop_runtime",
+        repo: String(repo),
+        reason: "close to success refused: criterion red",
+        criterion_exit: verdict.exit,
+      });
+      return 1;
+    }
+    if (verdict.verdict === "not_executable") {
+      process.stderr.write(
+        `warning: criterion cannot run (${verdict.detail ?? "spawn error"}); closing success on the agent's claim alone\n`,
+      );
+    } else {
+      const evidence = ensureEvidence(touch);
+      evidence.proved = dedupe([...evidence.proved, criterion]);
+      evidence.last_failure = null;
+    }
+  }
+  if (snapshot) {
+    ensureEvidence(touch);
+    touch.evidence.snapshot = snapshot;
   }
   touch.status = "closed";
   setTerminalState(touch, requestedTerminalState);
@@ -2037,7 +2098,8 @@ const CLI_OPTIONS = {
   close: {
     repo: { type: "string" },
     reason: { type: "string", default: "complete" },
-    "terminal-state": { type: "string", default: "success" },
+    "terminal-state": { type: "string" },
+    snapshot: { type: "string" },
   },
   amend: {
     repo: { type: "string" },
@@ -2120,7 +2182,8 @@ function cmdHelp() {
       "  status --repo <repo> [--limit N]                       read-only state + recent events\n" +
       '  amend  --repo <repo> [--criterion "<new>"] [--files "<glob>"] --reason "<why>"   move the goalpost / widen scope, recorded\n' +
       '  claim  --repo <repo> --session <id> --files "<glob>"   partitioned same-worktree concurrency\n' +
-      "  close  --repo <repo> --terminal-state <success|noop|blocked|stalled|exhausted> --reason \"<why>\"\n" +
+      '  close  --repo <repo> --terminal-state <success|noop|blocked|stalled|exhausted> --reason "<why>" \\\n' +
+      '         [--snapshot "<changed; remaining; failure; next>"]   # success re-runs the criterion; blocked/stalled/exhausted require --snapshot\n' +
       "  validate --repo <repo>                                 schema check only\n" +
       "\n" +
       "rules: the criterion must be executable and red at init; git operations need\n" +

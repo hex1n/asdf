@@ -24,7 +24,7 @@ Shared reference for the `converge`, `workloop`, `judgment-loop`, and `meta-loop
   gitignored, private to the loop, and non-authoritative; the durable unit is
   the task, and episodes come and go underneath it.
 
-## Runtime Contract
+## Opening A Task
 
 When work needs the loop supervisor, open a task:
 

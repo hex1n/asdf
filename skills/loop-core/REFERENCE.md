@@ -53,7 +53,7 @@ The criterion is the loop's one sensor, and it is self-administered: the same ag
 - **fresh-context** — a read-only reviewer with only the artifact and the standard, none of the authoring context; washes session-state contamination (optimism, sunk cost, tunnel vision), not model-level blind spots.
 - **second-model** — a different model; washes model-level blind spots too. Prefer it when available.
 
-Record the level reached with `taskloop review --level <second-model|fresh-context|self-reread>`. The engine records the provenance (which level, not a verdict — a review is a probabilistic signal fed back into the loop body, never a machine gate) so the outcome ledger shows how independently each task was checked; the meta loop watches whether `review_level: none` correlates with rework. When the runtime cannot supply the strongest level, drop a rung and record the downgrade.
+Record the level reached with `taskloop review --level <second-model|fresh-context|self-reread>`. The engine records the provenance (which level, not a verdict — a review is a probabilistic signal fed back into the loop body, never a machine gate) so the outcome ledger shows how independently each task was checked; the meta loop watches whether `review_level: none` correlates with rework. When the runtime cannot supply the strongest level, drop a rung and record the downgrade. The ledger's `review_level` is the strongest level *ever* recorded on the task, not tied to the closed state — so review late, after the last substantive edit, or it can overstate what actually closed.
 
 ## The Envelope
 

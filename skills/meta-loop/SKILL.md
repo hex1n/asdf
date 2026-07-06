@@ -46,9 +46,9 @@ project vocabulary) and dedupe against the causes already recorded in
 `docs/rework-log.md`.
 
 Completion criterion: a candidate list where each entry names the failure
-mode and its narrowest target level — machine (gate/CLI error, adapter,
-doctor check) before prose (skill text, contract card). Rules default into
-the machine, not prose.
+mode and its narrowest target level — machine (gate/CLI error message,
+criterion adapter, hook check) before prose (skill text, contract card).
+Rules default into the machine, not prose.
 
 ### 4. One Candidate Per Round
 

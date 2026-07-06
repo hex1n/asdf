@@ -52,7 +52,8 @@ node ~/bin/taskloop.mjs status      # 安装后检查（读任务状态，或 'n
 ## 仓库结构
 
 ```
-bootstrap/   # 机器安装：工作循环契约、doctor、hook、安装器
+taskloop/    # 循环系统：task-first CLI + PreToolUse/Stop hook + 结局账
+bootstrap/   # 机器安装：工作循环契约、适配器种子、安装器
 skills/      # 源技能与不可触发支持目录
 docs/        # 设计笔记、计划与调研
 tests/       # 仓库级契约测试：安装器、契约一致性、技能结构
@@ -71,8 +72,8 @@ bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能�
 在每次 push 与 pull request 上以 Node + Python 双运行时跑全量测试。
 
 ```bash
-# Node bootstrap 契约测试（安装器、doctor）
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
+# Node taskloop（循环系统）测试 + 适配器种子测试
+node --test taskloop/tests/taskloop.test.mjs tests/e2e_report_check.test.mjs
 
 # Node taskloop（净室 v2）测试
 node --test taskloop/tests/taskloop.test.mjs

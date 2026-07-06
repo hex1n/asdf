@@ -143,7 +143,7 @@ function git(args) {
 // Distribution rides the commit boundary: a commit is the point where a
 // change has passed the evidence loop, so hooks/post-commit re-runs this
 // installer and the drift window collapses to zero. Local repo config only;
-// anything unexpected degrades to a note and the doctor stays the backstop.
+// anything unexpected degrades to a note; install.mjs --dry-run is the drift backstop.
 function registerCommitDistribution(dry) {
   if (!exists(path.join(REPO, "hooks", "post-commit"))) {
     plan("ok", "commit-time distribution skipped (no hooks/post-commit in this source tree)");
@@ -475,7 +475,7 @@ function managedCodexHookBlock() {
     'type = "command"',
     `command = ${commandToml}`,
     `timeout = ${PRETOOL_HOOK_TIMEOUT_SECONDS}`,
-    'statusMessage = "Checking agent loop run contract"',
+    'statusMessage = "Checking taskloop envelope"',
     '',
     '[[hooks.Stop]]',
     'matcher = ".*"',
@@ -484,7 +484,7 @@ function managedCodexHookBlock() {
     'type = "command"',
     `command = ${commandToml}`,
     `timeout = ${STOP_HOOK_TIMEOUT_SECONDS}`,
-    'statusMessage = "Checking agent loop stop gate"',
+    'statusMessage = "Checking taskloop stop gate"',
     HOOK_END,
     '',
   ].join("\n");

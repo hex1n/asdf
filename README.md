@@ -45,9 +45,6 @@ distributed into runtimes as a *managed installed skill* — see
 | [`workloop`](skills/workloop/) | land/verify | The one work loop for machine-verifiable work: source the criterion (given/recovered/absent), open a taskloop task, change–verify–review–fix, stop at a named terminal state. |
 | [`judgment-loop`](skills/judgment-loop/) | land/verify | Rubric-gated production loop for judgment-verified deliverables: pre-registered rubric, fresh-context review, human acceptance. |
 | [`meta-loop`](skills/meta-loop/) | meta | Improvement loop for the loop itself: loop-health metrics, candidate harvest, one evidence-gated change per round. |
-
-The loop system these skills drive is **taskloop** (`taskloop/`); see its
-[README](taskloop/README.md).
 | [`first-principles-planner`](skills/first-principles-planner/) | converge | Reframe the root problem and return the current-best plan with failure conditions. |
 | [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
 | [`java-stack-craft`](skills/java-stack-craft/) | land | Write and review Java/Spring code with profile detection, quality gates, and the landing-contract loop discipline. |
@@ -58,12 +55,14 @@ The loop system these skills drive is **taskloop** (`taskloop/`); see its
 | [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | new project | Generate a project-level operating layer (startup route, direction anchor, repo profile, goal loop) so the loop works in a fresh repo. |
 
 `skills/loop-core/` is a shared support directory for the loop skills,
-not an invocable skill.
+not an invocable skill. The loop system these skills drive is **taskloop**
+(`taskloop/`); see its [README](taskloop/README.md).
 
 ## Repository layout
 
 ```
-bootstrap/   # machine install: work-loop contract, doctor, hook, installer
+taskloop/    # the loop system: task-first CLI + PreToolUse/Stop hooks + ledger
+bootstrap/   # machine install: work-loop contract, adapter seed, installer
 skills/      # source skills and non-invocable support directories
 docs/        # design notes, plans, research
 tests/       # repo-level contract tests for the installer, contracts, and skills
@@ -84,11 +83,8 @@ No third-party dependencies are required. CI ([`.github/workflows/tests.yml`](.g
 runs the full suite on every push and pull request with both runtimes provisioned.
 
 ```bash
-# Node bootstrap contract tests (installer, doctor)
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
-
-# Node taskloop (clean-room v2) tests
-node --test taskloop/tests/taskloop.test.mjs
+# Node taskloop tests (the loop system) + adapter-seed test
+node --test taskloop/tests/taskloop.test.mjs tests/e2e_report_check.test.mjs
 
 # Python repo-level contract tests (contract parity, skill structure)
 python -m unittest discover -s tests

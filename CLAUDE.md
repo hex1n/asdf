@@ -27,7 +27,7 @@ loop machinery's maintenance discipline and semantic boundaries live in
 
 - `skills/` — source skills, one directory each. Current skills:
   `bootstrap-agent-os`, `converge`, `deep-research`, `e2e-test-executor`,
-  `e2e-test-planner`, `first-principles-planner`, `fixloop`,
+  `e2e-test-planner`, `first-principles-planner`,
   `generating-api-docs`, `generating-test-scope`, `java-stack-craft`,
   `judgment-loop`, `meta-loop`, `workloop`; `loop-core` is a
   non-invocable shared support directory for the loop skills.

@@ -36,6 +36,8 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 | [`land`](skills/land/) | 落地 | 已拍板实现循环：Goal、run contract、Done when、改、验、审、判停。 |
 | [`fixloop`](skills/fixloop/) | 落地/验证 | 面向真实失败和红色检查的复现驱动诊断修复循环。 |
 | [`loop`](skills/loop/) | 驱动器 | 自驱循环驱动器，围绕机器可查判据运行到明确终态。 |
+| [`judgment-loop`](skills/judgment-loop/) | 落地/验证 | 品味类交付物的评分表环：先注册 rubric 再动笔，fresh-context 评审，人验收。 |
+| [`meta-loop`](skills/meta-loop/) | 元层 | 循环自身的改进环：loop-health 指标、候选收割、每轮一个证据闸改动。 |
 | [`first-principles-planner`](skills/first-principles-planner/) | 收敛 | 重构根本问题，给出当前最佳方案及其失效条件。 |
 | [`deep-research`](skills/deep-research/) | 收敛 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`java-stack-craft`](skills/java-stack-craft/) | 落地 | 识别 JDK/Spring profile、匹配本地约定地编写与审查 Java/Spring 代码，含落地契约循环纪律。 |

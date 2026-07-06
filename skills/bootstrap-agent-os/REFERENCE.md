@@ -46,30 +46,31 @@ entries; trim to the target project's actual risks.
 
 ```markdown
 - Preserve run/test data by default; capture the diagnostic scene before any cleanup.
-- Before landing a plan, restate the run contract (target repo/working directory plus
+- Before landing a plan, restate the envelope (target repo/working directory plus
   files, tables, interfaces); stop and confirm before touching anything outside it.
-- If the repo has `.agent-loop/`, mirror the active run contract into
-  `.agent-loop/run-contract.json` v2 runtime contract with
-  `agent-loop.mjs init` and use `.agent-loop/loop-events.jsonl`
-  as local hook evidence; this state is gitignored and non-authoritative. The
-  event log proves scope/process observations only, not business correctness. A
-  stale run contract will not trap Stop, but write operations still require
-  `close`, `steal`, or a separate worktree.
-- Do not run two active writer loops in the same worktree by default: the active
-  run contract binds the first session. Use a separate git worktree, deliberately
-  take over with `init --force --steal --reason <why>`, or only when explicitly
-  requested use `agent-loop.mjs claim` to enter `partitioned` mode with
-  non-overlapping file claims and a single integrator session.
+- Open the task with `taskloop open` (goal + red-at-birth criterion + alignment +
+  envelope); state lands in `.taskloop/task.json`, gitignored and
+  non-authoritative. Do not hand-write it. The outcome ledger records
+  scope/process observations only, not business correctness. A suspended task
+  stays open for the next episode; a different session supersedes the previous
+  one rather than sharing it.
+- Do not run two active writer loops in the same worktree by default. For
+  parallel work use a separate git worktree, each with its own `.taskloop/`
+  task, and let one integrator session own the cross-worktree git operations
+  and merge after each writer's task reaches a terminal state. There is no
+  shared-worktree `partitioned` mode.
 - Only run git add/commit/push/reset/restore/checkout/clean after the user asks
-  for that operation; before running it, create or update the active run contract
-  with `--git-allowed <op>`, `--git-reason <why>`, and enough git budget.
+  for that operation; before running it, authorize it in the task envelope with
+  `--git-allowed <op>` and `--git-reason <why>`.
 - Treat explicit user approval as execution permission; do not add another
   convergence/planning gate unless new blocking evidence appears.
 - Completion claims must cite real tool output, status/diff, command output, or
-  SQL assertions; failed or skipped tools cannot support success claims.
-- Keep terminal states explicit: `success` and `noop` are normal closures;
-  `blocked`, `stalled`, and `exhausted` are not success and require a resumable
-  state snapshot.
+  SQL assertions; failed or skipped tools cannot support success claims. There is
+  no claim-based success — `done` comes only from a fresh green criterion.
+- Keep terminal states explicit: `done` is the only machine-written success,
+  `not_needed` and `abandoned` are human-declared closures, and a suspend
+  (`stuck`, `out_of_budget`, `needs_input`) keeps the task open with a
+  resumable snapshot (the machine records the changed files).
 - If a landing or debugging task lacks a machine-checkable completion criterion
   (test command, SQL assertion, expected response), ask for one before editing;
   a trivial single-file change with no data/interface impact may use a one-line
@@ -130,13 +131,13 @@ Workflow assets should describe objectives, context, verification, stop conditio
 
 Purpose: give agents a private, gitignored place for current loop state.
 
-Default path: `.agent-loop/`.
+Default path: `.taskloop/`.
 
 Include:
 
 - `active-goal.json`: optional current goal snapshot for long-running work.
-- `run-contract.json`: current loop boundary for files, tables, interfaces, and completion criterion. Prefer creating it with `agent-loop.mjs init` rather than hand-written JSON. Use `enforcement: "strict"` after the user approves the scope; use `"warn"` only while the list is still being discovered.
-- `loop-events.jsonl`: append-only hook observations for PreToolUse/Stop events and other local loop evidence. It proves scope/process observations only; it does not prove business correctness.
+- `task.json`: the current task — goal, red-at-birth criterion, alignment, envelope (files, tables, interfaces), and task-level budgets. Create it with `taskloop open`, not hand-written JSON.
+- `~/.taskloop/outcomes.jsonl`: the out-of-tree, append-only outcome ledger, one row per task close. It records scope/process observations only; it does not prove business correctness.
 - `checkpoints/`: context compaction or interruption recovery notes.
 - Runtime capability probes and temporary verifier state.
 
@@ -146,7 +147,7 @@ Do not include:
 - Credentials, secrets, raw customer identifiers, or production payloads.
 - Facts that should be reviewed with the project, such as repo profiles, evidence contracts, or reusable templates.
 
-Local run state is non-authoritative. Promote stable, reviewable assets to `docs/loop-engineering/`. The global `agent-loop.mjs` may read `run-contract.json`, validate its schema, fail closed on invalid active scope, and append to `loop-events.jsonl`, but the hook never makes `.agent-loop/` a project policy source.
+Local task state is non-authoritative. Promote stable, reviewable assets to `docs/loop-engineering/`. The global `taskloop.mjs` reads `task.json`, enforces the envelope, and runs the criterion gate, but the hook never makes `.taskloop/` a project policy source.
 
 ## Bootstrap Tree
 
@@ -155,7 +156,7 @@ Use existing project names when present. If the project has no convention, this 
 ```text
 AGENTS.md
 VISION.md
-.gitignore                 # includes .agent-loop/
+.gitignore                 # includes .taskloop/
 docs/
   loop-engineering/
     README.md
@@ -169,16 +170,15 @@ docs/
       README.md
   agents/
     repo-profile.md
-.agent-loop/          # gitignored local run state, optional on disk
-  run-contract.json          # current loop boundary, created only during active work
-  loop-events.jsonl    # local hook evidence, append-only
+.taskloop/            # gitignored local task state, optional on disk
+  task.json                  # the current task, created only during active work
 ```
 
 Minimum viable content:
 
 - `AGENTS.md`: authority order, load map, boundaries, and pointers.
 - `VISION.md`: purpose, system boundary, hard gates, report-only invariants, rejected invariants, and maintenance rule.
-- `.gitignore`: ignores `.agent-loop/` local run state.
+- `.gitignore`: ignores `.taskloop/` local task state.
 - `docs/loop-engineering/README.md`: asset map, load boundary, tool-neutral rule, loop shape for long or repeated work, and when not to run unattended loops.
 - `goals/goal.md`: outcome, scope, required context, runtime preconditions, success evidence, constraints, loop budget, stop conditions, and closeout.
 - `evidence/README.md`: case shape, required evidence, runtime gates, verifier results, and redaction policy.
@@ -238,4 +238,4 @@ Do not use this skill when:
 
 Sample A: a backend service already has a root agent instruction file, a direction anchor, and a loop engineering directory with goal and evidence templates. The bootstrap task is to audit routing, remove duplicated rules, move stable assets under `docs/loop-engineering/`, and keep feature-specific verifier details in domain packs.
 
-Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index, a goal/evidence contract, and a gitignored `.agent-loop/` local-state convention without importing UI feature names into the shared startup route.
+Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index, a goal/evidence contract, and a gitignored `.taskloop/` local-state convention without importing UI feature names into the shared startup route.

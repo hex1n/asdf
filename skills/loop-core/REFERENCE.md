@@ -10,7 +10,7 @@ The **task** is the durable unit of one loop run. Everything else — episodes, 
 - **Criterion**: a machine-checkable done-when (see *Sourcing The Criterion*). There is no claim-based success — green always comes from a fresh criterion run.
 - **Alignment**: one required line — "green ⇒ goal because <what the check exercises>; not covered: <gaps>" (see *Criterion-Goal Alignment*).
 - **Envelope**: the files/tables/interfaces/git surface the task may touch (see *The Envelope*).
-- **Budgets**: rounds (default eight), and opt-in writes / wall-clock — all **task-level**, never refilled by resuming (see *Episodes, Suspend, And Resume*).
+- **Budgets**: rounds (default eight), and opt-in writes / wall-clock / output tokens — all **task-level**, never refilled by resuming (see *Episodes, Suspend, And Resume*). Token spend is tallied per episode from the runtime transcript (best-effort telemetry) and lands on the outcome ledger as `output_tokens_estimate`, so the meta loop can see what a loop costs, not just whether it closed green.
 
 Task state lives in `.taskloop/task.json`, created only by `taskloop open`. It is gitignored, private to the loop, and **non-authoritative** — never a project policy source. **Evidence** for any completion claim is real tool output, status/diff, command output, SQL/API response, read-only verification, or an execution report. Prose alone is not evidence.
 
@@ -28,7 +28,7 @@ Open the task with:
 node ~/bin/taskloop.mjs open --repo <repo> --goal "<one line>" \
   --criterion "<executable check, red until done>" \
   --alignment "green ⇒ goal because <...>; not covered: <...>" \
-  --files "<glob>" [--rounds 8] [--writes N] [--wall-clock-minutes M]
+  --files "<glob>" [--rounds 8] [--writes N] [--wall-clock-minutes M] [--token-budget T]
 ```
 
 `taskloop open` runs the criterion once and refuses an already-green start (red at birth — an already-green criterion cannot prove the task) or one the machine cannot execute. Do not hand-write `task.json`; the CLI owns it. Prefer a **criterion adapter** over a hand-written check when the done-when reads evidence produced elsewhere; the adapter interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous pass, stale green, collapsed verdicts — unrepresentable. `e2e-report-check.mjs` is the seed adapter (required scenario set + build freshness, exit 0/1/2).
@@ -57,7 +57,7 @@ Record the level reached with `taskloop review --level <second-model|fresh-conte
 
 ## The Envelope
 
-The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write and wall-clock budgets bound the never-stopping side, and reads and verification commands never burn or hit them.
+The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write, wall-clock, and token budgets bound the never-stopping side, and reads and verification commands never burn or hit them.
 
 Every authority expansion — destructive, network, install scripts, a git op, a whole-repo envelope — is recorded on the task as a **grant with provenance**: `self` unless the human's blessing is recorded with `--granted-by user`. The machine cannot verify the judgment behind an expansion, only who made it; the ledger's `self_granted` count makes self-authorized power visible to the meta loop. Provenance is a record, never a gate.
 

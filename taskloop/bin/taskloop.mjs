@@ -93,6 +93,7 @@ function appendLedger(repo, task, extra = {}) {
     const row = {
       ts: utcNow(),
       repo: String(repo),
+      id: task.id ?? null,
       state: task.state,
       goal: task.goal ?? null,
       criterion: task.criterion ?? null,
@@ -102,6 +103,7 @@ function appendLedger(repo, task, extra = {}) {
       criterion_input_drift: Boolean(task.evidence?.criterion_input_drift),
       criterion_input_coverage: task.criterion_input_coverage ?? "full",
       review_level: strongestReviewLevel(task),
+      self_granted: (Array.isArray(task.grants) ? task.grants : []).filter((g) => g?.granted_by === "self").length,
       ...extra,
     };
     fs.appendFileSync(path.join(dir, LEDGER_FILE), JSON.stringify(row) + "\n", "utf8");
@@ -239,10 +241,10 @@ function criterionInputDrift(task, repo) {
     } catch {
       current = "missing";
     }
-    if (current !== String(entry.hash ?? "")) {
-      changed.push(String(entry.path));
-      entry.hash = current;
-    }
+    // Pure detection: never re-baseline here, or the first observation would
+    // disarm the gate and the next close attempt would sail through. The
+    // fingerprint moves only through amend --criterion --reason.
+    if (current !== String(entry.hash ?? "")) changed.push(String(entry.path));
   }
   return changed;
 }
@@ -420,13 +422,43 @@ function touchedSummary(task, limit = 10) {
   return `(${touched.length}): ${shown}${extra}`;
 }
 
+// Machine-generated memory of what was tried: no judgment, just each failed
+// close attempt's identity (signature) and first output line (head), capped so
+// the task file stays small. Both close doors record through here.
+const ATTEMPTS_CAP = 20;
+
+function recordAttempt(task, verdict, signature) {
+  if (!Array.isArray(task.attempts)) task.attempts = [];
+  const firstLine = String(verdict.output ?? "").trim().split(/\r?\n/)[0] ?? "";
+  task.attempts.push({
+    at: utcNow(),
+    round: task.spent?.rounds ?? 0,
+    exit: verdict.exit ?? null,
+    signature,
+    head: firstLine.slice(0, 160),
+  });
+  while (task.attempts.length > ATTEMPTS_CAP) task.attempts.shift();
+}
+
+function deadEndsSummary(task) {
+  const attempts = Array.isArray(task.attempts) ? task.attempts : [];
+  if (!attempts.length) return "";
+  const distinct = new Set(attempts.map((a) => a.signature)).size;
+  return (
+    `; dead-ends: ${attempts.length} failed attempt${attempts.length === 1 ? "" : "s"} ` +
+    `(${distinct} distinct) — last: ${attempts.at(-1).head || "(no output)"}`
+  );
+}
+
 function resumeBanner(task) {
   const prev = (task.episodes ?? []).at(-2);
   return (
     `taskloop: resuming episode ${task.episodes.length}` +
     (prev?.outcome ? ` (previous: ${prev.outcome})` : "") +
     `; snapshot: ${task.snapshot?.judgment ?? "none recorded"}` +
-    `; machine-observed changed files ${touchedSummary(task)}\n`
+    `; machine-observed changed files ${touchedSummary(task)}` +
+    deadEndsSummary(task) +
+    "\n"
   );
 }
 
@@ -468,6 +500,7 @@ const CLI_OPTIONS = {
     "network-allowed": { type: "boolean", default: false },
     "install-scripts-allowed": { type: "boolean", default: false },
     "keep-green": { type: "boolean", default: false },
+    "granted-by": { type: "string", default: "self" },
     reason: { type: "string" },
     force: { type: "boolean", default: false },
   },
@@ -479,6 +512,7 @@ const CLI_OPTIONS = {
     files: { type: "string", multiple: true },
     rounds: { type: "string" },
     reason: { type: "string" },
+    "granted-by": { type: "string", default: "self" },
   },
   suspend: {
     repo: { type: "string" },
@@ -501,6 +535,36 @@ function repoFromArg(value) {
   const raw = String(value ?? process.cwd()).trim() || process.cwd();
   const expanded = raw.startsWith("~") ? path.join(home(), raw.slice(1)) : raw;
   return path.resolve(expanded);
+}
+
+// Authority expansions are grants with provenance. The machine cannot verify
+// the judgment behind an expansion — it can only record who made it, so the
+// ledger shows how much of a task's authority was self-declared. A grant is a
+// record, never a gate.
+const GRANT_PROVENANCES = new Set(["self", "user"]);
+const WHOLE_REPO_GLOB = /^(\*\*(\/\*)?|\.|\*)$/;
+
+function collectGrants({ grantedBy, values, files, sink = process.stderr }) {
+  const grants = [];
+  const at = utcNow();
+  const push = (scope, reason = null) => grants.push({ at, scope, granted_by: grantedBy, reason });
+  if (values["destructive-allowed"]) push("destructive");
+  if (values["network-allowed"]) push("network");
+  if (values["install-scripts-allowed"]) push("install-scripts");
+  for (const op of (values["git-allowed"] ?? []).map((o) => String(o).toLowerCase())) {
+    push(`git:${op}`, String(values["git-reason"] ?? "").trim() || null);
+  }
+  for (const glob of files) {
+    if (!WHOLE_REPO_GLOB.test(String(glob).trim())) continue;
+    push(`envelope:${glob}`);
+    if (grantedBy === "self") {
+      sink.write(
+        `warning: whole-repo envelope "${glob}" is self-granted breadth — ` +
+          "prefer the narrowest globs, or record --granted-by user when the human granted it\n",
+      );
+    }
+  }
+  return grants;
 }
 
 function cmdOpen(values) {
@@ -526,6 +590,10 @@ function cmdOpen(values) {
   }
   if (values["keep-green"] && !String(values.reason ?? "").trim()) {
     return cliError("--keep-green requires --reason <why a green start is intentional>");
+  }
+  const grantedBy = String(values["granted-by"] ?? "self").trim() || "self";
+  if (!GRANT_PROVENANCES.has(grantedBy)) {
+    return cliError('--granted-by must be "self" or "user" — provenance is recorded as stated, never invented');
   }
   const existing = loadTask(repo);
   if (existing && existing.state === "open" && !values.force) {
@@ -568,6 +636,9 @@ function cmdOpen(values) {
 
   const task = {
     version: 1,
+    // The id joins this task's open row to its terminal row on the ledger;
+    // an open that never reaches a close is the trace of a vanished task.
+    id: fnv1aHex(`${utcNow()}|${values.goal}|${criterion}|${process.hrtime.bigint()}`),
     state: "open",
     goal: String(values.goal).trim(),
     criterion,
@@ -577,6 +648,7 @@ function cmdOpen(values) {
       return { criterion_inputs: inputs, criterion_input_coverage: partial ? "partial" : "full" };
     })(),
     criterion_timeout_seconds: timeoutSec,
+    keep_green: Boolean(values["keep-green"]),
     alignment: String(values.alignment).trim(),
     progress: String(values.progress ?? "").trim() || null,
     envelope: {
@@ -603,8 +675,11 @@ function cmdOpen(values) {
     episodes: [],
     amendments: [],
     reviews: [],
+    grants: collectGrants({ grantedBy, values, files }),
+    attempts: [],
   };
   saveTask(repo, task);
+  appendLedger(repo, task);
   process.stdout.write(`opened ${taskPath(repo)} (budget: ${task.budget.rounds} rounds)\n`);
   return 0;
 }
@@ -622,13 +697,19 @@ function requireOpenTask(repo) {
   return task;
 }
 
-function warnOnInputDrift(task, repo, sink = process.stderr) {
+// A green whose check files changed since fingerprinting is a moved sensor,
+// not a proof: both close doors refuse it. The gate is machine-observable and
+// the blessed path is cheap — amend --criterion --reason re-fingerprints and
+// records why the check legitimately moved. The evidence flag stays true for
+// the ledger: the drift event is history even after the re-bless.
+function gateOnInputDrift(task, repo, sink = process.stderr) {
   const drift = criterionInputDrift(task, repo);
   if (drift.length) {
     task.evidence.criterion_input_drift = true;
     sink.write(
-      `warning: criterion input files changed since open: ${drift.join(", ")} — ` +
-        "a green from an edited check needs a recorded reason (amend --criterion --reason)\n",
+      `criterion input files changed since they were fingerprinted: ${drift.join(", ")} — ` +
+        "the sensor itself moved, so this green cannot close the task. " +
+        "Re-bless the move: amend --criterion --reason <why the check legitimately changed>, then close.\n",
     );
   }
   return drift;
@@ -643,9 +724,10 @@ function cmdDone(values) {
     // Metered like a blocked stop: a refused done burns a round, so retrying
     // `done` against a flaky criterion cannot fish for a false green for free.
     task.spent.rounds += 1;
+    const tail = outputTail(verdict.output);
+    recordAttempt(task, verdict, fnv1aHex(`${verdict.exit}|${tail}`));
     saveTask(repo, task);
     const overBudget = task.spent.rounds >= task.budget.rounds;
-    const tail = outputTail(verdict.output);
     process.stderr.write(
       `done refused: the criterion is red (round ${task.spent.rounds}/${task.budget.rounds}): ${task.criterion}\n` +
         (tail ? `--- criterion output (tail) ---\n${tail}\n` : "") +
@@ -663,7 +745,11 @@ function cmdDone(values) {
     );
     return 1;
   }
-  warnOnInputDrift(task, repo);
+  if (gateOnInputDrift(task, repo).length) {
+    saveTask(repo, task);
+    process.stderr.write("done refused: drift green — see above for the amend --criterion --reason path.\n");
+    return 1;
+  }
   closeEpisode(task, "green");
   task.state = "done";
   task.closed_at = utcNow();
@@ -800,6 +886,12 @@ function cmdAmend(values) {
   if (addFiles.length) {
     amendment.files_added = addFiles;
     task.envelope.files = [...new Set([...task.envelope.files, ...addFiles])];
+    const grantedBy = String(values["granted-by"] ?? "self").trim() || "self";
+    if (!GRANT_PROVENANCES.has(grantedBy)) {
+      return cliError('--granted-by must be "self" or "user" — provenance is recorded as stated, never invented');
+    }
+    if (!Array.isArray(task.grants)) task.grants = [];
+    task.grants.push(...collectGrants({ grantedBy, values: {}, files: addFiles }));
   }
   if (rounds) {
     amendment.rounds = { from: task.budget.rounds, to: Number.parseInt(rounds, 10) || task.budget.rounds };
@@ -847,10 +939,14 @@ function cmdVerify(values) {
 
 function repoFromPayload(payload) {
   const cwd = String(payload.cwd ?? process.cwd());
-  // Walk up looking for an existing .taskloop/ so hooks work from subdirs.
+  // Walk up looking for an existing .taskloop/ so hooks work from subdirs,
+  // but never past a git boundary: a nested repo (vendored checkout, test
+  // fixture, worktree) is its own project and must not be captured by an
+  // enclosing directory's task.
   let dir = path.resolve(cwd);
   for (;;) {
     if (fs.existsSync(path.join(dir, STATE_DIR, TASK_FILE))) return dir;
+    if (fs.existsSync(path.join(dir, ".git"))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) return path.resolve(cwd);
     dir = parent;
@@ -951,8 +1047,20 @@ function hookStop(payload, repo, task) {
   if (resumed) process.stderr.write(resumeBanner(task));
 
   const verdict = runCriterion(task.criterion, repo, task.criterion_timeout_seconds);
+  if (verdict.verdict === "pass" && task.keep_green) {
+    // Green is a keep-green task's steady state, not a success event: the
+    // fresh-green door stays shut and only an explicit verb closes the task.
+    task.stall = { signature: null, count: 0, history: [] };
+    saveTask(repo, task);
+    return 0;
+  }
   if (verdict.verdict === "pass") {
-    warnOnInputDrift(task, repo);
+    if (gateOnInputDrift(task, repo).length) {
+      // Non-closure, like a suspend: the turn may end, but this green does
+      // not open the done door. The task stays open for the re-bless.
+      saveTask(repo, task);
+      return 0;
+    }
     closeEpisode(task, "green");
     task.state = "done";
     task.closed_at = utcNow();
@@ -974,6 +1082,7 @@ function hookStop(payload, repo, task) {
   task.spent.rounds += 1;
   const tail = outputTail(verdict.output);
   const signature = fnv1aHex(`${verdict.exit}|${tail}`);
+  recordAttempt(task, verdict, signature);
   if (task.stall.signature === signature) task.stall.count += 1;
   else {
     task.stall.signature = signature;

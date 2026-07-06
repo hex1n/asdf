@@ -20,7 +20,7 @@ The only real fork in the work loop is where the red comes from:
 
 - **given** — the approved plan already carries the check.
 - **recovered** — reproduce the failure first; the red is earned from the world, not declared.
-- **absent (keep-green)** — a verification task whose criterion is legitimately green; open with the keep-green reason.
+- **absent (keep-green)** — a verification task whose criterion is legitimately green; open with the keep-green reason. Green is such a task's steady state, not a success event: the stop gate never auto-closes it, only the explicit verbs (`done`, `not-needed`, `abandon`) do — a red, by contrast, is the regression alarm and burns rounds as usual.
 
 Open the task with:
 
@@ -33,7 +33,7 @@ node ~/bin/taskloop.mjs open --repo <repo> --goal "<one line>" \
 
 `taskloop open` runs the criterion once and refuses an already-green start (red at birth — an already-green criterion cannot prove the task) or one the machine cannot execute. Do not hand-write `task.json`; the CLI owns it. Prefer a **criterion adapter** over a hand-written check when the done-when reads evidence produced elsewhere; the adapter interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous pass, stale green, collapsed verdicts — unrepresentable. `e2e-report-check.mjs` is the seed adapter (required scenario set + build freshness, exit 0/1/2).
 
-The criterion's own input files are fingerprinted at open; a green whose check files changed since (editing the test instead of the code) is flagged `criterion_input_drift` in the outcome ledger. A criterion move goes through `amend --criterion --reason`, not a silent edit.
+The criterion's own input files are fingerprinted at open; a green whose check files changed since (editing the test instead of the code) is a moved sensor, not a proof — both close doors refuse it until the move is re-blessed through `amend --criterion --reason`, which re-fingerprints. The drift event stays on the outcome ledger as `criterion_input_drift` even after the re-bless.
 
 ## Criterion-Goal Alignment
 
@@ -59,13 +59,15 @@ Record the level reached with `taskloop review --level <second-model|fresh-conte
 
 The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write and wall-clock budgets bound the never-stopping side, and reads and verification commands never burn or hit them.
 
+Every authority expansion — destructive, network, install scripts, a git op, a whole-repo envelope — is recorded on the task as a **grant with provenance**: `self` unless the human's blessing is recorded with `--granted-by user`. The machine cannot verify the judgment behind an expansion, only who made it; the ledger's `self_granted` count makes self-authorized power visible to the meta loop. Provenance is a record, never a gate.
+
 Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only after the user explicitly asks, and only when the envelope authorizes it — `open`/`amend` with `--git-allowed <op> --git-reason <why>`. Destructive git, remote execution (`curl | sh`), install scripts, and secret dumps stay denied unless the envelope opens them. Destructive operations still require explicit user intent even when authorized.
 
 ## Episodes, Suspend, And Resume
 
 An **episode** is one continuous run of a task under a single session. A task suspends and resumes across episodes; budgets are task-level, so resuming never refills them — same failure repeated twice, or two rounds with no change, suspends as `stuck`; the round cap suspends as `out_of_budget`; missing input suspends as `needs_input`.
 
-Suspend is **not a closure** — the task stays open for the next episode. The snapshot has two halves: the machine records the changed files from its own observations; the human supplies the three judgment lines (remaining criterion, current failure, next safe action). A different session supersedes the previous episode rather than sharing it.
+Suspend is **not a closure** — the task stays open for the next episode. The snapshot has two halves: the machine records the changed files from its own observations; the human supplies the three judgment lines (remaining criterion, current failure, next safe action). The machine also keeps the **attempt ledger**: every failed close attempt leaves its failure signature and output head on the task, and the resume banner hands the dead-ends to the next episode so they are inherited, not rediscovered. A different session supersedes the previous episode rather than sharing it.
 
 ## Terminal States
 
@@ -76,6 +78,8 @@ A task closes exactly one of three ways; only the first is machine-written:
 | `done` | Criterion green from a fresh run (the stop gate or the `done` verb). The only machine-written success. |
 | `not_needed` | Read-only verification showed no change was needed (`not-needed --evidence`). |
 | `abandoned` | Superseded or dropped (`abandon --reason`). |
+
+`taskloop open` also writes a `state: open` row to the outcome ledger, and the terminal row carries the same task id — so a task that vanishes without a closing verb (state dir deleted, work silently dropped) remains visible as an open with no matching close.
 
 The stop gate never writes success on a red criterion. `stuck` and `out_of_budget` are episode outcomes it assigns automatically, then suspends the task open; an `out_of_budget` run whose every round failed differently is reported as still-moving (resume it, or `amend --rounds --reason`).
 

@@ -32,6 +32,22 @@ rubber-stamp rubric is this domain's vacuous-criterion trap.
 Completion criterion: a rubric exists, predates the first draft, and the
 user approved or supplied it.
 
+Then put the run on the ledger. Judgment work has no executable red, so
+save the approved rubric to a file and open a **keep-green** task — the
+machine check pins the process (the rubric is pre-registered), never the
+quality:
+
+```text
+node ~/bin/taskloop.mjs open --repo <repo> --goal "<deliverable, one line>" \
+  --criterion "test -s <rubric-file>" \
+  --keep-green --reason "judgment deliverable: no executable red exists" \
+  --alignment "green ⇒ rubric pre-registered and the process ran; quality is judged by the human, not this check" \
+  --files "<deliverable and rubric globs>"
+```
+
+Without this open, step 3's `taskloop review` has no task to land on and
+the review level is never recorded.
+
 ### 2. Draft
 
 Produce a complete candidate — no placeholder sections. Match the audience

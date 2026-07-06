@@ -129,13 +129,24 @@ def loop_history_metrics(history_path):
     terminal state (done / not_needed / abandoned), how many episodes it spanned,
     and whether its criterion inputs drifted. A task that took more than one
     episode is resumed work (it crossed a suspend/resume), read straight off the
-    row instead of joined across rows."""
+    row instead of joined across rows.
+
+    Opens are audited separately: the engine writes a state:"open" row at
+    birth and the terminal row carries the same task id. An open whose id
+    never reaches a close is `unclosed` — but the ledger alone cannot tell
+    in-flight (suspended, mid-work) from dropped. The machine-checkable
+    difference is the live task.json: an unclosed open whose repo still
+    holds a task.json with the same id is in-flight; one that does not is
+    `vanished` — the task was dropped without a closing verb. Opens are
+    never folded into the close distribution."""
     try:
         fh = io.open(history_path, "r", encoding="utf-8", errors="replace")
     except OSError:
         return None
     states = Counter()
     rows = []
+    open_ids = []
+    closed_ids = set()
     with fh:
         for line in fh:
             line = line.strip()
@@ -148,6 +159,11 @@ def loop_history_metrics(history_path):
             if not isinstance(e, dict):
                 continue
             state = str(e.get("state") or "?")
+            if state == "open":
+                open_ids.append((str(e.get("repo") or ""), e.get("id")))
+                continue
+            if e.get("id") is not None:
+                closed_ids.add(e.get("id"))
             states[state] += 1
             try:
                 episodes = int(e.get("episodes") or 1)
@@ -156,12 +172,13 @@ def loop_history_metrics(history_path):
             review = str(e.get("review_level") or "none")
             rows.append((str(e.get("repo") or "?"), state, episodes,
                          bool(e.get("criterion_input_drift")), review))
-    if not rows:
+    if not rows and not open_ids:
         return None
     nonsuccess = [i for i, (_, s, _e, _d, _v) in enumerate(rows) if s in NONSUCCESS_STATES]
     resumed = sum(1 for _r, _s, episodes, _d, _v in rows if episodes > 1)
     drift = sum(1 for _r, _s, _e, d, _v in rows if d)
     review_levels = Counter(v for _r, _s, _e, _d, v in rows)
+    unclosed = [(r, oid) for r, oid in open_ids if oid not in closed_ids]
     return {
         "states": dict(states),
         "total": len(rows),
@@ -171,7 +188,43 @@ def loop_history_metrics(history_path):
         "review_levels": dict(review_levels),
         "reviewed_none": review_levels.get("none", 0),
         "repos": len({r for r, _s, _e, _d, _v in rows}),
+        "opened": len(open_ids),
+        "unclosed": len(unclosed),
+        "vanished": sum(1 for repo, oid in unclosed if oid is None or live_task_id(repo) != oid),
     }
+
+
+def live_task_id(repo):
+    """The id of the live .taskloop/task.json under repo, or None."""
+    try:
+        with io.open(os.path.join(repo, ".taskloop", "task.json"), "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data.get("id") if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def history_report_lines(hist, history_path):
+    """The loop-health indicator lines for the outcome ledger (5 and 6).
+
+    Rendering is part of the audit: a computed count that never reaches the
+    report is invisible to the meta loop."""
+    if not hist:
+        return ["5. terminal_states: no ledger yet (%s missing; requires taskloop task closes)"
+                % history_path]
+    dist = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["states"].items()))
+    inflight = hist["unclosed"] - hist["vanished"]
+    lines = ["5. terminal_states (task closes, all-time): %s (total %d across %d opted-in repos); "
+             "opens: %d recorded, in-flight: %d, vanished: %d"
+             % (dist, hist["total"], hist["repos"], hist["opened"], inflight, hist["vanished"])]
+    rrate = (100.0 * hist["resumed"] / hist["total"]) if hist["total"] else 0.0
+    drate = (100.0 * hist["drift"] / hist["total"]) if hist["total"] else 0.0
+    nrate = (100.0 * hist["reviewed_none"] / hist["total"]) if hist["total"] else 0.0
+    rl = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["review_levels"].items()))
+    lines.append("6. resumed_tasks (spanned >1 episode, all-time): %d / %d tasks (%.0f%%); "
+                 "criterion_input_drift: %d (%.0f%%); review_level: %s (none: %.0f%%)"
+                 % (hist["resumed"], hist["total"], rrate, hist["drift"], drate, rl, nrate))
+    return lines
 
 
 # ---------------- Codex user-text extraction (importable helpers) ----------------
@@ -457,20 +510,7 @@ def main(argv=None):
     lh.append("4. hard_criteria_openings: %d / %d sessions (%.0f%%)"
               % (hard_first, len(win_firsts), 100.0 * hard_first / len(win_firsts) if win_firsts else 0))
     hist = loop_history_metrics(history_path)
-    if hist:
-        dist = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["states"].items()))
-        lh.append("5. terminal_states (task closes, all-time): %s (total %d across %d opted-in repos)"
-                  % (dist, hist["total"], hist["repos"]))
-        rrate = (100.0 * hist["resumed"] / hist["total"]) if hist["total"] else 0.0
-        drate = (100.0 * hist["drift"] / hist["total"]) if hist["total"] else 0.0
-        nrate = (100.0 * hist["reviewed_none"] / hist["total"]) if hist["total"] else 0.0
-        rl = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["review_levels"].items()))
-        lh.append("6. resumed_tasks (spanned >1 episode, all-time): %d / %d tasks (%.0f%%); "
-                  "criterion_input_drift: %d (%.0f%%); review_level: %s (none: %.0f%%)"
-                  % (hist["resumed"], hist["total"], rrate, hist["drift"], drate, rl, nrate))
-    else:
-        lh.append("5. terminal_states: no ledger yet (%s missing; requires taskloop task closes)"
-                  % history_path)
+    lh.extend(history_report_lines(hist, history_path))
 
     # Trend series: loop-health.txt is truncated every run, so append each
     # run's indicator values to a history file and print the delta versus the
@@ -490,6 +530,9 @@ def main(argv=None):
         "resumed": (hist or {}).get("resumed"),
         "drift": (hist or {}).get("drift"),
         "reviewed_none": (hist or {}).get("reviewed_none"),
+        "opened": (hist or {}).get("opened"),
+        "unclosed": (hist or {}).get("unclosed"),
+        "vanished": (hist or {}).get("vanished"),
     }
     health_history = os.path.join(out_dir, "loop-health-history.jsonl")
     delta = health_delta_line(load_last_jsonl_row(health_history), run_row)

@@ -20,13 +20,13 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 
 | 目录 | 内容 | 安装目标 |
 |---|---|---|
-| `../skills/` | 全部源技能；`workflow-core/` 是不可触发支持目录 | `~/.claude/skills/`、`~/.codex/skills/` |
+| `../skills/` | 全部源技能；`loop-core/` 是不可触发支持目录 | `~/.claude/skills/`、`~/.codex/skills/` |
 | `contract/` | **工作循环契约（默认值卡）**—— 用户级分发的单一源，机器可读源即人读源；双端同义由 `tests/test_bootstrap_contract_parity.py` 守护；循环机制细节不在卡内，由 skills 与 hook 在使用点承载 | Claude：整文件分发为 `~/.claude/rules/work-loop.md`（官方 user rules 机制，每会话加载）；Codex：标记块合并进 `~/.codex/AGENTS.md`。启动文件为 symlink 时一律不写穿，跳过并提示 |
 | `bin/` | `agent-doctor.mjs` 只读环境自检、`agent-loop.mjs` run contract / loop event log / 判据闸门 hook、`e2e-report-check.mjs` E2E 报告判据检查器——均 Node，零额外依赖 | `~/bin/`；安装器同时注册 Claude/Codex PreToolUse/Stop hooks |
 
 ## 日常使用：接一个新需求
 
-装齐后不用再"想"流程——它固化在 workflow skills、hook 与契约里。默认档是轻量推进：**能直接做就直接做，有判据就落地**；只有用户明确要求、多个机制未收敛，或碰到不可逆/高风险改动时才升档到 `converge` skill。人的拍板优先于流程，不把"按方案来"再改写成新一轮收敛。
+装齐后不用再"想"流程——它固化在 loop skills、hook 与契约里。默认档是轻量推进：**能直接做就直接做，有判据就落地**；只有用户明确要求、多个机制未收敛，或碰到不可逆/高风险改动时才升档到 `converge` skill。人的拍板优先于流程，不把"按方案来"再改写成新一轮收敛。
 
 **第 0 步 · 判两件事（10 秒）**
 
@@ -50,7 +50,7 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 
 **第 4 步 · 留痕（自动）**
 
-返工时 workflow 按共享 rework-log 规则追加归因；月底元循环重跑 `analyze-sessions.py` 看 `loop-health.txt` 趋势。
+返工时 loop skills 按共享 rework-log 规则追加归因；月底元循环重跑 `analyze-sessions.py` 看 `loop-health.txt` 趋势。
 
 **判停速记（任何循环都不会无限空转）**
 
@@ -85,7 +85,7 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 
 - `~/bin` 在 PATH 里（doctor 用 `node` 跑，无需 PowerShell）
 - `~/.claude/skills/` 与 `~/.codex/skills/` 中有 `converge`、`land`、`fixloop`、`loop`
-  workflow skills；旧 `.claude/commands/<name>.md` 与 `.agents/skills/<name>/SKILL.md`
+  loop skills；旧 `.claude/commands/<name>.md` 与 `.agents/skills/<name>/SKILL.md`
   受管 wrapper 会由安装器清理
 - `~/.claude/settings.json` 与 `~/.codex/config.toml` 中的 PreToolUse/Stop hooks 已由
   安装器写入，调用 `node ~/bin/agent-loop.mjs`；旧 `~/.codex/hooks.json` 中的
@@ -93,9 +93,13 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 - `node ~/bin/agent-loop.mjs status --repo <repo>` 可只读查看当前 v2 runtime contract、
   最近 hook event log 和 schema 有效性；`claim --repo <repo> --session <id> --files <glob>` 用于显式 partitioned 并发；`close --repo <repo>` 用于结束当前循环
 - 仓库若不在 `~/Desktop/asdf`，给 doctor 设 `ASDF_REPO` 环境变量指向仓库根
-- 周期性任务不会自动注册：元循环（月度跑 `docs/research/2026-07-02-analyze-sessions.py`
-  产出 `loop-health.txt`）与 weekly automation 需自行挂 cron/schedule；doctor 会在
-  loop-health.txt 超过 35 天时提醒
+- 周期性任务不会自动注册：元循环（月度跑 `scripts/analyze-sessions.py` 产出
+  `loop-health.txt`）与 weekly automation 需自行挂 cron/schedule；doctor 会在
+  loop-health.txt 超过 35 天时提醒，并只读检查 `asdf-meta-loop` 定时任务是否已注册
+  （任务名或命令里保留 `asdf-meta-loop` / `analyze-sessions` 字样，doctor 靠它识别）。
+  注册示例——Windows：
+  `schtasks /create /tn asdf-meta-loop /sc monthly /d 1 /st 09:00 /tr "python <repo>\scripts\analyze-sessions.py"`；
+  Unix：`crontab -e` 加一行 `0 9 1 * * python <repo>/scripts/analyze-sessions.py`
 - `~/.claude/settings.json` 与 `~/.codex/config.toml` 仍按机器维护；安装器只管理本仓
   标记的 agent loop hook 块，其他配置保留
 - Codex 审批层实际生效性：跑 `codex --ask-for-approval never "Summarize current instructions"`
@@ -130,7 +134,7 @@ node ~/bin/agent-doctor.mjs            # 安装后自检
 - 新增规则先过 [AGENTS.md](../AGENTS.md) 的 Rule Harvest Gate（≥2 次重复纠正或明确
   认可的不变量），写明语料证据；分发后用冷启动会话做证伪验证（不重申约束，诱导违规，
   观察默认行为）。
-- 与 workflow skills（converge/land/fixloop/loop）的循环契约保持同义：skills 是
+- 与 loop skills（converge/land/fixloop/loop）的循环契约保持同义：skills 是
   "每次任务显式声明"，契约是"不声明时的默认值"；默认档必须保持轻量，不把 `converge`
   变成用户拍板后的隐式回退步骤。同义由 `tests/test_bootstrap_contract_parity.py`
   机器守护。

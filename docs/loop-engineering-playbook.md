@@ -1,10 +1,10 @@
 # Loop Engineering 实战手册
 
 > 本手册回答一个问题：**在每天的实际工作中怎么用 loop engineering**。
-> 机制本身（用户级契约、workflow skills、`.agent-loop/` hook、判据闸门）由
+> 机制本身（用户级契约、loop skills、`.agent-loop/` hook、判据闸门）由
 > `bootstrap/install.mjs` 分发，语义与边界见 [bootstrap/README.md](../bootstrap/README.md)；
 > 本手册只讲"用法"。方法论从真实编码会话的语料分析中提炼；分析脚本
-> [`docs/research/2026-07-02-analyze-sessions.py`](research/2026-07-02-analyze-sessions.py)
+> [`scripts/analyze-sessions.py`](../scripts/analyze-sessions.py)
 > 可对**你自己的**本机会话语料重跑（见第 4 节），输出含个人语料，始终留在本机
 > gitignore 文件里，不入仓。
 
@@ -136,14 +136,17 @@ scope / adversarial 中最相关的视角独立审查，吸收所有确认的问
 
 打法是否被真正采用，靠数字说话——但数字是**你自己的**，不入仓：
 
-1. **首跑建基线**：`python docs/research/2026-07-02-analyze-sessions.py` 对本机
+1. **首跑建基线**：`python scripts/analyze-sessions.py` 对本机
    Claude Code / Codex 会话语料出量化基线，输出落 gitignored 的本地文件
    （`docs/research/loop-health.txt` 与语料中间件），含个人提示语料，永不提交。
-2. **看四个指标**（均可由脚本直接复算）：
+2. **看六个指标**（均可由脚本直接复算；前四个是行为指标，后两个是结果指标）：
    - "继续"类脉冲词频次 → 应明显下降
    - 人工打断/abort 次数 → 下降
    - 范围漂移类纠正占比 → 应压到低位
    - 开场带硬判据的会话占比 → 应过半
+   - 终态分布（`~/.agent-loop/history.jsonl` 汇聚的 success/stalled/exhausted 占比）
+     → success 占比应走高
+   - 非成功终态的续跑率 → 走高说明 blocked/stalled 快照真的被接续，而不是烂尾
 3. **只看趋势**：机器正则口径比定性回忆严格，绝对值天然偏低；月度重跑与上次
    对账看方向，不与体感数字比大小。
 4. **数字不动 = 打法没被采用**：先查启动语是否用起来了，再考虑加机制。

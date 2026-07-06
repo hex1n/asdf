@@ -192,6 +192,13 @@ function pruneEmptyDir(dir, dry) {
   }
 }
 
+function backupLegacySupportDir(target, dry) {
+  if (!exists(target)) return;
+  const backup = backupPath(target, "bak-asdf-loop-core");
+  plan("remove", `${target} (backup: ${backup})`);
+  if (!dry) fs.renameSync(target, backup);
+}
+
 function workflowHookCommand() {
   return `node "${path.join(HOME, "bin", "agent-loop.mjs")}"`;
 }
@@ -555,6 +562,10 @@ function main() {
   const agentsSkills = path.join(HOME, ".agents", "skills");
   const agentsIsLiveCache = [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]
     .some((rt) => sameFile(rt, agentsSkills));
+  for (const rt of [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]) {
+    backupLegacySupportDir(path.join(rt, "workflow-core"), dry);
+  }
+  if (!agentsIsLiveCache) backupLegacySupportDir(path.join(agentsSkills, "workflow-core"), dry);
   for (const name of WORKFLOW_SKILLS) {
     removeManagedLegacyWorkflowFile(path.join(HOME, ".claude", "commands", `${name}.md`), name, "claude", dry);
     if (agentsIsLiveCache) continue;
@@ -582,7 +593,7 @@ function main() {
   for (const kind of order) {
     const rows = ACTIONS.filter(([k]) => k === kind).map(([, detail]) => detail);
     counts[kind] = rows.length;
-    if (["new", "update", "append", "error"].includes(kind)) {
+    if (["new", "update", "append", "remove", "error"].includes(kind)) {
       for (const detail of rows) process.stdout.write(`  ${kind.padEnd(7)} ${detail}\n`);
     }
   }

@@ -47,7 +47,7 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
 | [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | 新项目 | 生成项目级操作层（启动路由、方向锚点、repo profile、goal loop），让循环在全新 repo 生效。 |
 
-`skills/workflow-core/` 是 workflow skills 的共享支持目录，不是可触发技能。
+`skills/loop-core/` 是 loop skills 的共享支持目录，不是可触发技能。
 
 ## 仓库结构
 

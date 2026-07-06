@@ -12,7 +12,7 @@ argument-hint: "[done-when criterion + optional run contract or loop body]"
 This skill is the driver, not the body. It keeps the agent moving until a
 machine-checkable condition holds, so the user is not the per-turn clock.
 
-Read `../workflow-core/REFERENCE.md` when you need terminal-state, runtime,
+Read `../loop-core/REFERENCE.md` when you need terminal-state, runtime,
 concurrency, git, or closeout details.
 
 ## Workflow

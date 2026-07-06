@@ -53,7 +53,7 @@ distributed into runtimes as a *managed installed skill* — see
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
 | [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | new project | Generate a project-level operating layer (startup route, direction anchor, repo profile, goal loop) so the loop works in a fresh repo. |
 
-`skills/workflow-core/` is a shared support directory for the workflow skills,
+`skills/loop-core/` is a shared support directory for the loop skills,
 not an invocable skill.
 
 ## Repository layout

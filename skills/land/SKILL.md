@@ -14,7 +14,7 @@ Treat the user's current prompt as approved landing input. If the prompt only
 asks for analysis or options, do not edit; route to `converge` or answer in
 planning mode.
 
-Read `../workflow-core/REFERENCE.md` when you need terminal-state, runtime,
+Read `../loop-core/REFERENCE.md` when you need terminal-state, runtime,
 concurrency, git, or closeout details.
 
 ## Workflow

@@ -1,11 +1,11 @@
 ---
 name: bootstrap-agent-os
-description: Bootstrap or review project-level agent workflow operating docs. Use when the user asks to generate, audit, or repair AGENTS.md, VISION.md as a direction anchor, repo profiles, agent-workflows, goal/evidence/profile structure, or a project-level agent workflow bootstrap. Do not use for feature implementation, E2E test planning or execution, API documentation, product requirements, design docs, business glossary edits, or business-domain documentation unless the task changes agent workflow routing or links those docs from the project operating layer.
+description: Bootstrap or review project-level loop engineering operating docs. Use when the user asks to generate, audit, or repair AGENTS.md, VISION.md as a direction anchor, repo profiles, loop-engineering assets, goal/evidence/profile structure, or a project-level loop engineering bootstrap. Do not use for feature implementation, E2E test planning or execution, API documentation, product requirements, design docs, business glossary edits, or business-domain documentation unless the task changes loop engineering routing or links those docs from the project operating layer.
 ---
 
-# Bootstrap Agent OS
+# Bootstrap Loop Engineering
 
-Bootstrap a small project-level agent operating layer: startup routing, durable direction, repo profile, goal loop, and evidence structure. Keep it source-backed, tool-neutral, and narrow. Durable assets are reviewable project docs; local agent run state belongs in a gitignored state directory and never becomes an authority source.
+Bootstrap a small project-level loop engineering layer: startup routing, durable direction, repo profile, goal loop, and evidence structure. Keep it source-backed, tool-neutral, and narrow. Durable assets are reviewable project docs; local agent run state belongs in a gitignored state directory and never becomes an authority source.
 
 Output language: write generated project documents in the language explicitly requested by the user; if none is explicit, match the user's prompt language. Preserve code identifiers, paths, commands, tool names, enum values, and quoted source text as-is.
 
@@ -17,7 +17,7 @@ Read only the operating assets needed to understand the current shape:
 
 - Root startup files such as `AGENTS.md`, `CLAUDE.md`, or equivalent agent instructions.
 - Direction or context anchors such as `VISION.md`, `CONTEXT.md`, or a project glossary.
-- Existing workflow directories such as `docs/agent-workflows/`, `agent-workflows/`, `docs/agents/`, or `docs/*workflows*/`.
+- Existing loop/workflow directories such as `docs/loop-engineering/`, `docs/agents/`, `docs/*workflows*/`, or equivalent project conventions.
 - Existing repo profiles, verification menus, goal templates, evidence indexes, and workflow scripts.
 - Local run-state directories such as `.agent-loop/` only to understand active handoff state; do not promote their contents into durable docs.
 
@@ -78,7 +78,7 @@ Before finishing:
 ## Subagent Prompt
 
 ```
-Bootstrap or review the project-level agent workflow docs for <project-root>.
+Bootstrap or review the project-level loop engineering docs for <project-root>.
 First read:
   <skill>/SKILL.md
   <skill>/REFERENCE.md

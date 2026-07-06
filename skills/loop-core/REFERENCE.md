@@ -1,4 +1,4 @@
-# Agent Workflow Core
+# Loop Core
 
 Shared reference for the `converge`, `land`, `fixloop`, and `loop` skills. This directory intentionally has no `SKILL.md`: it is supporting material, not an invocable workflow.
 
@@ -85,6 +85,28 @@ change is legitimate, only that "defining green" and "passing green" stayed
 separable and auditable. Drift is only checked in `warn`/`strict` enforcement;
 `off` observes nothing, including moved goalposts.
 
+## Criterion-Goal Alignment
+
+Red-at-init proves the criterion can discriminate "done" from "not started";
+it cannot prove the criterion covers the goal. A weak criterion (a file
+exists, a command merely runs) turns the stop gate into a rubber stamp.
+
+- When restating the run contract at init, record one alignment line:
+  "criterion green ⇒ goal met, because <what the check actually exercises>;
+  not covered: <known gaps>". If the honest line is "criterion green proves
+  little", strengthen the criterion before starting the loop.
+- Verification that stays outside the machine criterion (slow suites, manual
+  checks, deployment smoke) must be named in the alignment line and reported
+  as closeout evidence instead of being silently dropped.
+- At closeout, re-read the alignment line: when the work revealed that the
+  criterion under-covers the goal, `amend` it with a reason — or report the
+  gap explicitly — before claiming `success`.
+
+Two-domain fit: a backend loop whose criterion runs focused API tests but not
+the data backfill it also changed; a docs loop whose criterion checks that
+links resolve but not that the new section renders in the published site.
+Both need the gap named at init and re-checked at closeout.
+
 ## Terminal States
 
 Use one terminal state in every closeout:
@@ -103,7 +125,8 @@ are not success and require a resumable state snapshot.
 **Which states the machine holds.** The Stop hook enforces three of these
 mechanically from the criterion verdict and its counters: `success` (criterion
 green), `stalled` (the same failure signature repeats — default three consecutive
-stops), and `exhausted` (the consecutive-block cap). `noop` and `blocked` are
+stops — or two signatures strictly alternate across twice the stall cap, the
+oscillation case), and `exhausted` (the consecutive-block cap). `noop` and `blocked` are
 about *why* there was nothing to do or what is missing; the machine cannot derive
 them from a verdict, so they remain agent-declared and must be justified in the
 closeout. Do not read a machine-held state as more than "the criterion was
@@ -119,8 +142,10 @@ green / kept failing the same way / never went green in budget."
   `exhausted` when the eight-iteration default cap, explicit user cap, or
   runtime budget is reached before success. The Stop hook releases `stalled`
   automatically after the same failure signature repeats (default three
-  consecutive stops; override with `budget.max_stall_repeats`), which caps the
-  criterion re-runs a genuinely stuck loop pays before it stops.
+  consecutive stops; override with `budget.max_stall_repeats`) or after two
+  failure signatures strictly alternate across twice the stall cap (fix A
+  breaks B, fix B breaks A), which caps the criterion re-runs a genuinely
+  stuck loop pays before it stops.
 - Treat a loop as rework when it repairs previously delivered work or resumes a
   prior `blocked`, `stalled`, or `exhausted` closeout. If the target repo has
   `docs/rework-log.md` or its workflow contract names that file, append a

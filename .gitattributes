@@ -1,0 +1,4 @@
+# All text files are LF in the repository and the working tree; the repo
+# tracks no binary assets today (text=auto lets git keep auto-detecting any
+# that appear later).
+* text=auto eol=lf

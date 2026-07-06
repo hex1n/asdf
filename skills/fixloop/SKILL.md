@@ -13,7 +13,7 @@ Treat the user's current prompt as a failure to reproduce, diagnose, repair, and
 replay. If the task is only research with no live failure or repair request, use
 `deep-research` instead.
 
-Read `../workflow-core/REFERENCE.md` when you need terminal-state, runtime,
+Read `../loop-core/REFERENCE.md` when you need terminal-state, runtime,
 concurrency, git, or closeout details.
 
 ## Workflow

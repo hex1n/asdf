@@ -112,7 +112,7 @@ Include:
 
 ### Workflow Assets
 
-Purpose: store reusable run assets outside startup docs and outside product/domain docs. Prefer `docs/agent-workflows/` for versioned, reviewable project assets.
+Purpose: store reusable run assets outside startup docs and outside product/domain docs. Prefer `docs/loop-engineering/` for versioned, reviewable project assets. If a project already has an older workflow-assets directory or equivalent convention, audit and use one durable asset directory rather than creating both.
 
 Common assets:
 
@@ -146,7 +146,7 @@ Do not include:
 - Credentials, secrets, raw customer identifiers, or production payloads.
 - Facts that should be reviewed with the project, such as repo profiles, evidence contracts, or reusable templates.
 
-Local run state is non-authoritative. Promote stable, reviewable assets to `docs/agent-workflows/`. The global `agent-loop.mjs` may read `run-contract.json`, validate its schema, fail closed on invalid active scope, and append to `loop-events.jsonl`, but the hook never makes `.agent-loop/` a project policy source.
+Local run state is non-authoritative. Promote stable, reviewable assets to `docs/loop-engineering/`. The global `agent-loop.mjs` may read `run-contract.json`, validate its schema, fail closed on invalid active scope, and append to `loop-events.jsonl`, but the hook never makes `.agent-loop/` a project policy source.
 
 ## Bootstrap Tree
 
@@ -157,7 +157,7 @@ AGENTS.md
 VISION.md
 .gitignore                 # includes .agent-loop/
 docs/
-  agent-workflows/
+  loop-engineering/
     README.md
     standards/
       repo-conventions.md
@@ -179,7 +179,7 @@ Minimum viable content:
 - `AGENTS.md`: authority order, load map, boundaries, and pointers.
 - `VISION.md`: purpose, system boundary, hard gates, report-only invariants, rejected invariants, and maintenance rule.
 - `.gitignore`: ignores `.agent-loop/` local run state.
-- `docs/agent-workflows/README.md`: asset map, load boundary, tool-neutral rule, loop shape for long or repeated work, and when not to run unattended loops.
+- `docs/loop-engineering/README.md`: asset map, load boundary, tool-neutral rule, loop shape for long or repeated work, and when not to run unattended loops.
 - `goals/goal.md`: outcome, scope, required context, runtime preconditions, success evidence, constraints, loop budget, stop conditions, and closeout.
 - `evidence/README.md`: case shape, required evidence, runtime gates, verifier results, and redaction policy.
 - `docs/agents/repo-profile.md`: load conditions, project shape, source routing, verification menu, review gate, and local-only facts.
@@ -232,10 +232,10 @@ Do not use this skill when:
 - The user wants an E2E test plan or execution report.
 - The user wants API documentation for an interface.
 - The task is a one-off investigation whose notes do not define reusable project operating structure.
-- The user asks to edit product requirements, design docs, or business glossary without changing agent workflow routing.
+- The user asks to edit product requirements, design docs, or business glossary without changing loop engineering routing.
 
 ## Generalization Samples
 
-Sample A: a backend service already has a root agent instruction file, a direction anchor, and a workflow directory with goal and evidence templates. The bootstrap task is to audit routing, remove duplicated rules, move stable assets under `docs/agent-workflows/`, and keep feature-specific verifier details in domain packs.
+Sample A: a backend service already has a root agent instruction file, a direction anchor, and a loop engineering directory with goal and evidence templates. The bootstrap task is to audit routing, remove duplicated rules, move stable assets under `docs/loop-engineering/`, and keep feature-specific verifier details in domain packs.
 
 Sample B: a frontend product has a compact root instruction file, a product vision doc, a repo profile under `docs/agents/`, and UI regression run reports under `docs/test-runs/`. The bootstrap task is to add a workflow asset index, a goal/evidence contract, and a gitignored `.agent-loop/` local-state convention without importing UI feature names into the shared startup route.

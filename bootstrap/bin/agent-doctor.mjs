@@ -177,7 +177,7 @@ function installedSkillStatus(root, name) {
 // ~/.agents/skills counts as legacy residue only when it is NOT the live
 // shared cache: on machines where ~/.claude/skills or ~/.codex/skills is a
 // symlink resolving into ~/.agents/skills, that directory IS the install
-// target, so its workflow skills are current managed copies, not leftovers.
+// target, so its loop skills are current managed copies, not leftovers.
 function agentsSkillsIsLiveCache() {
   const agents = path.join(HOME, ".agents", "skills");
   let agentsReal;
@@ -274,8 +274,8 @@ function sourceSkillDirs(srcRoot) {
   return dirs(srcRoot).filter((p) => exists(path.join(p, "SKILL.md")));
 }
 
-function workflowSupportDirs(srcRoot) {
-  return ["workflow-core"].map((name) => path.join(srcRoot, name)).filter((p) => exists(path.join(p, "REFERENCE.md")));
+function loopSupportDirs(srcRoot) {
+  return ["loop-core"].map((name) => path.join(srcRoot, name)).filter((p) => exists(path.join(p, "REFERENCE.md")));
 }
 
 function daysSinceMtime(p) {
@@ -468,14 +468,23 @@ async function main() {
   }
   const mcp = (readText(codexCfg).match(/^\[mcp_servers\./gm) || []).length;
   if (exists(codexCfg)) item("codex MCP servers", mcp);
-  const workflowCoreClaude = exists(path.join(HOME, ".claude", "skills", "workflow-core", "REFERENCE.md"));
-  const workflowCoreCodex = exists(path.join(HOME, ".codex", "skills", "workflow-core", "REFERENCE.md"));
-  if (workflowCoreClaude && workflowCoreCodex) {
-    item("workflow-core support", "claude=ok codex=ok");
-  } else {
-    failItem("workflow-core support", `claude=${workflowCoreClaude ? "ok" : "MISSING"} codex=${workflowCoreCodex ? "ok" : "MISSING"}`);
-  }
   const agentsIsLiveCache = agentsSkillsIsLiveCache();
+  const loopCoreClaude = exists(path.join(HOME, ".claude", "skills", "loop-core", "REFERENCE.md"));
+  const loopCoreCodex = exists(path.join(HOME, ".codex", "skills", "loop-core", "REFERENCE.md"));
+  if (loopCoreClaude && loopCoreCodex) {
+    item("loop-core support", "claude=ok codex=ok");
+  } else {
+    failItem("loop-core support", `claude=${loopCoreClaude ? "ok" : "MISSING"} codex=${loopCoreCodex ? "ok" : "MISSING"}`);
+  }
+  const legacyWorkflowCoreRoots = [path.join(HOME, ".claude", "skills", "workflow-core"), path.join(HOME, ".codex", "skills", "workflow-core")];
+  if (!agentsIsLiveCache) legacyWorkflowCoreRoots.push(path.join(HOME, ".agents", "skills", "workflow-core"));
+  const legacyWorkflowCore = legacyWorkflowCoreRoots
+    .filter((p) => exists(path.join(p, "REFERENCE.md")));
+  if (legacyWorkflowCore.length) {
+    failItem("legacy workflow-core support", `${legacyWorkflowCore.map((p) => path.relative(HOME, p)).join(", ")} remains; run node bootstrap/install.mjs`);
+  } else {
+    item("legacy workflow-core support", "ok");
+  }
   for (const f of ["loop", "land", "fixloop", "converge"]) {
     const claudeSkill = installedSkillStatus(path.join(HOME, ".claude", "skills"), f);
     const codexSkill = installedSkillStatus(path.join(HOME, ".codex", "skills"), f);
@@ -514,7 +523,7 @@ async function main() {
   if (exists(srcRoot)) {
     const linked = new Set();
     const copied = new Set();
-    for (const sk of [...sourceSkillDirs(srcRoot), ...workflowSupportDirs(srcRoot)]) {
+    for (const sk of [...sourceSkillDirs(srcRoot), ...loopSupportDirs(srcRoot)]) {
       for (const rt of [path.join(HOME, ".claude", "skills"), path.join(HOME, ".codex", "skills")]) {
         const inst = path.join(rt, path.basename(sk));
         if (!exists(inst)) continue;
@@ -539,10 +548,26 @@ async function main() {
   const loopHealth = path.join(repo, "docs", "research", "loop-health.txt");
   if (exists(loopHealth)) {
     const age = daysSinceMtime(loopHealth);
-    const note = age > 35 ? " - WARN: monthly review due (run analyze-sessions.py)" : "";
+    const note = age > 35 ? " - WARN: monthly review due (run scripts/analyze-sessions.py)" : "";
     item("loop-health.txt", `age ${age} days${note}`);
   } else {
-    item("loop-health.txt", "missing - run docs/research/2026-07-02-analyze-sessions.py to create the baseline");
+    item("loop-health.txt", "missing - run scripts/analyze-sessions.py to create the baseline");
+  }
+  // Read-only probe: is the monthly meta-loop registered with the OS scheduler,
+  // or does it still run on a human clock? Optional either way — this never
+  // fails the doctor, it only surfaces the gap.
+  const schedProbeName = IS_WIN ? "schtasks" : "crontab";
+  const schedProbe = which(schedProbeName);
+  if (!schedProbe) {
+    item("meta-loop schedule", `unknown - ${schedProbeName} not on PATH; if wanted, register the monthly meta-loop manually (see bootstrap/README.md)`);
+  } else {
+    const schedOut = IS_WIN ? run([schedProbe, "/query", "/tn", "asdf-meta-loop"]) : run([schedProbe, "-l"]);
+    item(
+      "meta-loop schedule",
+      /asdf-meta-loop|analyze-sessions/i.test(schedOut)
+        ? "registered"
+        : "WARN: not registered - the monthly meta-loop still relies on a human clock; optional, see bootstrap/README.md for schtasks/crontab one-liners",
+    );
   }
   section("Agent loop runtime contract");
   const workflowState = path.join(repo, STATE_DIR, RUN_CONTRACT);

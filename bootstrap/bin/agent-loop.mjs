@@ -18,6 +18,7 @@ import { parseArgs } from "node:util";
 const STATE_DIR = ".agent-loop";
 const RUN_CONTRACT = "run-contract.json";
 const LOOP_EVENTS = "loop-events.jsonl";
+const LOOP_HISTORY = "history.jsonl";
 const LEGACY_STATE_DIR = ".agent-workflows";
 const LEGACY_RUN_CONTRACT = "touch-list.json";
 const LEGACY_LOOP_EVENTS = "evidence-ledger.jsonl";
@@ -534,6 +535,40 @@ function appendEvent(repo, event) {
   fs.mkdirSync(state, { recursive: true });
   if (event.ts === undefined) event.ts = utcNow();
   fs.appendFileSync(loopEventsPath(repo), jsonSorted(event) + "\n", "utf8");
+}
+
+// Out-of-tree terminal history: one line per closed loop under the user's
+// home, so terminal states survive the next `init --force` and the meta-loop
+// can compute outcome metrics (terminal-state distribution, resumed reworks).
+// Best-effort telemetry only: a failure to write must never trap a stop or a
+// close, and the file is no more tamper-resistant than the event log — it is
+// process evidence, not business verification.
+function historyHome() {
+  return path.resolve(process.env.USERPROFILE || process.env.HOME || os.homedir());
+}
+
+function appendTerminalHistory(repo, touch, via) {
+  try {
+    const dir = path.join(historyHome(), STATE_DIR);
+    fs.mkdirSync(dir, { recursive: true });
+    const evidence = touch.evidence && typeof touch.evidence === "object" ? touch.evidence : {};
+    const row = {
+      ts: utcNow(),
+      repo: String(repo),
+      via,
+      terminal_state: terminalState(touch),
+      reason: touch.closed_reason ?? null,
+      goal: touch.goal ?? null,
+      criterion: criterionValue(touch) ?? null,
+      gate_blocks_total: Number.parseInt(String(touch.gate_blocks_total), 10) || 0,
+      stall_count: Number.parseInt(String(touch.stall_count), 10) || 0,
+      iteration: evidence.iteration ?? null,
+      session: ownerSessionId(touch) ?? null,
+    };
+    fs.appendFileSync(path.join(dir, LOOP_HISTORY), jsonSorted(row) + "\n", "utf8");
+  } catch {
+    /* degrade, never trap */
+  }
 }
 
 function readEvents(repo, limit = 5) {
@@ -1264,6 +1299,7 @@ function checkStop(payload, repo, touch) {
     });
     touch.stall_signature = null;
     touch.stall_count = 0;
+    touch.stall_history = [];
   }
   touch.criterion_hash = liveCriterionHash;
 
@@ -1278,6 +1314,7 @@ function checkStop(payload, repo, touch) {
     touch.gate_blocks = 0;
     touch.stall_count = 0;
     touch.stall_signature = null;
+    touch.stall_history = [];
     touch.status = "closed";
     touch.closed_at = utcNow();
     touch.closed_reason = "criterion passed";
@@ -1286,6 +1323,7 @@ function checkStop(payload, repo, touch) {
     evidence.last_failure = null;
     evidence.proved = dedupe([...evidence.proved, criterion]);
     writeJson(runContractPath(repo), touch);
+    appendTerminalHistory(repo, touch, "stop-gate");
     appendEvent(repo, { ...base, decision: "allow", reason: "criterion passed", criterion_exit: 0 });
     return 0;
   }
@@ -1320,6 +1358,21 @@ function checkStop(payload, repo, touch) {
   }
   const stallCap = intField(budgetValue(touch, "max_stall_repeats", STALL_SIGNATURE_CAP), STALL_SIGNATURE_CAP);
 
+  // A strict two-signature alternation (A,B,A,B,...) never repeats
+  // consecutively, so the counter above reads it as progress — fix A breaks B,
+  // fix B breaks A. Keep a short signature history and treat a full
+  // alternating window of 2 * stallCap stops as the same non-progress loop.
+  const oscillationWindow = 2 * stallCap;
+  const stallHistory = (Array.isArray(touch.stall_history) ? touch.stall_history : []).map(String);
+  stallHistory.push(signature);
+  while (stallHistory.length > Math.max(oscillationWindow, 8)) stallHistory.shift();
+  touch.stall_history = stallHistory;
+  let oscillating = false;
+  if (stallHistory.length >= oscillationWindow) {
+    const tail = stallHistory.slice(-oscillationWindow);
+    oscillating = tail[0] !== tail[1] && tail.every((sig, i) => sig === tail[i % 2]);
+  }
+
   setLastFailure(touch, {
     summary: `criterion failed (${failureLabel})`,
     criterion,
@@ -1340,24 +1393,27 @@ function checkStop(payload, repo, touch) {
   // Prefer `stalled` over `exhausted`: stallCap < cap, so a loop reding the
   // identical way releases early with the more informative terminal state; a
   // loop whose failure keeps changing only ever hits the blunt cap.
-  const stalled = touch.stall_count >= stallCap;
+  const stalled = touch.stall_count >= stallCap || oscillating;
   const exhausted = touch.gate_blocks >= cap;
   if (stalled || exhausted) {
     const state = stalled ? "stalled" : "exhausted";
+    const stallDetail =
+      oscillating && touch.stall_count < stallCap
+        ? `failure signatures alternating in a two-signature cycle across ${oscillationWindow} consecutive stops`
+        : `same failure repeated ${touch.stall_count} times`;
     touch.status = "closed";
     touch.closed_at = utcNow();
-    touch.closed_reason = stalled
-      ? `criterion gate stalled: same failure repeated ${touch.stall_count} times`
-      : "criterion gate exhausted";
+    touch.closed_reason = stalled ? `criterion gate stalled: ${stallDetail}` : "criterion gate exhausted";
     setTerminalState(touch, state);
     writeJson(runContractPath(repo), touch);
+    appendTerminalHistory(repo, touch, "stop-gate");
     appendEvent(repo, {
       ...base,
       decision: "release",
       terminal_state: state,
       reason:
         (stalled
-          ? `criterion gate released as stalled after ${touch.stall_count} identical consecutive failures`
+          ? `criterion gate released as stalled: ${stallDetail}`
           : `criterion gate released after ${touch.gate_blocks} consecutive blocks ` +
             `(${touch.gate_blocks_total} total this session)`) +
         "; produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
@@ -1683,11 +1739,21 @@ function cmdClose(values) {
     );
     return 2;
   }
+  // A closed contract already recorded its one terminal event (and one history
+  // row); a retried close must not rewrite the terminal state or append a
+  // duplicate row that would pollute the outcome metrics.
+  if (lifecycleStatus(touch) === "closed") {
+    process.stderr.write(
+      `${file} is already closed (terminal_state ${terminalState(touch)}); re-init to start a new loop\n`,
+    );
+    return 1;
+  }
   touch.status = "closed";
   setTerminalState(touch, requestedTerminalState);
   touch.closed_reason = String(values.reason ?? "complete").trim();
   touch.closed_at = utcNow();
   writeJson(file, touch);
+  appendTerminalHistory(repo, touch, "close");
   appendEvent(repo, {
     event: "Close",
     decision: "observe",
@@ -1732,6 +1798,7 @@ function cmdAmend(values) {
   touch.criterion_hash = criterionHash(next);
   touch.stall_signature = null;
   touch.stall_count = 0;
+  touch.stall_history = [];
   const errors = validateTouchList(touch);
   if (errors.length) {
     for (const error of errors) process.stderr.write(`error: ${error}\n`);

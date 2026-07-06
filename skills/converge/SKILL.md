@@ -16,7 +16,7 @@ argument-hint: "[problem, decision, or plan to converge]"
 Converge produces a decision-ready plan. It does not edit files or implement the
 plan unless the user later gives explicit landing approval.
 
-Read `../workflow-core/REFERENCE.md` only when the plan needs loop terminal
+Read `../loop-core/REFERENCE.md` only when the plan needs loop terminal
 states, evidence, or handoff fields.
 
 ## Workflow

@@ -20,7 +20,7 @@ The only real fork in the work loop is where the red comes from:
 
 - **given** — the approved plan already carries the check.
 - **recovered** — reproduce the failure first; the red is earned from the world, not declared.
-- **absent (keep-green)** — a verification task whose criterion is legitimately green; open with the keep-green reason.
+- **absent (keep-green)** — a verification task whose criterion is legitimately green; open with the keep-green reason. Green is such a task's steady state, not a success event: the stop gate never auto-closes it, only the explicit verbs (`done`, `not-needed`, `abandon`) do — a red, by contrast, is the regression alarm and burns rounds as usual.
 
 Open the task with:
 

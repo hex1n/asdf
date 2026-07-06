@@ -665,11 +665,28 @@ function shellRedirectionPaths(command) {
   return paths;
 }
 
+// Command text embeds file CONTENT (heredocs, echoed Java/XML/SQL, patch
+// bodies), and the best-effort extractors above happily pick code tokens out
+// of it: `List<Long> teamIds)` reads as a redirection into "teamIds)", a
+// lambda `i -> i.getName()` as a write to "i.getName()", a `--- intro` diff
+// line as a path. Only path-shaped tokens may reach scope enforcement — a
+// dropped junk token merely skips one enforcement probe, while a false deny
+// blocks real work (observed: dozens of code-token denies in one session).
+// Explicit tool fields (file_path etc.) stay unfiltered: they are
+// authoritative targets by construction.
+function plausibleFileTarget(value) {
+  const v = String(value ?? "").trim();
+  if (!v || v.length > 260) return false;
+  if (/^[-+*<>|&]/.test(v)) return false;
+  if (/[()<>{}|;`"']/.test(v) || /\s/.test(v)) return false;
+  return /[\\/]/.test(v) || /\.[A-Za-z0-9]{1,8}$/.test(v);
+}
+
 function fileTargets(tool, mapping) {
   const targets = stringFieldValues(mapping, FILE_FIELD_NAMES);
   for (const command of commandValues(mapping)) {
-    targets.push(...patchPaths(command));
-    targets.push(...shellRedirectionPaths(command));
+    targets.push(...patchPaths(command).filter(plausibleFileTarget));
+    targets.push(...shellRedirectionPaths(command).filter(plausibleFileTarget));
   }
   return dedupe(targets);
 }
@@ -785,6 +802,68 @@ function recordGitOps(touch, payload, ops) {
   for (const op of ops) {
     evidence.git_ops.push({ op, session_id: sid, ts: utcNow() });
   }
+}
+
+// A mismatch deny is read by a live agent mid-task: hand it commands it can
+// run verbatim, not philosophy. Observed failure mode: an agent hit this deny
+// dozens of times in one session and went source-diving for the CLI instead
+// of closing, stealing, or switching worktree.
+function sessionMismatchGuidance(repo, mismatch) {
+  const cli = process.argv[1] ?? "agent-loop.mjs";
+  let abandoned = "";
+  // Best-effort abandonment hint; only meaningful when the expected owner is
+  // a concrete session id (not the partitioned-mode role description).
+  if (!/\s/.test(String(mismatch.expected ?? ""))) {
+    try {
+      const rows = readEvents(repo, 200).filter(
+        (row) => row && row.session_id === mismatch.expected && row.ts,
+      );
+      const last = rows.length ? Date.parse(rows[rows.length - 1].ts) : NaN;
+      const idleMin = Number.isFinite(last) ? Math.round((Date.now() - last) / 60000) : null;
+      if (idleMin === null) {
+        abandoned = " The owning session has no recent hook events here - likely abandoned; steal is safe.";
+      } else if (idleMin >= 30) {
+        abandoned = ` The owning session has been idle for ${idleMin} minutes - likely abandoned; steal is safe.`;
+      }
+    } catch {
+      /* hint is best-effort */
+    }
+  }
+  return (
+    `session mismatch: run contract bound to ${mismatch.expected}; current session is ${mismatch.actual}.${abandoned} Pick one:\n` +
+    `  node "${cli}" close --repo "${repo}" --terminal-state <success|noop|blocked|stalled|exhausted> --reason "<why>"  # the old loop is finished\n` +
+    `  node "${cli}" init --repo "${repo}" --force --steal --reason "<why>" --files "<glob>" --criterion "<check>"  # take over the stale loop\n` +
+    `  git worktree add ../<name>-wt  # run parallel loops in separate worktrees`
+  );
+}
+
+// Naked-write reminder: the repo opted into loop state (.agent-loop/ exists)
+// but no ACTIVE run contract covers this write. Remind once per session with
+// a copyable init template - never block (trivial single-file changes are
+// legitimately contract-free). additionalContext is the only documented
+// exit-0 channel that reaches the model on both Claude Code and Codex;
+// permissionDecision is deliberately omitted so the reminder never changes
+// permission semantics.
+function nakedWriteReminder(repo, touch, payload, tool, mapping) {
+  const active = touch !== null && lifecycleStatus(touch) === "active";
+  if (active) return null;
+  const writeShaped =
+    fileTargets(tool, mapping).length > 0 ||
+    sqlTargets(mapping).length > 0 ||
+    looksLikeWrite(tool, mapping);
+  if (!writeShaped) return null;
+  const sid = sessionIdFromPayload(payload);
+  try {
+    if (readEvents(repo, 200).some((row) => row && row.naked_write && row.session_id === sid)) return null;
+  } catch {
+    /* dedup is best-effort */
+  }
+  const cli = process.argv[1] ?? "agent-loop.mjs";
+  return (
+    `no active run contract in this loop-enabled repo (${STATE_DIR}/ present). For non-trivial work, open one first:\n` +
+    `  node "${cli}" init --repo "${repo}" --files "<glob>" --criterion "<machine-checkable check, red until done>" --goal "<one line>"\n` +
+    `Trivial single-file changes may proceed without one. This reminder appears once per session.`
+  );
 }
 
 function sessionMismatch(touch, payload) {
@@ -1056,9 +1135,7 @@ function checkPretool(payload, repo, touch) {
 
   const mismatch = sessionMismatch(touch, payload);
   if (mismatch) {
-    const reason =
-      `session mismatch: run contract bound to ${mismatch.expected}; ` +
-      `current session is ${mismatch.actual}; use a separate worktree or close/steal the run contract`;
+    const reason = sessionMismatchGuidance(repo, mismatch);
     appendEvent(repo, { ...base, decision: "deny", reason });
     return deny(reason);
   }
@@ -1072,6 +1149,17 @@ function checkPretool(payload, repo, touch) {
 
   if (!shouldEnforce(touch) || mode === "off") {
     markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps);
+    const reminder = nakedWriteReminder(repo, touch, payload, tool, mapping);
+    if (reminder) {
+      appendEvent(repo, { ...base, decision: "warn", naked_write: true, reason: reminder });
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: reminder },
+        }) + "\n",
+      );
+      process.stderr.write(reminder + "\n");
+      return 0;
+    }
     appendEvent(repo, { ...base, decision: "observe" });
     return 0;
   }
@@ -1138,6 +1226,7 @@ function checkPretool(payload, repo, touch) {
 // merely costs one extra criterion run, while a false "clean" would hold a
 // stale red, which the stall release still bounds.
 function markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, opts = {}) {
+  if (!touch || typeof touch !== "object") return false;
   const writeShaped =
     gitOps.length > 0 ||
     fileTargets(tool, mapping).length > 0 ||
@@ -1987,8 +2076,36 @@ function runCli(command, argv) {
   return cmdClose(values);
 }
 
+// The CLI's first screen is a copyable init template: agents groping for the
+// interface should get the command, not an option dump or a parse error
+// (observed: six --help attempts followed by source-diving in one session).
+function cmdHelp() {
+  process.stdout.write(
+    "agent-loop.mjs - project-local run contract + criterion gate (PreToolUse/Stop hook + CLI)\n" +
+      "\n" +
+      "start a loop (copy, fill in, run):\n" +
+      '  node ~/bin/agent-loop.mjs init --repo <repo> --files "<glob>" [--files ...] \\\n' +
+      '    --criterion "<machine-checkable check, red until the task is done>" \\\n' +
+      '    --goal "<one line>" [--session <id>] [--force]\n' +
+      "\n" +
+      "other commands:\n" +
+      "  status --repo <repo> [--limit N]                       read-only state + recent events\n" +
+      '  amend  --repo <repo> --criterion "<new>" --reason "<why>"   change the goalpost with a record\n' +
+      '  claim  --repo <repo> --session <id> --files "<glob>"   partitioned same-worktree concurrency\n' +
+      "  close  --repo <repo> --terminal-state <success|noop|blocked|stalled|exhausted> --reason \"<why>\"\n" +
+      "  validate --repo <repo>                                 schema check only\n" +
+      "\n" +
+      "rules: the criterion must be executable and red at init; git operations need\n" +
+      "--git-allowed <op> --git-reason <why>; state lives in .agent-loop/ (gitignored).\n",
+  );
+  return 0;
+}
+
 function main() {
   const argv = process.argv.slice(2);
+  if (argv.length && ["help", "--help", "-h"].includes(argv[0])) {
+    return cmdHelp();
+  }
   if (argv.length && Object.hasOwn(CLI_OPTIONS, argv[0])) {
     return runCli(argv[0], argv.slice(1));
   }

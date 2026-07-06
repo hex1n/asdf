@@ -45,6 +45,16 @@ Red-at-birth proves the criterion can tell "done" from "not started"; it cannot 
 
 Two-domain fit: a backend loop whose criterion runs focused API tests but not the data backfill it also changed; a docs loop whose criterion checks that links resolve but not that the new section renders in the published site.
 
+### The Independence Ladder (a second sensor for criterion-weak work)
+
+The criterion is the loop's one sensor, and it is self-administered: the same agent runs it, reads the verdict, writes `done`. That is enough when the criterion is objective and complete (a given test for a bug fix). It is not enough for **criterion-weak** work — refactors, migrations, design-shaped changes — where the machine check passes while the real done-ness (structure, coverage, "is this the right thing") goes unjudged. There the load-bearing sensor is an **independent review**, and its value scales with how uncorrelated the reviewer's failure modes are with the author's:
+
+- **self-reread** — never independent; the author's context is what is compromised.
+- **fresh-context** — a read-only reviewer with only the artifact and the standard, none of the authoring context; washes session-state contamination (optimism, sunk cost, tunnel vision), not model-level blind spots.
+- **second-model** — a different model; washes model-level blind spots too. Prefer it when available.
+
+Record the level reached with `taskloop review --level <second-model|fresh-context|self-reread>`. The engine records the provenance (which level, not a verdict — a review is a probabilistic signal fed back into the loop body, never a machine gate) so the outcome ledger shows how independently each task was checked; the meta loop watches whether `review_level: none` correlates with rework. When the runtime cannot supply the strongest level, drop a rung and record the downgrade.
+
 ## The Envelope
 
 The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write and wall-clock budgets bound the never-stopping side, and reads and verification commands never burn or hit them.

@@ -40,17 +40,27 @@ and length the rubric names.
 Completion criterion: a reviewer could judge the draft against every rubric
 item without asking what is missing.
 
-### 3. Fresh-Context Review
+### 3. Independent Review
 
-Review the draft against the rubric in an independent context: a read-only
-subagent that receives only the rubric and the draft, none of the authoring
-context. Every finding must cite the rubric item it violates. The author's
-own re-read never counts as the independent pass; when the runtime cannot
-supply an independent context, record the downgrade and mark the round's
-verdict provisional.
+Review the draft against the rubric from the most independent perspective the
+runtime can supply — a reviewer whose failure modes are least correlated with
+the author's. There is an independence ladder, weakest to strongest:
 
-Completion criterion: a verdict list where each finding cites a rubric item,
-or a recorded downgrade.
+- **self-reread** — never counts as the independent pass (the author's context
+  is exactly what is compromised);
+- **fresh-context** — a read-only subagent that receives only the rubric and the
+  draft, none of the authoring context; washes session-state contamination
+  (optimism, sunk cost, tunnel vision) but not model-level blind spots;
+- **second-model** — a different model reviews; washes model-level blind spots
+  too (uncorrelated weights). Prefer this when available.
+
+Every finding must cite the rubric item it violates. Use the strongest level
+available; when you must drop a rung, record the downgrade and mark the round's
+verdict provisional. Record the level reached with `taskloop review --level
+<...>` so the outcome ledger shows how independently the work was checked.
+
+Completion criterion: a finding list where each finding cites a rubric item,
+the review level is recorded, and any downgrade is named.
 
 ### 4. Revise Narrowly
 

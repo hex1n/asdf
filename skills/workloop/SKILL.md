@@ -56,13 +56,23 @@ relevant verification after each meaningful change; each round `status`-checks
 that nothing left the envelope. The body is identical across sources with one
 branch — **recovered adds a freshness gate**: replay only against the changed
 build/process/config/data, because a green on the old world's evidence does not
-count. For non-trivial changes, take an independent read-only review when the
-runtime supports it; otherwise record the downgrade and do a focused
-self-review. Keep at least two plausible causes alive until one distinguishing
-check separates them.
+count. Keep at least two plausible causes alive until one distinguishing check
+separates them.
 
-Completion criterion: the criterion passes, or the task has a named non-`done`
-outcome.
+The criterion gate proves the check passes; it does not prove the change is
+structurally right. When the criterion is a **weak proxy for done** — a
+refactor, a migration, a design-shaped change where "green" leaves the real
+done-ness (coverage, coherence, "is this the right structure") unjudged, as the
+alignment line should admit — the criterion alone is a rubber stamp. There, take
+an independent review at the strongest level the runtime supports (second-model
+> fresh-context > self-reread; self-reread never counts), feed its findings back
+into this body, and record the level with `taskloop review --level <...>` so the
+ledger shows how independently it was checked. When you must drop a rung, record
+the downgrade.
+
+Completion criterion: the criterion passes; for a criterion-weak change, an
+independent review at a recorded level fed its findings back, or the downgrade
+is named.
 
 ## 4. Stop Without Drifting
 

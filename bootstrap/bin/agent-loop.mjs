@@ -1357,6 +1357,68 @@ function criterionHash(criterion) {
   return fnv1aHex(String(criterion ?? "").trim());
 }
 
+// The criterion is the loop's only sensor, and the files it executes (tests,
+// checkers) are usually writable by the same loop it adjudicates. The goalpost
+// hash above only covers the command string; these fingerprints cover the
+// command's file inputs, so a check weakened mid-loop is visible at green.
+// Best-effort heuristic: path-shaped tokens in the criterion that resolve to
+// files inside the repo. A criterion with no extractable paths gets an empty
+// list and no checking — honest degradation, not silent coverage.
+function criterionInputPaths(criterion, repo) {
+  const repoRoot = path.resolve(String(repo ?? ""));
+  const tokens = String(criterion ?? "").split(/[\s"'();|&<>]+/).filter(Boolean);
+  const seen = new Set();
+  const inputs = [];
+  for (const rawToken of tokens) {
+    const token = rawToken.replace(/^--?[\w-]+=/, "");
+    if (!token || token.startsWith("-")) continue;
+    if (!/[\\/.]/.test(token)) continue;
+    if (token.includes("*") || token.includes("?")) continue;
+    const rel = token.replace(/\\/g, "/");
+    const abs = path.resolve(repoRoot, rel);
+    if (abs !== repoRoot && !abs.startsWith(repoRoot + path.sep)) continue;
+    let stat;
+    try {
+      stat = fs.statSync(abs);
+    } catch {
+      continue;
+    }
+    if (!stat.isFile()) continue;
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    try {
+      inputs.push({ path: rel, hash: fnv1aHex(fs.readFileSync(abs, "latin1")) });
+    } catch {
+      /* unreadable input: skip rather than trap */
+    }
+  }
+  return inputs;
+}
+
+// Compare stored input fingerprints against the working tree, adopting the
+// current state as the new baseline (mirrors the goalpost check: the machine
+// reports the move once; judging its legitimacy stays with the human).
+function criterionInputDrift(touch, repo) {
+  const inputs = Array.isArray(touch.criterion_inputs) ? touch.criterion_inputs : [];
+  const changed = [];
+  for (const entry of inputs) {
+    if (!entry || typeof entry !== "object") continue;
+    const rel = String(entry.path ?? "");
+    if (!rel) continue;
+    let current;
+    try {
+      current = fnv1aHex(fs.readFileSync(path.resolve(String(repo), rel), "latin1"));
+    } catch {
+      current = "missing";
+    }
+    if (current !== String(entry.hash ?? "")) {
+      changed.push(rel);
+      entry.hash = current;
+    }
+  }
+  return changed;
+}
+
 // Criterion gate: the machine-side stop verdict. Prose contracts stay
 // advisory; this makes "green before stop" deterministic in strict mode.
 // warn mode runs the criterion and records the verdict without blocking
@@ -1450,6 +1512,10 @@ function checkStop(payload, repo, touch) {
   }
 
   if (verdict.verdict === "pass") {
+    // A green earned by editing the check itself is the one goalpost move the
+    // command-string hash cannot see. Warn, never block: the edit may be a
+    // legitimate test fix, and judging that stays with the human.
+    const inputDrift = criterionInputDrift(touch, repo);
     touch.gate_blocks = 0;
     touch.stall_count = 0;
     touch.stall_signature = null;
@@ -1463,6 +1529,17 @@ function checkStop(payload, repo, touch) {
     evidence.proved = dedupe([...evidence.proved, criterion]);
     writeJson(runContractPath(repo), touch);
     appendTerminalHistory(repo, touch, "stop-gate");
+    if (inputDrift.length) {
+      appendEvent(repo, {
+        ...base,
+        decision: "warn",
+        reason:
+          `criterion input files changed since init without amend: ${inputDrift.join(", ")} — ` +
+          "if the edit redefined done, record it (amend --criterion --reason); a weakened check makes this green unproven",
+        criterion_input_modified: true,
+        changed_inputs: inputDrift,
+      });
+    }
     appendEvent(repo, { ...base, decision: "allow", reason: "criterion passed", criterion_exit: 0 });
     return 0;
   }
@@ -1707,8 +1784,11 @@ function cmdInit(values) {
     // An intentionally-green start is an exception; exceptions carry reasons.
     ...(values["allow-green-init"] ? { reason: String(values.reason ?? "").trim() } : {}),
   };
-  // Freeze the criterion baseline so a later goalpost move is recordable.
+  // Freeze the criterion baseline so a later goalpost move is recordable —
+  // the command string via its hash, the command's file inputs via
+  // fingerprints (the check itself must not be silently rewritable mid-loop).
   data.criterion_hash = criterionHash(data.criterion);
+  data.criterion_inputs = criterionInputPaths(data.criterion, repo);
   if (initVerdict.verdict === "not_executable") {
     const mustBlock = String(data.enforcement).toLowerCase() === "strict";
     const message =
@@ -1959,6 +2039,22 @@ function cmdClose(values) {
       const evidence = ensureEvidence(touch);
       evidence.proved = dedupe([...evidence.proved, criterion]);
       evidence.last_failure = null;
+      const inputDrift = criterionInputDrift(touch, repo);
+      if (inputDrift.length) {
+        process.stderr.write(
+          `warning: criterion input files changed since init without amend: ${inputDrift.join(", ")}; ` +
+            "if the edit redefined done, record it (amend --criterion --reason)\n",
+        );
+        appendEvent(repo, {
+          event: "Close",
+          decision: "warn",
+          evidence_kind: "loop_runtime",
+          repo: String(repo),
+          reason: `criterion input files changed since init without amend: ${inputDrift.join(", ")}`,
+          criterion_input_modified: true,
+          changed_inputs: inputDrift,
+        });
+      }
     }
   }
   if (snapshot) {
@@ -2026,6 +2122,7 @@ function cmdAmend(values) {
     const previousHash = touch.criterion_hash ?? criterionHash(previous);
     touch.criterion = next;
     touch.criterion_hash = criterionHash(next);
+    touch.criterion_inputs = criterionInputPaths(next, repo);
     touch.stall_signature = null;
     touch.stall_count = 0;
     touch.stall_history = [];

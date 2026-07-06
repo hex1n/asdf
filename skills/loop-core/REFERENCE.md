@@ -94,6 +94,13 @@ change is legitimate, only that "defining green" and "passing green" stayed
 separable and auditable. Drift is only checked in `warn`/`strict` enforcement;
 `off` observes nothing, including moved goalposts.
 
+The same discipline covers the criterion's file inputs: `init` fingerprints
+repo files named in the criterion command, and a green whose check files
+changed since init is released with a `criterion_input_modified` warning —
+editing the test instead of the code is the goalpost move the command-string
+hash cannot see. A legitimate check fix goes through `amend --reason` like any
+other redefinition of done.
+
 ## Criterion-Goal Alignment
 
 Red-at-init proves the criterion can discriminate "done" from "not started";

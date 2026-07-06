@@ -153,19 +153,24 @@ def loop_history_metrics(history_path):
                 episodes = int(e.get("episodes") or 1)
             except (TypeError, ValueError):
                 episodes = 1
-            rows.append((str(e.get("repo") or "?"), state, episodes, bool(e.get("criterion_input_drift"))))
+            review = str(e.get("review_level") or "none")
+            rows.append((str(e.get("repo") or "?"), state, episodes,
+                         bool(e.get("criterion_input_drift")), review))
     if not rows:
         return None
-    nonsuccess = [i for i, (_, s, _e, _d) in enumerate(rows) if s in NONSUCCESS_STATES]
-    resumed = sum(1 for _r, _s, episodes, _d in rows if episodes > 1)
-    drift = sum(1 for _r, _s, _e, d in rows if d)
+    nonsuccess = [i for i, (_, s, _e, _d, _v) in enumerate(rows) if s in NONSUCCESS_STATES]
+    resumed = sum(1 for _r, _s, episodes, _d, _v in rows if episodes > 1)
+    drift = sum(1 for _r, _s, _e, d, _v in rows if d)
+    review_levels = Counter(v for _r, _s, _e, _d, v in rows)
     return {
         "states": dict(states),
         "total": len(rows),
         "nonsuccess": len(nonsuccess),
         "resumed": resumed,
         "drift": drift,
-        "repos": len({r for r, _s, _e, _d in rows}),
+        "review_levels": dict(review_levels),
+        "reviewed_none": review_levels.get("none", 0),
+        "repos": len({r for r, _s, _e, _d, _v in rows}),
     }
 
 
@@ -458,9 +463,11 @@ def main(argv=None):
                   % (dist, hist["total"], hist["repos"]))
         rrate = (100.0 * hist["resumed"] / hist["total"]) if hist["total"] else 0.0
         drate = (100.0 * hist["drift"] / hist["total"]) if hist["total"] else 0.0
+        nrate = (100.0 * hist["reviewed_none"] / hist["total"]) if hist["total"] else 0.0
+        rl = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["review_levels"].items()))
         lh.append("6. resumed_tasks (spanned >1 episode, all-time): %d / %d tasks (%.0f%%); "
-                  "criterion_input_drift: %d (%.0f%%)"
-                  % (hist["resumed"], hist["total"], rrate, hist["drift"], drate))
+                  "criterion_input_drift: %d (%.0f%%); review_level: %s (none: %.0f%%)"
+                  % (hist["resumed"], hist["total"], rrate, hist["drift"], drate, rl, nrate))
     else:
         lh.append("5. terminal_states: no ledger yet (%s missing; requires taskloop task closes)"
                   % history_path)
@@ -482,6 +489,7 @@ def main(argv=None):
         "nonsuccess": (hist or {}).get("nonsuccess"),
         "resumed": (hist or {}).get("resumed"),
         "drift": (hist or {}).get("drift"),
+        "reviewed_none": (hist or {}).get("reviewed_none"),
     }
     health_history = os.path.join(out_dir, "loop-health-history.jsonl")
     delta = health_delta_line(load_last_jsonl_row(health_history), run_row)

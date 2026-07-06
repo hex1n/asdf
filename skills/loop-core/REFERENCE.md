@@ -33,7 +33,7 @@ node ~/bin/taskloop.mjs open --repo <repo> --goal "<one line>" \
 
 `taskloop open` runs the criterion once and refuses an already-green start (red at birth — an already-green criterion cannot prove the task) or one the machine cannot execute. Do not hand-write `task.json`; the CLI owns it. Prefer a **criterion adapter** over a hand-written check when the done-when reads evidence produced elsewhere; the adapter interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous pass, stale green, collapsed verdicts — unrepresentable. `e2e-report-check.mjs` is the seed adapter (required scenario set + build freshness, exit 0/1/2).
 
-The criterion's own input files are fingerprinted at open; a green whose check files changed since (editing the test instead of the code) is flagged `criterion_input_drift` in the outcome ledger. A criterion move goes through `amend --criterion --reason`, not a silent edit.
+The criterion's own input files are fingerprinted at open; a green whose check files changed since (editing the test instead of the code) is a moved sensor, not a proof — both close doors refuse it until the move is re-blessed through `amend --criterion --reason`, which re-fingerprints. The drift event stays on the outcome ledger as `criterion_input_drift` even after the re-bless.
 
 ## Criterion-Goal Alignment
 

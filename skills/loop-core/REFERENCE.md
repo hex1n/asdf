@@ -41,6 +41,11 @@ strict mode refuses `init` because the criterion cannot discriminate "done" from
 "not started". Declare an intentional already-green loop (noop verify,
 keep-green regression guard) with `--allow-green-init --reason <why>`.
 
+Prefer a criterion adapter over a hand-written check when the done-when reads
+evidence produced elsewhere (reports, datasets, artifacts): the adapter
+interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous pass,
+stale green, collapsed verdicts — unrepresentable.
+
 When the done-when is an E2E result, do not make the criterion re-run the
 executor — the Stop gate re-runs its criterion on every stop. Let the loop body
 run the executor once, then point the criterion at the report:

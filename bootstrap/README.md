@@ -3,8 +3,8 @@
 装的核心是**个人 agent 工作循环**（判据 → 收敛 → 落地 → 排查 → 判停），在任意项目
 零配置生效。循环系统是 **taskloop**（`../taskloop/`）；本目录分发它、契约卡与配套
 skills，并注册 hook。项目文档层不在此分发，需要时用 project-docs-layer skill 按
-项目审计/修复（四问审计：Start/Verify/Direction/Danger；只写本会话验证过的事实，
-循环纪律不进项目文档——机器与契约卡已承载）。
+项目审计/修复（五问审计：Start/Verify/Conventions/Direction/Danger,答案尽量下推到可执行之家；
+只写验证过的事实，循环纪律不进项目文档——机器与契约卡已承载）。
 
 在任意新电脑上装齐：
 

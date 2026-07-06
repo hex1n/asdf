@@ -1694,9 +1694,17 @@ function checkStop(payload, repo, touch) {
       oscillating && touch.stall_count < stallCap
         ? `failure signatures alternating in a two-signature cycle across ${oscillationWindow} consecutive stops`
         : `same failure repeated ${touch.stall_count} times`;
+    // Exhausted lumps two very different loops: one thrashing and one making
+    // real progress slower than its budget. The signature history can tell
+    // them apart — all-distinct signatures mean the failure changed on every
+    // block, so name the moving case and point it at the lineage-recording
+    // resume path instead of handing both the same dead end.
+    const moving = !stalled && stallHistory.length >= 2 && new Set(stallHistory).size === stallHistory.length;
     touch.status = "closed";
     touch.closed_at = utcNow();
-    touch.closed_reason = stalled ? `criterion gate stalled: ${stallDetail}` : "criterion gate exhausted";
+    touch.closed_reason = stalled
+      ? `criterion gate stalled: ${stallDetail}`
+      : `criterion gate exhausted${moving ? " while still moving" : ""}`;
     setTerminalState(touch, state);
     writeJson(runContractPath(repo), touch);
     appendTerminalHistory(repo, touch, "stop-gate");
@@ -1708,7 +1716,12 @@ function checkStop(payload, repo, touch) {
         (stalled
           ? `criterion gate released as stalled: ${stallDetail}`
           : `criterion gate released after ${touch.gate_blocks} consecutive blocks ` +
-            `(${touch.gate_blocks_total} total this session)`) +
+            `(${touch.gate_blocks_total} total this session)` +
+            (moving
+              ? " — every block had a distinct failure signature, so the loop was still moving when the " +
+                "budget ran out; if the progress is real, re-init with the same criterion (lineage is recorded) " +
+                "and continue from the snapshot"
+              : "")) +
         "; produce a resumable state snapshot (changed files, remaining criterion, current failure) before handing back",
       criterion_exit: verdict.exit,
     });

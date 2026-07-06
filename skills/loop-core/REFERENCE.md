@@ -157,7 +157,10 @@ green / kept failing the same way / never went green in budget."
 
 - The default cap is eight iterations unless the user states a different cap or
   the target repo declares a stricter budget. Count a meaningful change plus its
-  verification attempt as one iteration.
+  verification attempt as one iteration. That counting is the agent's own
+  discipline: what the machine enforces is narrower — consecutive blocked stop
+  attempts (`max_iterations` at the gate) plus the opt-in write/wall-clock
+  budgets above. Neither substitutes for the other.
 - Stop as `stalled` when the same failure repeated twice, or when two
   consecutive rounds change neither the failure nor the evidence. Stop as
   `exhausted` when the eight-iteration default cap, explicit user cap, or

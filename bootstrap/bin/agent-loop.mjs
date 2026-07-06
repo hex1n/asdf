@@ -1325,6 +1325,39 @@ function markDirtyIfWriteShaped(repo, touch, tool, mapping, gitOps, opts = {}) {
   return changed;
 }
 
+// Wave-1 visibility for renamed tasks (anti-laundering is visibility, not
+// prevention): a best-effort, read-only glance at the out-of-tree terminal
+// history at init. Absence, unreadability, or malformed rows degrade to
+// silence — the history stays non-load-bearing telemetry, never runtime input.
+function renamedTaskHint(repo, newCriterionHash) {
+  try {
+    const file = path.join(historyHome(), STATE_DIR, LOOP_HISTORY);
+    const lines = fs.readFileSync(file, "utf8").trim().split(/\r?\n/).filter(Boolean).slice(-20);
+    let others = 0;
+    for (const line of lines) {
+      let row;
+      try {
+        row = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (!isPlainObject(row)) continue;
+      if (String(row.repo ?? "") !== String(repo)) continue;
+      if (!["blocked", "stalled", "exhausted"].includes(String(row.terminal_state ?? ""))) continue;
+      const criterion = String(row.criterion ?? "");
+      if (!criterion || criterionHash(criterion) === newCriterionHash) continue;
+      others += 1;
+    }
+    if (!others) return null;
+    return (
+      `note: ${others} recent non-success close(s) in this repo under different criteria; ` +
+      "if this is the same task renamed, re-init with the original criterion so lineage records the resume\n"
+    );
+  } catch {
+    return null;
+  }
+}
+
 function touchedFilesSummary(touch, limit = 10) {
   const evidence = ensureEvidence(touch);
   const touched = Array.isArray(evidence.touched_files) ? evidence.touched_files.map(String) : [];
@@ -1951,6 +1984,10 @@ function cmdInit(values) {
         (priorTouched ? `; machine-observed changed files ${priorTouched}` : "") +
         "\n",
     );
+  }
+  if (!data.resume_of && !values.fresh) {
+    const hint = renamedTaskHint(repo, data.criterion_hash);
+    if (hint) process.stdout.write(hint);
   }
   if (initVerdict.verdict === "not_executable") {
     const mustBlock = String(data.enforcement).toLowerCase() === "strict";

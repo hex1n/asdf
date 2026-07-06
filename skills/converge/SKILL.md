@@ -28,7 +28,7 @@ irreversible/high-risk decisions. If the user already approved a plan, do not
 return here unless new blocking evidence appears or the user asks to reconsider.
 
 Completion criterion: the output is clearly planning-only or the task is routed
-to `land`.
+to `workloop`.
 
 ### 2. Reframe From First Principles
 

@@ -1,205 +1,89 @@
 # Loop Core
 
-Shared reference for the `converge`, `land`, `fixloop`, and `loop` skills. This directory intentionally has no `SKILL.md`: it is supporting material, not an invocable workflow.
+Shared reference for the `converge`, `workloop`, `judgment-loop`, and `meta-loop` skills. This directory intentionally has no `SKILL.md`: it is supporting material, not an invocable workflow. The loop system these skills route to is **taskloop** (`~/bin/taskloop.mjs`); this file is its shared vocabulary, organized around the task-first object model.
 
-## Loop Primitives
+## The Task
 
-- **Goal**: the user-visible outcome, stated without naming an implementation
-  unless the user already approved one.
-- **run contract**: the repo/worktree plus files, tables, interfaces, or external
-  surfaces the loop may touch. Stop before expanding it.
-- **Done when**: a machine-checkable completion criterion such as a test command,
-  SQL assertion, expected response, diff condition, or deployment fingerprint.
-  A trivial single-file change with no data or interface impact may use one
-  current-vs-expected sentence. The criterion must be **red before the work and
-  idempotent**: it has to fail until the task is done (an already-green criterion
-  proves nothing — see red-at-init below), and the stop gate re-runs it on every
-  stop (reusing the last red verdict only when nothing write-shaped ran in
-  between; green always comes from a fresh run), so it must be read-only and
-  side-effect-free.
-- **Evidence**: real tool output, status/diff, command output, SQL/API response,
-  read-only verification, or an execution report. Prose alone is not evidence.
-- **Runtime state**: local agent state under `.agent-loop/`. It is
-  gitignored, private to the agent loop, and non-authoritative.
+The **task** is the durable unit of one loop run. Everything else — episodes, rounds, evidence — lives underneath it.
 
-## Runtime Contract
+- **Goal**: the user-visible outcome, stated without naming an implementation unless the user already approved one.
+- **Criterion**: a machine-checkable done-when (see *Sourcing The Criterion*). There is no claim-based success — green always comes from a fresh criterion run.
+- **Alignment**: one required line — "green ⇒ goal because <what the check exercises>; not covered: <gaps>" (see *Criterion-Goal Alignment*).
+- **Envelope**: the files/tables/interfaces/git surface the task may touch (see *The Envelope*).
+- **Budgets**: rounds (default eight), and opt-in writes / wall-clock — all **task-level**, never refilled by resuming (see *Episodes, Suspend, And Resume*).
 
-When a target repo has `.agent-loop/`, initialize the active loop with:
+Task state lives in `.taskloop/task.json`, created only by `taskloop open`. It is gitignored, private to the loop, and **non-authoritative** — never a project policy source. **Evidence** for any completion claim is real tool output, status/diff, command output, SQL/API response, read-only verification, or an execution report. Prose alone is not evidence.
+
+## Sourcing The Criterion
+
+The only real fork in the work loop is where the red comes from:
+
+- **given** — the approved plan already carries the check.
+- **recovered** — reproduce the failure first; the red is earned from the world, not declared.
+- **absent (keep-green)** — a verification task whose criterion is legitimately green; open with the keep-green reason.
+
+Open the task with:
 
 ```text
-node ~/bin/agent-loop.mjs init --repo <repo> --files <glob> --criterion <check>
+node ~/bin/taskloop.mjs open --repo <repo> --goal "<one line>" \
+  --criterion "<executable check, red until done>" \
+  --alignment "green ⇒ goal because <...>; not covered: <...>" \
+  --files "<glob>" [--rounds 8] [--writes N] [--wall-clock-minutes M]
 ```
 
-Use v2 `run-contract.json`; v1 state is invalid and must be re-initialized.
-`.agent-loop/loop-events.jsonl` proves only scope/process observations.
-It does not prove business correctness and cannot replace tests, SQL, API
-responses, screenshots, logs, or diff review.
+`taskloop open` runs the criterion once and refuses an already-green start (red at birth — an already-green criterion cannot prove the task) or one the machine cannot execute. Do not hand-write `task.json`; the CLI owns it. Prefer a **criterion adapter** over a hand-written check when the done-when reads evidence produced elsewhere; the adapter interface in [ADAPTERS.md](ADAPTERS.md) makes the known traps — vacuous pass, stale green, collapsed verdicts — unrepresentable. `e2e-report-check.mjs` is the seed adapter (required scenario set + build freshness, exit 0/1/2).
 
-`init` runs the criterion once (**red-at-init**): a done-when criterion for a
-task with work to do must be red before the work starts. If it is already green,
-strict mode refuses `init` because the criterion cannot discriminate "done" from
-"not started". Declare an intentional already-green loop (noop verify,
-keep-green regression guard) with `--allow-green-init --reason <why>`.
-
-When the done-when is an E2E result, do not make the criterion re-run the
-executor — the Stop gate re-runs its criterion on every stop. Let the loop body
-run the executor once, then point the criterion at the report:
-
-```text
-node ~/bin/e2e-report-check.mjs --report <execution-report.md> --require-passed <ids> --build <artifact>
-```
-
-It is read-only and idempotent: exit 0 when the required scenarios passed on the
-current build, 1 on a scenario failure or a missing required scenario, 2 on a
-stale report (its loaded-build fingerprint differs from the current build),
-absent/malformed report, or unverifiable freshness. Pass `--no-freshness` only
-when there is no build artifact to fingerprint.
-
-Abandoned state does not trap Stop, but write operations still require `close`,
-`steal`, or a separate worktree. Take over only with:
-
-```text
-node ~/bin/agent-loop.mjs init --repo <repo> --force --steal --reason <why> ...
-```
-
-Close runtime state through the CLI, not by editing `run-contract.json`:
-
-```text
-node ~/bin/agent-loop.mjs close --repo <repo> --terminal-state <success|noop|blocked|stalled|exhausted> --reason <why>
-```
-
-Omitting `--terminal-state` means `success`; use an explicit non-success state
-when the loop stops without meeting the done-when criterion.
-
-If the criterion itself turns out wrong, change it through `amend`, not by
-editing `run-contract.json`:
-
-```text
-node ~/bin/agent-loop.mjs amend --repo <repo> --criterion <new check> --reason <why the goalpost moved>
-```
-
-`amend` records the change with its reason and resets stall tracking (failures
-now belong to a different check) but does **not** refill the block budget —
-amend fixes the target, it does not buy more iterations; re-init resets budget.
-Changing the criterion by direct file edit still works but is flagged at the
-next stop as an unrecorded goalpost move: the machine cannot judge whether the
-change is legitimate, only that "defining green" and "passing green" stayed
-separable and auditable. Drift is only checked in `warn`/`strict` enforcement;
-`off` observes nothing, including moved goalposts.
+The criterion's own input files are fingerprinted at open; a green whose check files changed since (editing the test instead of the code) is flagged `criterion_input_drift` in the outcome ledger. A criterion move goes through `amend --criterion --reason`, not a silent edit.
 
 ## Criterion-Goal Alignment
 
-Red-at-init proves the criterion can discriminate "done" from "not started";
-it cannot prove the criterion covers the goal. A weak criterion (a file
-exists, a command merely runs) turns the stop gate into a rubber stamp.
+Red-at-birth proves the criterion can tell "done" from "not started"; it cannot prove the criterion covers the goal. A weak criterion (a file exists, a command merely runs) turns the stop gate into a rubber stamp.
 
-- When restating the run contract at init, record one alignment line:
-  "criterion green ⇒ goal met, because <what the check actually exercises>;
-  not covered: <known gaps>". If the honest line is "criterion green proves
-  little", strengthen the criterion before starting the loop.
-- Verification that stays outside the machine criterion (slow suites, manual
-  checks, deployment smoke) must be named in the alignment line and reported
-  as closeout evidence instead of being silently dropped.
-- At closeout, re-read the alignment line: when the work revealed that the
-  criterion under-covers the goal, `amend` it with a reason — or report the
-  gap explicitly — before claiming `success`.
+- The `--alignment` line is required at open. If the honest line is "green proves little", strengthen the criterion before starting.
+- Verification outside the machine criterion (slow suites, manual checks, deployment smoke) must be named in the alignment line and reported as closeout evidence, not silently dropped.
+- At closeout, re-read the alignment line: when the work revealed the criterion under-covers the goal, `amend` it with a reason — or report the gap — before claiming `done`.
 
-Two-domain fit: a backend loop whose criterion runs focused API tests but not
-the data backfill it also changed; a docs loop whose criterion checks that
-links resolve but not that the new section renders in the published site.
-Both need the gap named at init and re-checked at closeout.
+Two-domain fit: a backend loop whose criterion runs focused API tests but not the data backfill it also changed; a docs loop whose criterion checks that links resolve but not that the new section renders in the published site.
+
+## The Envelope
+
+The envelope is the write boundary, declared at open and enforced by the PreToolUse hook. Writes outside it are denied; **reads are never blocked**, so a task can always still read and verify. The opt-in write and wall-clock budgets bound the never-stopping side, and reads and verification commands never burn or hit them.
+
+Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only after the user explicitly asks, and only when the envelope authorizes it — `open`/`amend` with `--git-allowed <op> --git-reason <why>`. Destructive git, remote execution (`curl | sh`), install scripts, and secret dumps stay denied unless the envelope opens them. Destructive operations still require explicit user intent even when authorized.
+
+## Episodes, Suspend, And Resume
+
+An **episode** is one continuous run of a task under a single session. A task suspends and resumes across episodes; budgets are task-level, so resuming never refills them — same failure repeated twice, or two rounds with no change, suspends as `stuck`; the round cap suspends as `out_of_budget`; missing input suspends as `needs_input`.
+
+Suspend is **not a closure** — the task stays open for the next episode. The snapshot has two halves: the machine records the changed files from its own observations; the human supplies the three judgment lines (remaining criterion, current failure, next safe action). A different session supersedes the previous episode rather than sharing it.
 
 ## Terminal States
 
-Use one terminal state in every closeout:
+A task closes exactly one of three ways; only the first is machine-written:
 
 | State | Meaning |
 | --- | --- |
-| `success` | Done-when criterion passed and required evidence is present. |
-| `noop` | Read-only verification showed no change was needed. |
-| `blocked` | Missing user input, permission, deployment, capability, or an unreachable criterion prevents progress. |
-| `stalled` | The same failure repeated twice, or two consecutive rounds changed neither the failure nor the evidence. |
-| `exhausted` | Iteration, budget, or explicit user cap was reached before success. |
+| `done` | Criterion green from a fresh run (the stop gate or the `done` verb). The only machine-written success. |
+| `not_needed` | Read-only verification showed no change was needed (`not-needed --evidence`). |
+| `abandoned` | Superseded or dropped (`abandon --reason`). |
 
-`success` and `noop` are normal closures. `blocked`, `stalled`, and `exhausted`
-are not success and require a resumable state snapshot.
-
-**Which states the machine holds.** The Stop hook enforces three of these
-mechanically from the criterion verdict and its counters: `success` (criterion
-green), `stalled` (the same failure signature repeats — default three consecutive
-stops — or two signatures strictly alternate across twice the stall cap, the
-oscillation case), and `exhausted` (the consecutive-block cap). `noop` and `blocked` are
-about *why* there was nothing to do or what is missing; the machine cannot derive
-them from a verdict, so they remain agent-declared and must be justified in the
-closeout. Do not read a machine-held state as more than "the criterion was
-green / kept failing the same way / never went green in budget."
-
-## Budget And Rework
-
-- The default cap is eight iterations unless the user states a different cap or
-  the target repo declares a stricter budget. Count a meaningful change plus its
-  verification attempt as one iteration.
-- Stop as `stalled` when the same failure repeated twice, or when two
-  consecutive rounds change neither the failure nor the evidence. Stop as
-  `exhausted` when the eight-iteration default cap, explicit user cap, or
-  runtime budget is reached before success. The Stop hook releases `stalled`
-  automatically after the same failure signature repeats (default three
-  consecutive stops; override with `budget.max_stall_repeats`) or after two
-  failure signatures strictly alternate across twice the stall cap (fix A
-  breaks B, fix B breaks A), which caps the criterion re-runs a genuinely
-  stuck loop pays before it stops.
-- Treat a loop as rework when it repairs previously delivered work or resumes a
-  prior `blocked`, `stalled`, or `exhausted` closeout. If the target repo has
-  `docs/rework-log.md` or its workflow contract names that file, append a
-  compact cause line. If no durable rework-log convention exists, include the
-  rework cause in the closeout report instead of inventing a new project file.
+The stop gate never writes success on a red criterion. `stuck` and `out_of_budget` are episode outcomes it assigns automatically, then suspends the task open; an `out_of_budget` run whose every round failed differently is reported as still-moving (resume it, or `amend --rounds --reason`).
 
 ## Concurrency
 
-Default to one writer loop per worktree. For parallel work, use separate git
-worktrees. Use same-worktree `partitioned` mode only when the user explicitly
-asks for it:
+Default to one writer task per worktree. For parallel work use separate git worktrees — each carries its own `.taskloop/` task, and one integrator session owns the cross-worktree git operations and merges after each writer's task reaches a terminal state. There is no shared-worktree partitioned mode: a second writer gets its own worktree, not a claim inside yours.
 
-```text
-node ~/bin/agent-loop.mjs claim --repo <repo> --session <id> --files <glob>
-```
+## Closeout And Rework
 
-Claims must not overlap. Git operations belong to one integrator session.
+Every closeout report includes the terminal state; the done-when verification result or why it cannot run; the actual touched targets (machine-observed in `evidence.touched_files`) versus the declared envelope; evidence links or command outputs for completion claims; remaining risks; and, for a suspend, the three judgment lines.
 
-## Git Operations
-
-Run `git add`, `commit`, `push`, `reset`, `restore`, `checkout`, or `clean` only
-after the user explicitly asks for that operation. Before the operation, update
-the active run contract with:
-
-```text
---git-allowed <op> --git-reason <why>
-```
-
-and enough git budget. Destructive git operations still require explicit user
-intent even when a budget exists.
-
-## Closeout
-
-Every closeout report includes:
-
-- the final terminal state;
-- the done-when verification result or the reason it cannot run;
-- the actual touched targets versus the declared run contract;
-- evidence links or command outputs for completion claims;
-- remaining P2/P3 findings or risks;
-- for non-success states, a resumable snapshot: changed files, remaining
-  criterion, current failure, and next safe action.
-- for rework, the rework-log entry or the closeout-only rework cause.
+Treat a task as rework when it repairs previously delivered work or resumes a prior non-green close. If the target repo has `docs/rework-log.md` or its workflow contract names that file, append a compact rework cause line; otherwise include the rework cause in the closeout report. The default round budget is eight unless the user or target repo states a different cap.
 
 ## Generalization Samples
 
 These primitives must fit at least two different domains:
 
-- backend sample: change an API handler, verify with focused tests and a
-  response assertion;
-- frontend sample: change a UI workflow, verify with a browser check and DOM or
-  screenshot evidence.
+- backend sample: change an API handler, verify with focused tests and a response assertion;
+- frontend sample: change a UI workflow, verify with a browser check and DOM or screenshot evidence.
 
-Rules that only fit one project, product, table name, enum, or business term do
-not belong in this shared reference.
+Rules that only fit one project, product, table name, enum, or business term do not belong in this shared reference.

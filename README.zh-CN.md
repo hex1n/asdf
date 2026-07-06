@@ -15,16 +15,16 @@
 
 ```bash
 node bootstrap/install.mjs         # 把循环分发到 ~/.claude 与 ~/.codex
-node ~/bin/agent-doctor.mjs         # 安装后自检
+node ~/bin/taskloop.mjs status      # 安装后检查（读任务状态，或 'no task'）
 ```
 
+- [`taskloop/`](taskloop/) — 循环系统：task-first CLI、PreToolUse/Stop hook
+  （envelope + 判据闸门）、结局账、程序卡。见其 [README](taskloop/README.md)。
 - [`bootstrap/`](bootstrap/) — 机器级安装：工作循环契约卡
   （源在 [`bootstrap/contract/`](bootstrap/contract/)；Claude 侧装为 user rule，
-  Codex 侧合并进 AGENTS.md）、agent-doctor 自检、可选的 `.agent-loop` hook、
-  幂等安装器。其 [README](bootstrap/README.md) 内含**接新需求的工作流程**、
-  分发清单与维护纪律。
-- [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — 日常打法
-  手册（六类工作、循环启动语、判停条件）。
+  Codex 侧合并进 AGENTS.md）、e2e-report-check 适配器种子、幂等安装器
+  （分发 taskloop 并注册其 hook）。其 [README](bootstrap/README.md) 内含
+  **接新需求的工作流程**、分发清单与维护纪律。
 
 ## 技能 —— 循环调用的组件
 
@@ -35,9 +35,9 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 | 技能 | 循环阶段 | 用途 |
 | --- | --- | --- |
 | [`converge`](skills/converge/) | 收敛 | 显式或高风险未收敛决策的只读方案收敛。 |
-| [`land`](skills/land/) | 落地 | 已拍板实现循环：Goal、run contract、Done when、改、验、审、判停。 |
-| [`fixloop`](skills/fixloop/) | 落地/验证 | 面向真实失败和红色检查的复现驱动诊断修复循环。 |
-| [`loop`](skills/loop/) | 驱动器 | 自驱循环驱动器，围绕机器可查判据运行到明确终态。 |
+| [`workloop`](skills/workloop/) | 落地/验证 | 唯一的工作环：判据溯源（given/recovered/absent）→ 开 taskloop 任务 → 改-验-审-修 → 停在明确终态。 |
+| [`judgment-loop`](skills/judgment-loop/) | 落地/验证 | 品味类交付物的评分表环：先注册 rubric 再动笔，fresh-context 评审，人验收。 |
+| [`meta-loop`](skills/meta-loop/) | 元层 | 循环自身的改进环：loop-health 指标、候选收割、每轮一个证据闸改动。 |
 | [`first-principles-planner`](skills/first-principles-planner/) | 收敛 | 重构根本问题，给出当前最佳方案及其失效条件。 |
 | [`deep-research`](skills/deep-research/) | 收敛 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`java-stack-craft`](skills/java-stack-craft/) | 落地 | 识别 JDK/Spring profile、匹配本地约定地编写与审查 Java/Spring 代码，含落地契约循环纪律。 |
@@ -52,9 +52,10 @@ node ~/bin/agent-doctor.mjs         # 安装后自检
 ## 仓库结构
 
 ```
-bootstrap/   # 机器安装：工作循环契约、doctor、hook、安装器
+taskloop/    # 循环系统：task-first CLI + PreToolUse/Stop hook + 结局账
+bootstrap/   # 机器安装：工作循环契约、适配器种子、安装器
 skills/      # 源技能与不可触发支持目录
-docs/        # loop-engineering 手册、设计笔记、计划与调研
+docs/        # 设计笔记、计划与调研
 tests/       # 仓库级契约测试：安装器、契约一致性、技能结构
 AGENTS.md    # 技能编写与维护约定
 CONTEXT.md   # 技能分发的领域术语
@@ -71,8 +72,11 @@ bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能�
 在每次 push 与 pull request 上以 Node + Python 双运行时跑全量测试。
 
 ```bash
-# Node bootstrap 契约测试（安装器、doctor）
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
+# Node taskloop（循环系统）测试 + 适配器种子测试
+node --test taskloop/tests/taskloop.test.mjs tests/e2e_report_check.test.mjs
+
+# Node taskloop（净室 v2）测试
+node --test taskloop/tests/taskloop.test.mjs
 
 # Python 仓库级契约测试（契约一致性、技能结构）
 python -m unittest discover -s tests

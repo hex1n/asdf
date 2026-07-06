@@ -10,7 +10,7 @@ Skills are one component the loop calls; **the loop is the product**.
 ## The loop
 
 The work loop drives a task from intake to delivery — **judge scope → converge
-only when needed → land → verify → log**. Its default is light: small and clear
+only when needed → work → verify → log**. Its default is light: small and clear
 work moves straight to implementation with a checkable criterion. The
 `converge` skill is reserved for explicit requests, unresolved mechanism
 choices, or irreversible high-risk changes. Once you approve a plan, approval
@@ -19,17 +19,18 @@ evidence appears.
 
 ```bash
 node bootstrap/install.mjs         # distribute the loop to ~/.claude and ~/.codex
-node ~/bin/agent-doctor.mjs         # post-install self-check
+node ~/bin/taskloop.mjs status      # post-install check (reads task state, or 'no task')
 ```
 
+- [`taskloop/`](taskloop/) — the loop system: the task-first CLI, PreToolUse/
+  Stop hooks (envelope + criterion gate), outcome ledger, and program cards.
+  See its [README](taskloop/README.md).
 - [`bootstrap/`](bootstrap/) — machine-level install: the work-loop contract
   card (sourced in [`bootstrap/contract/`](bootstrap/contract/); installed as
-  a Claude user rule and a Codex AGENTS.md block), agent-doctor self-check,
-  optional `.agent-loop` hook, and an idempotent installer. Its
-  [README](bootstrap/README.md) documents the **new-requirement workflow**,
-  the distribution manifest, and the maintenance discipline.
-- [`docs/loop-engineering-playbook.md`](docs/loop-engineering-playbook.md) — the
-  day-to-day playbook (six work families, loop starters, stop conditions).
+  a Claude user rule and a Codex AGENTS.md block), the e2e-report-check adapter
+  seed, and an idempotent installer that distributes taskloop and registers its
+  hooks. Its [README](bootstrap/README.md) documents the **new-requirement
+  workflow**, the distribution manifest, and the maintenance discipline.
 
 ## Skills — components the loop calls
 
@@ -41,9 +42,9 @@ distributed into runtimes as a *managed installed skill* — see
 | Skill | Loop stage | Purpose |
 | --- | --- | --- |
 | [`converge`](skills/converge/) | converge | Planning-only convergence for explicit or high-risk unresolved decisions. |
-| [`land`](skills/land/) | land | Approved implementation loop: Goal, run contract, Done when, change, verify, review, stop. |
-| [`fixloop`](skills/fixloop/) | land/verify | Reproduce-driven diagnose-fix loop for live failures and failing checks. |
-| [`loop`](skills/loop/) | driver | Self-driving loop driver that runs until a machine-checkable criterion reaches a terminal state. |
+| [`workloop`](skills/workloop/) | land/verify | The one work loop for machine-verifiable work: source the criterion (given/recovered/absent), open a taskloop task, change–verify–review–fix, stop at a named terminal state. |
+| [`judgment-loop`](skills/judgment-loop/) | land/verify | Rubric-gated production loop for judgment-verified deliverables: pre-registered rubric, fresh-context review, human acceptance. |
+| [`meta-loop`](skills/meta-loop/) | meta | Improvement loop for the loop itself: loop-health metrics, candidate harvest, one evidence-gated change per round. |
 | [`first-principles-planner`](skills/first-principles-planner/) | converge | Reframe the root problem and return the current-best plan with failure conditions. |
 | [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
 | [`java-stack-craft`](skills/java-stack-craft/) | land | Write and review Java/Spring code with profile detection, quality gates, and the landing-contract loop discipline. |
@@ -54,14 +55,16 @@ distributed into runtimes as a *managed installed skill* — see
 | [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | new project | Generate a project-level operating layer (startup route, direction anchor, repo profile, goal loop) so the loop works in a fresh repo. |
 
 `skills/loop-core/` is a shared support directory for the loop skills,
-not an invocable skill.
+not an invocable skill. The loop system these skills drive is **taskloop**
+(`taskloop/`); see its [README](taskloop/README.md).
 
 ## Repository layout
 
 ```
-bootstrap/   # machine install: work-loop contract, doctor, hook, installer
+taskloop/    # the loop system: task-first CLI + PreToolUse/Stop hooks + ledger
+bootstrap/   # machine install: work-loop contract, adapter seed, installer
 skills/      # source skills and non-invocable support directories
-docs/        # loop-engineering playbook, design notes, plans, research
+docs/        # design notes, plans, research
 tests/       # repo-level contract tests for the installer, contracts, and skills
 AGENTS.md    # skill-authoring and maintenance conventions
 CONTEXT.md   # canonical domain terms for skill distribution
@@ -80,8 +83,8 @@ No third-party dependencies are required. CI ([`.github/workflows/tests.yml`](.g
 runs the full suite on every push and pull request with both runtimes provisioned.
 
 ```bash
-# Node bootstrap contract tests (installer, doctor)
-node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
+# Node taskloop tests (the loop system) + adapter-seed test
+node --test taskloop/tests/taskloop.test.mjs tests/e2e_report_check.test.mjs
 
 # Python repo-level contract tests (contract parity, skill structure)
 python -m unittest discover -s tests

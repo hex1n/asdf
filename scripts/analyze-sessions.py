@@ -20,7 +20,7 @@ HOME_FLAT = re.sub(r"[:\\/]", "-", HOME)
 # artifacts so the existing .gitignore entries keep covering them.
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_OUT = os.path.join(REPO, "docs", "research")
-DEFAULT_HISTORY = os.path.join(HOME, ".agent-loop", "history.jsonl")
+DEFAULT_HISTORY = os.path.join(HOME, ".taskloop", "outcomes.jsonl")
 
 # Behavior indicators (loop-health 1-4) are computed over a rolling window so
 # monthly re-runs can actually move: an all-time denominator freezes the trend.
@@ -69,7 +69,7 @@ CORRECTION_PAT = re.compile(
 VERIFY_PAT = re.compile(
     r"(测试|验证|跑一下|跑下|运行一下|执行一下|test|verify|检查一下|确认一下|自测|回归|校验|复测|验一下)", re.I)
 
-# loop-health metric patterns (playbook §4 indicators)
+# loop-health metric patterns (behavior indicators 1-4)
 PULSE_SET = {"继续", "fix", "改", "落地", "改进", "可以", "要", "确认", "同意", "认可",
              "按这个来", "按这个落地", "go", "ok", "1", "2", "3"}
 DRIFT_PAT = re.compile(
@@ -78,7 +78,7 @@ DRIFT_PAT = re.compile(
 HARD_PAT = re.compile(
     r"(报文|SQL|select |断言|预期|期望结果|复现|测试命令|全绿|判据|通过标准|expected|assert|响应结果)", re.I)
 
-NONSUCCESS_STATES = ("blocked", "stalled", "exhausted")
+NONSUCCESS_STATES = ("abandoned",)
 
 
 def load_last_jsonl_row(path):
@@ -121,9 +121,15 @@ def health_delta_line(prev, cur):
 
 
 def loop_history_metrics(history_path):
-    """Outcome metrics from the out-of-tree terminal history that
-    agent-loop.mjs appends (one line per closed loop). Returns None when the
-    history does not exist or holds no parseable rows."""
+    """Outcome metrics from the out-of-tree taskloop outcome ledger
+    (~/.taskloop/outcomes.jsonl, one line per closed task). Returns None when
+    the ledger does not exist or holds no parseable rows.
+
+    v2 records the task as the durable unit: one row per close with the task's
+    terminal state (done / not_needed / abandoned), how many episodes it spanned,
+    and whether its criterion inputs drifted. A task that took more than one
+    episode is resumed work (it crossed a suspend/resume), read straight off the
+    row instead of joined across rows."""
     try:
         fh = io.open(history_path, "r", encoding="utf-8", errors="replace")
     except OSError:
@@ -141,21 +147,25 @@ def loop_history_metrics(history_path):
                 continue
             if not isinstance(e, dict):
                 continue
-            state = str(e.get("terminal_state") or "?")
+            state = str(e.get("state") or "?")
             states[state] += 1
-            rows.append((str(e.get("repo") or "?"), state))
+            try:
+                episodes = int(e.get("episodes") or 1)
+            except (TypeError, ValueError):
+                episodes = 1
+            rows.append((str(e.get("repo") or "?"), state, episodes, bool(e.get("criterion_input_drift"))))
     if not rows:
         return None
-    nonsuccess = [i for i, (_, s) in enumerate(rows) if s in NONSUCCESS_STATES]
-    resumed = sum(
-        1 for i in nonsuccess if any(r == rows[i][0] for r, _ in rows[i + 1:])
-    )
+    nonsuccess = [i for i, (_, s, _e, _d) in enumerate(rows) if s in NONSUCCESS_STATES]
+    resumed = sum(1 for _r, _s, episodes, _d in rows if episodes > 1)
+    drift = sum(1 for _r, _s, _e, d in rows if d)
     return {
         "states": dict(states),
         "total": len(rows),
         "nonsuccess": len(nonsuccess),
         "resumed": resumed,
-        "repos": len({r for r, _ in rows}),
+        "drift": drift,
+        "repos": len({r for r, _s, _e, _d in rows}),
     }
 
 
@@ -414,10 +424,10 @@ def main(argv=None):
     print(out)
 
     # ---------------- loop-health ----------------
-    # Indicators 1-4 are behavior metrics from the session corpora (playbook §4),
+    # Indicators 1-4 are behavior metrics from the session corpora,
     # computed over the rolling window so monthly re-runs show direction;
     # 5-6 are outcome metrics from the out-of-tree terminal history that
-    # agent-loop.mjs appends on every loop close (all-time, coverage annotated).
+    # taskloop appends on every task close (all-time, coverage annotated).
     win_prompts = [p for p in claude_prompts + codex_prompts if date_in_window(p[0], since)]
     pulse = sum(1 for _, _, _, x in win_prompts
                 if x.strip().lower() in PULSE_SET or x.strip().startswith("继续"))
@@ -444,13 +454,15 @@ def main(argv=None):
     hist = loop_history_metrics(history_path)
     if hist:
         dist = " ".join("%s=%d" % (k, v) for k, v in sorted(hist["states"].items()))
-        lh.append("5. terminal_states (loop closes, all-time): %s (total %d across %d opted-in repos)"
+        lh.append("5. terminal_states (task closes, all-time): %s (total %d across %d opted-in repos)"
                   % (dist, hist["total"], hist["repos"]))
-        rate = (100.0 * hist["resumed"] / hist["nonsuccess"]) if hist["nonsuccess"] else 0.0
-        lh.append("6. nonsuccess_resumed (rework resumes, all-time): %d / %d nonsuccess closes (%.0f%%)"
-                  % (hist["resumed"], hist["nonsuccess"], rate))
+        rrate = (100.0 * hist["resumed"] / hist["total"]) if hist["total"] else 0.0
+        drate = (100.0 * hist["drift"] / hist["total"]) if hist["total"] else 0.0
+        lh.append("6. resumed_tasks (spanned >1 episode, all-time): %d / %d tasks (%.0f%%); "
+                  "criterion_input_drift: %d (%.0f%%)"
+                  % (hist["resumed"], hist["total"], rrate, hist["drift"], drate))
     else:
-        lh.append("5. terminal_states: no history yet (%s missing; requires an agent-loop.mjs with terminal history)"
+        lh.append("5. terminal_states: no ledger yet (%s missing; requires taskloop task closes)"
                   % history_path)
 
     # Trend series: loop-health.txt is truncated every run, so append each
@@ -469,6 +481,7 @@ def main(argv=None):
         "states": (hist or {}).get("states"),
         "nonsuccess": (hist or {}).get("nonsuccess"),
         "resumed": (hist or {}).get("resumed"),
+        "drift": (hist or {}).get("drift"),
     }
     health_history = os.path.join(out_dir, "loop-health-history.jsonl")
     delta = health_delta_line(load_last_jsonl_row(health_history), run_row)

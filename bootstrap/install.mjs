@@ -28,10 +28,10 @@ const LEGACY_HOOK_MARKERS = [
   ],
 ];
 const ACTIONS = [];
-const WORKFLOW_SKILLS = ["converge", "fixloop", "land", "loop"];
+const WORKFLOW_SKILLS = ["converge", "workloop"];
 const LOOP_HOOK_RE = /agent-(?:workflow-hook|loop)\.(?:py|mjs)/i;
 // The Stop gate re-runs the done-when criterion, which is budgeted
-// CRITERION_TIMEOUT_SECONDS (300) inside bin/agent-loop.mjs. The runtime's
+// CRITERION_TIMEOUT_SECONDS inside taskloop/bin/taskloop.mjs. The runtime's
 // outer hook timeout must exceed that budget or the runtime kills the gate
 // mid-verdict on any real test suite (Claude Code's default hook timeout is
 // 60s; the Codex TOML previously said 30s). 330 = criterion budget + slack.
@@ -143,7 +143,7 @@ function git(args) {
 // Distribution rides the commit boundary: a commit is the point where a
 // change has passed the evidence loop, so hooks/post-commit re-runs this
 // installer and the drift window collapses to zero. Local repo config only;
-// anything unexpected degrades to a note and the doctor stays the backstop.
+// anything unexpected degrades to a note; install.mjs --dry-run is the drift backstop.
 function registerCommitDistribution(dry) {
   if (!exists(path.join(REPO, "hooks", "post-commit"))) {
     plan("ok", "commit-time distribution skipped (no hooks/post-commit in this source tree)");
@@ -295,7 +295,7 @@ function backupLegacySupportDir(target, dry) {
 }
 
 function workflowHookCommand() {
-  return `node "${path.join(HOME, "bin", "agent-loop.mjs")}"`;
+  return `node "${path.join(HOME, "bin", "taskloop.mjs")}"`;
 }
 
 function pruneWorkflowHookGroups(groups) {
@@ -475,7 +475,7 @@ function managedCodexHookBlock() {
     'type = "command"',
     `command = ${commandToml}`,
     `timeout = ${PRETOOL_HOOK_TIMEOUT_SECONDS}`,
-    'statusMessage = "Checking agent loop run contract"',
+    'statusMessage = "Checking taskloop envelope"',
     '',
     '[[hooks.Stop]]',
     'matcher = ".*"',
@@ -484,7 +484,7 @@ function managedCodexHookBlock() {
     'type = "command"',
     `command = ${commandToml}`,
     `timeout = ${STOP_HOOK_TIMEOUT_SECONDS}`,
-    'statusMessage = "Checking agent loop stop gate"',
+    'statusMessage = "Checking taskloop stop gate"',
     HOOK_END,
     '',
   ].join("\n");
@@ -679,8 +679,7 @@ function main() {
   removeContractBlock(claudeMdPath, dry);
   guardedMergeContract(path.join(REPO, "bootstrap", "contract", "codex.md"), codexAgentsPath, dry);
 
-  copyFile(path.join(REPO, "bootstrap", "bin", "agent-doctor.mjs"), path.join(HOME, "bin", "agent-doctor.mjs"), dry);
-  copyFile(path.join(REPO, "bootstrap", "bin", "agent-loop.mjs"), path.join(HOME, "bin", "agent-loop.mjs"), dry);
+  copyFile(path.join(REPO, "taskloop", "bin", "taskloop.mjs"), path.join(HOME, "bin", "taskloop.mjs"), dry);
   copyFile(path.join(REPO, "bootstrap", "bin", "e2e-report-check.mjs"), path.join(HOME, "bin", "e2e-report-check.mjs"), dry);
   configureClaudeHooks(dry);
   configureCodexHooks(dry);
@@ -716,9 +715,9 @@ function main() {
 
   process.stdout.write(
     "\nmanual checks after install:\n" +
-      "  - PATH contains ~/bin (for agent-doctor.mjs and agent-loop.mjs)\n" +
+      "  - PATH contains ~/bin (for taskloop.mjs)\n" +
       "  - PreToolUse/Stop hooks were written to ~/.claude/settings.json and ~/.codex/config.toml\n" +
-      "  - run: node ~/bin/agent-doctor.mjs  - verifies versions, contract presence, hooks, skill drift, and legacy hook drift\n",
+      "  - run: node ~/bin/taskloop.mjs status  - reads the current task state, or 'no task'\n",
   );
 
   return counts.error ? 1 : 0;

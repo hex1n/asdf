@@ -64,54 +64,59 @@ _Avoid_: local update, manual fix
 
 ## Loop Engineering
 
-Language for the work-loop machinery distributed from `bootstrap/`. Semantics
-and boundaries live in [bootstrap/README.md](bootstrap/README.md) and the
-contract sources under [bootstrap/contract/](bootstrap/contract/).
+Language for the work-loop machinery. The loop system is **taskloop**
+(`taskloop/`); semantics and boundaries live in
+[taskloop/README.md](taskloop/README.md), with the always-loaded default card
+under [bootstrap/contract/](bootstrap/contract/).
 
 ### Language
 
 **Work Loop**:
-The product of this repository: the judge-scope → converge-when-needed → land → verify → stop cycle, distributed into user-level runtime files by `bootstrap/install.mjs`.
+The product of this repository: the judge-scope → converge-when-needed → work → verify → stop cycle, distributed into user-level runtime files by `bootstrap/install.mjs`.
 _Avoid_: workflow automation, skill collection
 
-**Run Contract**:
-The prose-level agreement for one loop run — target repo/working directory, the files/tables/interfaces to touch, and the completion criterion — restated before landing.
-_Avoid_: scope list, runtime contract (that is its machine form)
+**Task**:
+The durable unit of one loop run: goal, red-at-birth criterion, alignment line, envelope, task-level budgets, and evidence. Episodes (single continuous runs) come and go underneath it; budgets live on the task and are never refilled by resuming.
+_Avoid_: run (that is an episode), session
 
-**Runtime Contract**:
-The machine-readable landing of a Run Contract: `.agent-loop/run-contract.json` v2, created with `agent-loop.mjs init`. Gitignored agent-private state; never a project policy source.
-_Avoid_: run contract (the prose concept), loop state file
+**Envelope**:
+The files/tables/interfaces/git surface a task may touch, declared at `open`. The PreToolUse hook denies writes outside it; reads are never blocked. Stop before expanding it.
+_Avoid_: scope list, run contract (the v1 name)
+
+**Task State**:
+The machine-readable state of a task: `.taskloop/task.json`, created with `taskloop open`. Gitignored agent-private state; never a project policy source.
+_Avoid_: run-contract.json (the v1 file), loop state file
 
 **Criterion Gate (判据闸门)**:
-The Stop-hook machine adjudication that runs the contract's `criterion` and admits `terminal_state=success` only when it passes. A collaborative backstop against unintended early stops, not an adversarial defense.
+The Stop-hook machine adjudication that runs the task's `criterion` and closes `done` only on a fresh green run. A collaborative backstop against unintended early stops, not an adversarial defense. There is no claim-based success.
 _Avoid_: test gate, tamper-proof gate
 
 **Terminal State**:
-The explicit closure of a loop run: `success` and `noop` are normal closures; `blocked`, `stalled`, and `exhausted` are non-success and require a resumable snapshot.
-_Avoid_: done, finished
+The closure of a task: `done` (criterion green) is the only machine-written success; `not_needed` and `abandoned` are human-declared closures. Suspend is not a closure — its outcomes `needs_input`/`stuck`/`out_of_budget` keep the task open for the next episode.
+_Avoid_: success, finished
 
 **Driver (驱动器)**:
-The component that re-prompts the loop so a human is not the per-turn clock (`/goal` criterion re-check, or `ralph-loop` fresh-context re-feed). Driver + criterion gate + criterion together close the loop.
+The component that re-prompts the loop across turns so a human is not the per-turn clock (`/goal` criterion re-check, or `ralph-loop` fresh-context re-feed). Driver + criterion gate + criterion together close the loop; the taskloop stop gate already blocks a premature stop within a turn.
 _Avoid_: scheduler, cron job
 
 **Concurrency Mode**:
-How sessions share a working directory: `exclusive` (default single-writer binding), **worktree fan-out** (recommended: one worktree per writer, one integrator), or `partitioned` (explicit non-overlapping claims in one worktree).
+How parallel writers share work: worktree fan-out (one worktree per writer, each with its own `.taskloop/` task, one integrator). There is no shared-worktree partitioned mode.
 _Avoid_: multi-session (ambiguous)
 
 **Integrator Session**:
-In `partitioned` mode, the single session allowed to run git operations and merge writer claims after all claims reach a terminal state.
+The single session allowed to run git operations and merge across worktrees after each writer's task reaches a terminal state.
 _Avoid_: main session
 
-**Event Log**:
-`.agent-loop/loop-events.jsonl` — hook-observed scope/process evidence. It never proves business correctness and is not tamper-resistant.
+**Outcome Ledger**:
+`~/.taskloop/outcomes.jsonl` — one out-of-tree, append-only row per task close (state, episodes, criterion_input_drift). The runtime only writes it; it feeds the meta loop and is not tamper-resistant.
 _Avoid_: audit log
 
-**Abandoned Run Contract**:
-An active runtime contract whose owner session is gone. It never traps Stop, but write operations still require `close`, `steal`, or a separate worktree.
-_Avoid_: stale lock
+**Episode**:
+One continuous run of a task under a single session. A task suspends and resumes across episodes; the machine records the changed-files half of the snapshot from its own observations, the human supplies the three judgment lines.
+_Avoid_: session (a session may span or drop episodes)
 
 ### Flagged ambiguities
 
-- "Run Contract" vs "Runtime Contract": the prose agreement and its machine landing were both called "run contract". Resolved: **Run Contract** is the prose-level agreement; **Runtime Contract** is `.agent-loop/run-contract.json` v2. The file name `run-contract.json` is historical and unchanged.
+- "Task" vs "Episode": the durable unit vs one continuous run. Resolved: budgets and identity belong to the **Task**; an **Episode** is a run underneath it, and resuming never refills the task budget.
 - "gate" can mean the criterion gate, an approval gate, or a review gate. Resolved: **Criterion Gate** is only the Stop-hook criterion adjudication; approval and review gates are named separately.
-- The event log is not an audit log. Resolved: it proves collaborative scope/process only; business correctness needs tests, SQL, API responses, or diffs.
+- The outcome ledger is not an audit log. Resolved: it records collaborative outcome/process only; business correctness needs tests, SQL, API responses, or diffs.

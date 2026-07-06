@@ -1,7 +1,7 @@
 name: tests
 
 # Enforce the repo's anti-drift contract tests on every change. The bootstrap
-# installer/doctor and agent loop hook are Node; remaining skill/contract suites
+# the taskloop loop system and adapter seed are Node; remaining skill/contract suites
 # use Python stdlib unittest, so CI provisions both runtimes.
 on:
   push:
@@ -37,8 +37,11 @@ jobs:
           python --version
           node --version
 
-      - name: Node bootstrap contract tests
-        run: node --test tests/bootstrap_install.test.mjs tests/agent_doctor.test.mjs tests/agent_loop.test.mjs tests/e2e_report_check.test.mjs
+      - name: Node adapter-seed test
+        run: node --test tests/e2e_report_check.test.mjs
+
+      - name: Node taskloop tests (the loop system)
+        run: node --test taskloop/tests/taskloop.test.mjs
 
       - name: Python repo-level contract tests
         run: python -m unittest discover -s tests

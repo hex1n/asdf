@@ -7,19 +7,29 @@ demand; `SKILL.md` stays task-facing.
 
 ## The Answer Ladder
 
-Every fact in the docs layer sits on a rung; repair pushes facts down.
+Every fact in the docs layer sits on a rung (labels: `executable` /
+`anchored` / `bare`); repair pushes facts down.
 
 1. **executable** — the answer lives in something the project's own
    automation runs: a CI job, a task-runner target (make/just/npm script), a
    manifest, a lint/format config. Continuously re-verified; cannot silently
    rot while automation stays green.
-2. **anchored prose** — a doc line that points at an executable home ("tests:
-   see the `test` target; it covers X, not Y"). The pointer can dangle, but
-   the fact itself stays machine-owned.
-3. **bare prose** — a claim with no executable backing. Legitimate only for
-   what has no executable form (tribal context, direction, judgment-shaped
+2. **anchored** (prose pointer) — a doc line that points at an executable
+   home ("tests: see the `test` target; it covers X, not Y"). The pointer is
+   cheap to check and the audit must check it: a dangling pointer (target
+   renamed or gone) is a `stale` verdict, never a tolerated state — the fact
+   stays machine-owned only while the pointer resolves.
+3. **bare** (prose claim) — no executable backing. Legitimate only for what
+   has no executable form (tribal context, direction, judgment-shaped
    conventions); it decays from the moment it is written, so it needs a
    freshness steady state (below) or an accepted-decay note.
+
+**Evidence follows the rung.** One authority per rung, so two auditors reach
+the same verdict: an `executable` answer is `verified` by the project
+automation's own latest green (cite the run/status) or by an in-session
+execution — either blesses it; an `anchored` answer requires the pointer
+resolved this session; a `bare` answer requires the claim itself checked
+this session (execution for commands, inspection for context claims).
 
 A repair that deletes prose by giving the fact an executable home is the
 best possible edit this skill makes.
@@ -111,11 +121,23 @@ closeout report:
 The learning loop that feeds audits between invocations: when any session
 pays a **re-derivation cost** the docs should have covered — rediscovering
 the test command, re-deriving a convention, tripping a danger nobody wrote
-down — that cost is evidence, and it enters the next audit as an
-`undocumented` verdict with the session as its citation. This is the same
-birth certificate the Rule Harvest Gate accepts (repeated re-derivation,
-observed failure, explicit user invariant) — never speculation: a fact no
-session has needed does not get written because it "might help".
+down — that cost is evidence for the next audit's `undocumented` verdicts.
+This is the same birth certificate the Rule Harvest Gate accepts (repeated
+re-derivation, observed failure, explicit user invariant) — never
+speculation: a fact no session has needed does not get written because it
+"might help".
+
+The handoff needs a **durable sink**, because the excluded homes
+(`.taskloop/`, ledgers, transcripts) are unreadable to a later audit and
+there is **no ambient collector** — a cost nobody wrote down is not
+recoverable. The sink is a short docs-gaps list in the target repo itself: a
+"Docs gaps" section of the canonical startup file (or a small dedicated file
+once one exists), created the first time there is something to record, never
+speculatively. One line per entry: what was re-derived, where the answer was
+found. During repair, seed the one-line invitation ("re-derived something
+docs should have covered? add a line here") into that section so every
+future session knows where to record. The audit consumes the list — each
+entry becomes an `undocumented` verdict — and clears entries it resolves.
 
 ## Exclusion List (never enters target-project docs)
 
@@ -134,8 +156,11 @@ session has needed does not get written because it "might help".
   sections for content nobody has needed yet. The Rule Harvest Gate applies
   to doc lines exactly as to skill rules: a line earns its place via an
   observed failure, a repeated re-derivation, or an explicit user invariant.
-- **Unverified commands** — anything not executed green this session, unless
-  explicitly marked "not machine-verified — confirmed by <how>".
+- **Unverified commands** — any prose-written command whose rung's evidence
+  (see *Evidence follows the rung*) was not produced this session, unless
+  explicitly marked "not machine-verified — confirmed by <how>". An
+  `executable`-rung answer blessed by the project automation's own cited
+  green is verified, not excluded.
 
 ## Canonicalization
 
@@ -159,7 +184,10 @@ One row per question:
 
 | Question | Verdict | Rung | Evidence | Defect (if any) |
 |---|---|---|---|---|
-| Start | verified / stale / undocumented / absent | executable / anchored / prose | command + exit/output head, or path check | what is wrong, one line |
+| Start | verified / stale / undocumented / absent | executable / anchored / bare | command + exit/output head, cited automation run, or path check | what is wrong, one line |
 
-Evidence is real tool output — command output, a path listing, a quoted
-contradiction. Prose impressions do not fill this column.
+Evidence is real tool output — command output, a cited automation run, a
+path listing, a quoted contradiction. Prose impressions do not fill this
+column. An `absent` row carries `—` as its Rung, and its Evidence is the
+search that came up empty (where you looked) — no cell is ever invented to
+satisfy the format.

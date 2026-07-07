@@ -34,9 +34,10 @@ second: CI configs, task-runner files, manifests, lint/format configs, then
 the startup files the resident agent runtimes actually load (e.g. AGENTS.md,
 CLAUDE.md), README, any context/direction anchor, any contributing/safety
 doc. Note which files duplicate each other and which are pointers. Read only
-— no edits yet. If the driving session just paid a re-derivation cost the
-docs should have covered, record it: it is audit evidence (see Harvest in
-`REFERENCE.md`).
+— no edits yet. Check the docs-gaps list (the Harvest sink in
+`REFERENCE.md`); a re-derivation cost the driving session itself just paid
+is audit evidence too — carry both into step 2, and write the new entry to
+the gaps list at repair time (or before stopping, on an audit-only run).
 
 Completion criterion: a list of existing answer homes (executable and prose),
 each tagged with the question(s) it serves and its ladder rung, plus "no docs
@@ -46,15 +47,17 @@ layer" if empty.
 
 For each of Start / Verify / Conventions / Direction / Danger (definitions
 and per-question verification methods in `REFERENCE.md`): locate the answer,
-name its ladder rung (executable / anchored prose / bare prose), then verify
+name its ladder rung (executable / anchored / bare), then verify
 it against the world — execute the documented build/test/check commands
 read-only; confirm referenced paths exist; confirm claims match the repo's
 visible state. Classify each question:
 
-- **verified** — answered, and the evidence is green this session;
+- **verified** — answered, with the evidence its rung demands (executable:
+  the automation's own cited green or an in-session run; anchored/bare:
+  checked this session — see *Evidence follows the rung* in `REFERENCE.md`);
 - **stale** — answered, but execution or inspection contradicts it;
-- **undocumented** — a working answer exists in the repo (or was re-derived
-  by a session) but no home states it;
+- **undocumented** — a working answer exists in the repo (or sits in the
+  docs-gaps list a prior session recorded — see Harvest) but no home states it;
 - **absent** — no answer exists and there is nothing yet to document.
 
 Completion criterion: a five-row verdict table, each row carrying its
@@ -84,9 +87,11 @@ Apply the edits under these rules, all binding:
   work" claim becomes a check the project's automation runs (see Freshness in
   `REFERENCE.md`). Prose that merely restates an executable home becomes a
   pointer to it.
-- **Verified facts only** — every command written into a doc was executed
-  green in this session; a fact that cannot be verified is not written, or is
-  written with an explicit "not machine-verified — confirmed by <how>" marker.
+- **Verified facts only** — every prose-written command was executed green
+  in this session (an executable-rung answer may instead cite the project
+  automation's own green); a fact that cannot be verified is not written, or
+  is written with an explicit "not machine-verified — confirmed by <how>"
+  marker.
 - **One canonical home per fact** — when multiple runtimes each load their own
   startup file, pick one canonical file and make the others thin pointers or
   byte-identical stubs; never fork the same fact into divergent copies.

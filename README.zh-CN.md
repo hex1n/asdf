@@ -45,7 +45,7 @@ node ~/bin/taskloop.mjs status      # 安装后检查（读任务状态，或 'n
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
-| [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | 新项目 | 生成项目级操作层（启动路由、方向锚点、repo profile、goal loop），让循环在全新 repo 生效。 |
+| [`project-docs-layer`](skills/project-docs-layer/) | 项目文档 | 用五问（Start/Verify/Conventions/Direction/Danger）审计并最小修复项目文档层,答案尽量下推到可执行之家；只写验证过的事实，循环纪律留在机器里。 |
 
 `skills/loop-core/` 是 loop skills 的共享支持目录，不是可触发技能。
 

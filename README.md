@@ -52,7 +52,7 @@ distributed into runtimes as a *managed installed skill* — see
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
-| [`bootstrap-agent-os`](skills/bootstrap-agent-os/) | new project | Generate a project-level operating layer (startup route, direction anchor, repo profile, goal loop) so the loop works in a fresh repo. |
+| [`project-docs-layer`](skills/project-docs-layer/) | project docs | Audit or minimally repair a repo's operating docs via the five questions (Start/Verify/Conventions/Direction/Danger), pushing answers toward executable homes; verified facts only, work discipline stays in the machine. |
 
 `skills/loop-core/` is a shared support directory for the loop skills,
 not an invocable skill. The loop system these skills drive is **taskloop**

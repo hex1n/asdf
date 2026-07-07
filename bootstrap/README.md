@@ -2,9 +2,9 @@
 
 装的核心是**个人 agent 工作循环**（判据 → 收敛 → 落地 → 排查 → 判停），在任意项目
 零配置生效。循环系统是 **taskloop**（`../taskloop/`）；本目录分发它、契约卡与配套
-skills，并注册 hook。项目级操作层不在此分发，需要时用 bootstrap-agent-os skill 按
-项目生成（项目级边界条目的源模板随该 skill 分发，任意机器装完即可用；先盘点目标
-项目已有规则，只加缺失条目）。
+skills，并注册 hook。项目文档层不在此分发，需要时用 project-docs-layer skill 按
+项目审计/修复（五问审计：Start/Verify/Conventions/Direction/Danger,答案尽量下推到可执行之家；
+只写验证过的事实，循环纪律不进项目文档——机器与契约卡已承载）。
 
 在任意新电脑上装齐：
 
@@ -30,7 +30,7 @@ node ~/bin/taskloop.mjs status         # 安装后检查（读任务状态，或
 
 **第 0 步 · 判两件事（10 秒）**
 
-- 哪个仓库？老仓库直接走；全新仓库先用 `bootstrap-agent-os` 生成项目操作层，不手写。
+- 哪个仓库？老仓库直接走；全新仓库先用 `project-docs-layer` 审计并补最小文档层，不手写。
 - 需求多大？决定是否升档：
   - 微小改动（单文件、无数据/接口影响）→ 跳过收敛，一句"现状 → 期望"当判据，直接做或用 `workloop` skill。
   - 碰权限/资金/数据一致性/接口契约/洗数回填 → 升档；落地前至少补齐迁移、回滚、兼容与可复现判据。
@@ -67,7 +67,7 @@ node ~/bin/taskloop.mjs status         # 安装后检查（读任务状态，或
 **贴手卡片**
 
 ```
-新需求 → 哪个仓库？(新仓先 bootstrap-agent-os)
+新需求 → 哪个仓库？(新仓先 project-docs-layer)
        → 多大？ 微小=直接做 · 高风险=converge skill 或补迁移回滚判据 · 其余=默认轻
 1. converge skill  显式/高风险才用 → 只读证伪 → 编号选项 →〔你拍板〕
 2. workloop skill  拍板后执行 → taskloop open（判据溯源+envelope+判据）→ 改验审修循环 → 判据绿收 done
@@ -147,6 +147,7 @@ node ~/bin/taskloop.mjs status         # 安装后检查（读任务状态，或
   `goal/criterion/alignment/envelope/budget/spent/evidence/episodes/state`；
   出树结局账 `~/.taskloop/outcomes.jsonl` 每任务收口一行，供元循环，不替代
   测试、SQL、API 响应、diff 等业务验证证据。
-- 项目级条目不由本安装器分发：用 bootstrap-agent-os 的边界条目模板按项目生成，
-  先盘点已有规则、只加缺失，由各仓库自己的 git 管理。用户级契约不放工具映射
-  （MCP-vs-CLI 这类属于项目层）。
+- 项目级条目不由本安装器分发：用 project-docs-layer 按四问审计生成，只修有名有姓
+  的缺陷（stale/undocumented/用户不变量），循环纪律一律不抄进项目文档（机器与
+  契约卡已承载，第三份散文副本必漂移），由各仓库自己的 git 管理。用户级契约不放
+  工具映射（MCP-vs-CLI 这类属于项目层）。

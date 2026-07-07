@@ -5,8 +5,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .codex/
-.agent-loop/
-.agent-workflows/
 .taskloop/
 .tmp/
 tmp/

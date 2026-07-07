@@ -46,7 +46,7 @@ distributed into runtimes as a *managed installed skill* — see
 | [`judgment-loop`](skills/judgment-loop/) | land/verify | Rubric-gated production loop for judgment-verified deliverables: pre-registered rubric, fresh-context review, human acceptance. |
 | [`meta-loop`](skills/meta-loop/) | meta | Improvement loop for the loop itself: loop-health metrics, candidate harvest, one evidence-gated change per round. |
 | [`first-principles-planner`](skills/first-principles-planner/) | converge | Reframe the root problem and return the current-best plan with failure conditions. |
-| [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, what decision follows. |
+| [`deep-research`](skills/deep-research/) | converge | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`java-stack-craft`](skills/java-stack-craft/) | land | Write and review Java/Spring code with profile detection, quality gates, and the landing-contract loop discipline. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |

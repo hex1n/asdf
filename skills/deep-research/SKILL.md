@@ -1,7 +1,7 @@
 ---
 name: deep-research
 description: >
-  Conducts evidence-backed technical investigations to determine what is true, why behavior occurs, or what decision follows. Use for technical research, causal analysis, system tracing, comparison, or evaluation when the user asks to "调研", "分析", "深度分析", "追踪", "梳理", "为什么", "对比", "比较", "评估", "research", "investigate", "figure out why", "trace", "compare", or "evaluate"; use workloop (recovered-criterion sourcing) for active bug reproduction/fixes, including "排查", "定位", or "根因" requests that require reproducing, debugging, or fixing a live failure; use first-principles-planner when the deliverable is a plan or an adopt/replace/upgrade decision rather than evidence findings.
+  Conducts evidence-backed technical investigations to determine what is true, why behavior occurs, or which option the evidence supports. Use for technical research, causal analysis, system tracing, comparison, or evaluation when the user asks to "调研", "分析", "梳理", "追踪", "为什么", "对比", "评估", "research", "investigate", "figure out why", "trace", "compare", or "evaluate"; the deliverable is evidence-backed findings, not a fix or a plan.
 ---
 
 # Deep Research
@@ -41,7 +41,7 @@ Upgrade when contradictions, irreversible impact, or fragile external/current-st
 ## 2. Investigate
 For Standard/Deep:
 1. Check relevant prior work: research notes, design docs, docs index, project profiles, plans, or saved artifacts. If a named source does not exist, skip it and note the fallback.
-2. Choose the scenario from [REFERENCE.md](REFERENCE.md#research-scenario-gate): Codebase Investigation, External Investigation, or Mixed Investigation. Use it to set authority, orientation, and closure before gathering evidence. For Mixed Investigation, run the [REFERENCE.md](REFERENCE.md#mixed-applicability-check) before applying external claims to local behavior. For External or Mixed + Deep on exploratory or strategic questions, consider a perspective scan after the source inventory ([REFERENCE.md](REFERENCE.md#perspective-scan)).
+2. Choose the scenario from [REFERENCE.md](REFERENCE.md#research-scenario-gate): Codebase Investigation, External Investigation, or Mixed Investigation. Use it to set authority, orientation, and closure before gathering evidence. For Mixed Investigation, run the [REFERENCE.md](REFERENCE.md#mixed-applicability-check) before applying external claims to local behavior. For Deep External or Mixed investigations with parallelizable reading, use a background evidence lane ([REFERENCE.md](REFERENCE.md#background-evidence-lane)); for exploratory or strategic questions, consider a perspective scan after the source inventory ([REFERENCE.md](REFERENCE.md#perspective-scan)).
 3. For codebase research, read the smallest relevant local authority set: nearest operating instructions, workspace/project rules, README/docs index, project profile, and named domain docs. Before concluding no formal local source exists, run a targeted local search with the question's domain terms and inspect sources surfaced by indexes, links, naming, or nearby aggregation.
 4. Build a source inventory, then orient before deep evidence gathering: choose the smallest orientation form that clarifies the decision boundary — a diagram, a table, or one structural sentence ([REFERENCE.md](REFERENCE.md#orientation-diagrams)) — and share it early as the scaffold. Ground every element in what you have read; mark unverified elements with `?` and keep remaining `?` marks in the final answer.
 5. State the key unknown and what would change the conclusion — one line is enough for a contained Standard question; write a 3-5 line plan including where evidence will come from only for Deep or when the investigation spans lanes or keeps expanding.
@@ -52,7 +52,7 @@ For Standard/Deep:
 
 Stop early when the premise is wrong, the answer is clear, or two consecutive steps no longer change the conclusion. Before each new read or search, ask whether it could change a conclusion; if it would only confirm what you already have, stop. For Quick depth, skip the diagram unless one line of structure clarifies the answer.
 
-Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to a handoff — name the target and hand off. An adopt/replace/upgrade decision belongs to first-principles-planner: deliver the evidence findings and route the decision there rather than owning it.
+Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to a handoff — name the target and hand off. An adopt/replace/upgrade decision belongs to a first-principles planning workflow: deliver the evidence findings and route the decision there rather than owning it.
 
 Use [REFERENCE.md](REFERENCE.md) for diagram examples, a compressed worked example, current-state research, session-history analysis, broad-task staging, output patterns, saved artifact headers, and research-to-work handoff.
 

@@ -1,0 +1,7 @@
+{
+  "name": "asdf-skills",
+  "description": "Portable agent skills under eval: deep-research, e2e-test-planner/executor, first-principles-planner, java-stack-craft, and workflow skills",
+  "version": "0.0.0-eval",
+  "license": "UNLICENSED",
+  "keywords": ["skills", "evals"]
+}

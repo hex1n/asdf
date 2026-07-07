@@ -92,7 +92,7 @@ Because the author is the grader, every magnitude, confidence, and trigger judgm
 - The edit changes eval cases, graders, acceptance assertions, eval fixtures, or test logic used in the evidence path for a skill acceptance decision.
 - The accept decision rests on a single sample.
 
-In the pass, work in a fresh context and try to show the edit is not better or introduces a regression; accept only when that attempt fails. If the runtime cannot supply an independent context, record that in the round notes and mark the accept as provisional until a second reviewer or a later session runs the pass — never treat the author's own re-read as the independent check.
+In the pass, work in a fresh context and try to show the edit is not better or introduces a regression; accept only when that attempt fails. Prefer an independent runtime for the pass when one is available — e.g. the local Codex CLI — over a fresh context of the same model; a different model is a stronger falsifier for same-model blind spots. If the runtime cannot supply an independent context, record that in the round notes and mark the accept as provisional until a second reviewer or a later session runs the pass — never treat the author's own re-read as the independent check.
 
 ### Evolving toward a better skill, not just a safe change
 

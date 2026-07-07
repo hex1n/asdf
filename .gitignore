@@ -10,6 +10,9 @@ __pycache__/
 tmp/
 # Local eval run artifacts can carry real-project identifiers; keep them out of the repo.
 evals/
+# Instance-specific leak markers (internal codenames, hosts, stack names) used by
+# anonymization contract tests; the real markers must never be committed.
+tests/.instance_leak_markers.local
 # analyze-sessions.py outputs contain personal prompt corpora; only loop-health.txt aggregates are safe
 docs/research/corpus_*.txt
 docs/research/first_prompts*.txt

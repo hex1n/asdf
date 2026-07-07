@@ -81,12 +81,9 @@ node ~/bin/taskloop.mjs status         # 安装后检查（读任务状态，或
 ## 装完手动核对一次
 
 - `~/bin` 在 PATH 里，`node ~/bin/taskloop.mjs status` 可跑
-- `~/.claude/skills/` 与 `~/.codex/skills/` 中有 `converge`、`workloop` loop skills；旧
-  `land`/`fixloop`/`loop` 受管 wrapper、旧 `.claude/commands/<name>.md` 与
-  `.agents/skills/<name>/SKILL.md` 受管 wrapper 会由安装器清理
+- `~/.claude/skills/` 与 `~/.codex/skills/` 中有 `converge`、`workloop` loop skills
 - `~/.claude/settings.json` 与 `~/.codex/config.toml` 中的 PreToolUse/Stop hooks 已由
-  安装器写入，调用 `node ~/bin/taskloop.mjs`；旧 `~/.codex/hooks.json` 及历史 agent-loop
-  hook 会被移除
+  安装器写入，调用 `node ~/bin/taskloop.mjs`
 - `node ~/bin/taskloop.mjs status --repo <repo>` 只读查看当前 task.json；
   `node ~/bin/taskloop.mjs hooks` 打印手动接线（安装器已自动接）；
   `close/abandon/not-needed/suspend` 结束或挂起当前任务（终态必填；`done` 现场复跑判据，红则拒绝；suspend 需 `--judgment` 三行）

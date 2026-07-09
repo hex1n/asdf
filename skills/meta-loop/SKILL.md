@@ -82,3 +82,15 @@ re-deriving them.
 
 Completion criterion: nothing is half-landed; every candidate is either
 landed with passing checks or filed with its missing evidence named.
+
+## Evidence Pointer Hygiene
+
+Any evidence pointer that lands in a reading, candidate, or report — a commit
+hash, a file path, a ledger row id — is resolved once, live, at write time
+(`git cat-file -t <hash>`, read the file, grep the ledger). If it no longer
+resolves, repoint it to what is resolvable at write time or mark it explicitly;
+never ship a pointer copied from a session transcript without re-resolving it.
+History can be rewritten before a report ships, so an unverified hash is the
+most common stale pointer — and a report that flags others' bookkeeping must not
+inherit the same fault. (Observed: a taskloop review cited two commit hashes
+that no longer resolved and trusted ledger counters it never spot-checked.)

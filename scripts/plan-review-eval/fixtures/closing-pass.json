@@ -1,0 +1,133 @@
+{
+  "current_revision": "sha256:fixed",
+  "required_rubric_dimensions": ["coherence", "feasibility", "compatibility", "migration/rollback", "verification", "scope"],
+  "required_reviewers": ["reviewer-a"],
+  "final_reviewer_verdicts": [{
+    "reviewer": "reviewer-a",
+    "revision": "sha256:fixed",
+    "review_kind": "complete",
+    "verdict": "GO",
+    "invocation_id": "invocation-close"
+  }],
+  "findings": [
+    {
+      "id": "B-001",
+      "severity": "blocker",
+      "claim": "A required failure contract is contradictory.",
+      "evidence": "The frozen sources prescribe incompatible outcomes.",
+      "affected_section": "Failure handling",
+      "source_invocation_id": "invocation-sweep",
+      "revision": "sha256:original",
+      "owner": "parent",
+      "validation": "confirmed",
+      "parent_evidence_and_reason": "The contradiction is present in the original revision.",
+      "parent_validation_disclosed": true,
+      "disposition": "fix",
+      "closed": true
+    },
+    {
+      "id": "O-001",
+      "severity": "optional",
+      "claim": "A term could be clarified.",
+      "evidence": "The fixed revision uses the term without a definition.",
+      "affected_section": "Terminology",
+      "source_invocation_id": "invocation-close",
+      "revision": "sha256:fixed",
+      "owner": "parent",
+      "validation": "confirmed",
+      "parent_evidence_and_reason": "The ambiguity is non-blocking.",
+      "parent_validation_disclosed": true,
+      "disposition": "accept-risk",
+      "closed": true
+    }
+  ],
+  "round_receipts": [
+    {
+      "round_id": "R1",
+      "invocation_id": "invocation-sweep",
+      "revision_hash": "sha256:original",
+      "review_kind": "blocker-sweep",
+      "verdict": "NO-GO",
+      "runtime": "fixture-runtime",
+      "provider": "fixture-provider",
+      "model": "fixture-model",
+      "reviewer": "reviewer-a",
+      "effort": "fixture",
+      "reviewer_session_id_or_opaque_handle": "session-sweep",
+      "independence_level": "fresh-context",
+      "model_calls": 1,
+      "input_characters": 100,
+      "output_characters": 50,
+      "wall_clock_ms": 1000,
+      "physical_sessions": 1,
+      "retries": 0,
+      "measurement_source": "fixture",
+      "measurement_precision": "exact"
+    },
+    {
+      "round_id": "R2",
+      "invocation_id": "invocation-close",
+      "revision_hash": "sha256:fixed",
+      "review_kind": "complete",
+      "verdict": "GO",
+      "runtime": "fixture-runtime",
+      "provider": "fixture-provider",
+      "model": "fixture-model",
+      "reviewer": "reviewer-a",
+      "effort": "fixture",
+      "reviewer_session_id_or_opaque_handle": "session-close",
+      "independence_level": "fresh-context",
+      "model_calls": 1,
+      "input_characters": 100,
+      "output_characters": 50,
+      "wall_clock_ms": 1000,
+      "physical_sessions": 1,
+      "retries": 0,
+      "measurement_source": "fixture",
+      "measurement_precision": "exact"
+    }
+  ],
+  "round_reports": [
+    {
+      "invocation_id": "invocation-sweep",
+      "revision_hash": "sha256:original",
+      "review_kind": "blocker-sweep",
+      "verdict": "NO-GO",
+      "reviewer_output_disclosed": true,
+      "finding_ids": ["B-001"],
+      "finding_payloads": [{
+        "id": "B-001",
+        "severity": "blocker",
+        "claim": "A required failure contract is contradictory.",
+        "evidence": "The frozen sources prescribe incompatible outcomes.",
+        "affected_section": "Failure handling"
+      }],
+      "coverage": {
+        "rubric_dimensions": ["coherence", "feasibility", "compatibility", "migration/rollback", "verification", "scope"],
+        "severities": ["blocker", "verification_gap"]
+      }
+    },
+    {
+      "invocation_id": "invocation-close",
+      "revision_hash": "sha256:fixed",
+      "review_kind": "complete",
+      "verdict": "GO",
+      "reviewer_output_disclosed": true,
+      "finding_ids": ["O-001"],
+      "finding_payloads": [{
+        "id": "O-001",
+        "severity": "optional",
+        "claim": "A term could be clarified.",
+        "evidence": "The fixed revision uses the term without a definition.",
+        "affected_section": "Terminology"
+      }],
+      "coverage": {
+        "rubric_dimensions": ["coherence", "feasibility", "compatibility", "migration/rollback", "verification", "scope"],
+        "severities": ["blocker", "should_fix", "optional", "verification_gap"]
+      }
+    }
+  ],
+  "attempted_invocations": ["invocation-sweep", "invocation-close"],
+  "active_reviewer_invocations": [],
+  "material_change_after_go": false
+}

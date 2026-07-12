@@ -6,8 +6,8 @@ import { pathToFileURL } from "node:url";
 const VALID_SEVERITIES = new Set(["blocker", "should_fix", "optional", "verification_gap"]);
 const VALID_VALIDATIONS = new Set(["confirmed", "challenged", "needs_evidence"]);
 const VALID_DISPOSITIONS = new Set(["fix", "rebut", "accept-risk", "defer-gap", "needs-input"]);
-const VALID_PRECISIONS = new Set(["exact", "derived", "unavailable"]);
-const VALID_REVIEW_KINDS = new Set(["complete", "focused", "rebuttal-check"]);
+const VALID_PRECISIONS = new Set(["exact", "derived"]);
+const VALID_REVIEW_KINDS = new Set(["blocker-sweep", "complete", "focused", "rebuttal-check"]);
 const VALID_RECEIPT_VERDICTS = new Set([
   "GO",
   "CONDITIONAL-GO",
@@ -17,14 +17,7 @@ const VALID_RECEIPT_VERDICTS = new Set([
   "CANCELLED",
   "DISCARDED",
 ]);
-const TOKEN_FIELDS = [
-  "uncached_input_tokens",
-  "cache_read_input_tokens",
-  "cache_write_or_creation_tokens",
-  "output_tokens",
-  "reasoning_tokens",
-  "helper_agent_tokens",
-];
+const COST_FIELDS = ["model_calls", "input_characters", "output_characters", "wall_clock_ms", "physical_sessions", "retries"];
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -43,6 +36,15 @@ export function evaluateGateState(state) {
 
   const revision = state.current_revision;
   if (!nonEmptyString(revision)) failures.push("current revision is missing");
+  if (!Array.isArray(state.required_rubric_dimensions) || state.required_rubric_dimensions.length === 0 ||
+      state.required_rubric_dimensions.some((item) => !nonEmptyString(item))) {
+    failures.push("required_rubric_dimensions must be a non-empty string array");
+  }
+  if (Array.isArray(state.required_rubric_dimensions) &&
+      new Set(state.required_rubric_dimensions).size !== state.required_rubric_dimensions.length) {
+    failures.push("required_rubric_dimensions must not contain duplicates");
+  }
+  const requiredRubric = Array.isArray(state.required_rubric_dimensions) ? [...state.required_rubric_dimensions].sort() : [];
 
   if (!Array.isArray(state.required_reviewers)) failures.push("required_reviewers must be an array");
   const required = Array.isArray(state.required_reviewers) ? state.required_reviewers : [];
@@ -54,6 +56,11 @@ export function evaluateGateState(state) {
 
   if (!Array.isArray(state.final_reviewer_verdicts)) failures.push("final_reviewer_verdicts must be an array");
   const verdicts = Array.isArray(state.final_reviewer_verdicts) ? state.final_reviewer_verdicts : [];
+  if (verdicts.length !== required.length) failures.push("final_reviewer_verdicts must contain exactly the required reviewers");
+  if (new Set(verdicts.map((item) => item?.reviewer)).size !== verdicts.length ||
+      verdicts.some((item) => !required.includes(item?.reviewer) || item?.revision !== revision)) {
+    failures.push("every final reviewer verdict must uniquely name a required reviewer on the current revision");
+  }
   for (const reviewer of required) {
     const current = verdicts.filter((item) => item?.reviewer === reviewer && item?.revision === revision);
     if (current.length !== 1) {
@@ -94,6 +101,10 @@ export function evaluateGateState(state) {
     if (finding?.disposition != null && !VALID_DISPOSITIONS.has(finding.disposition)) {
       failures.push(`${id} has invalid disposition`);
     }
+    if (finding?.validation === "confirmed" && finding?.disposition === "fix" &&
+        finding?.closed === true && finding?.revision === revision) {
+      failures.push(`${id} cannot be fixed without a new revision`);
+    }
     if (finding?.validation === "challenged") {
       if (finding?.disposition !== "rebut" || finding?.reviewer_rebuttal_accepted !== true) {
         failures.push(`${id} is challenged but the reviewer has not accepted the rebuttal`);
@@ -115,7 +126,13 @@ export function evaluateGateState(state) {
       if (finding?.closed !== true) failures.push(`optional ${id} is not closed`);
     }
     if (finding?.severity === "verification_gap") {
-      if (finding?.validation === "confirmed" && finding?.disposition !== "defer-gap") {
+      if (!["decision_blocking", "outside_closing_scope"].includes(finding?.gap_scope)) {
+        failures.push(`${id} verification gap has invalid gap scope`);
+      }
+      if (!nonEmptyString(finding?.gap_scope_reason)) failures.push(`${id} verification gap has no scope reason`);
+      if (finding?.gap_scope === "decision_blocking") {
+        failures.push(`decision-blocking verification gap remains: ${id}`);
+      } else if (finding?.validation === "confirmed" && finding?.disposition !== "defer-gap") {
         failures.push(`${id} confirmed verification gap must use defer-gap`);
       }
       if (finding?.closed !== true) failures.push(`verification gap ${id} is not dispositioned`);
@@ -138,6 +155,8 @@ export function evaluateGateState(state) {
   const receipts = Array.isArray(state.round_receipts) ? state.round_receipts : [];
   const reports = Array.isArray(state.round_reports) ? state.round_reports : [];
   const receiptIds = receipts.map((receipt) => receipt?.invocation_id).filter(nonEmptyString);
+  if (attempts.some((id) => !nonEmptyString(id))) failures.push("every attempted invocation needs a non-empty ID");
+  for (const id of duplicates(attempts)) failures.push(`duplicate attempted invocation: ${id}`);
   for (const id of duplicates(receiptIds)) failures.push(`duplicate round receipt: ${id}`);
   for (const attempt of attempts) {
     if (!receiptIds.includes(attempt)) failures.push(`attempted invocation ${attempt} has no round receipt`);
@@ -161,30 +180,21 @@ export function evaluateGateState(state) {
       failures.push(`${id} receipt has no reviewer session or handle`);
     }
     if (!nonEmptyString(receipt?.independence_level)) failures.push(`${id} receipt has no independence level`);
-    if (!Number.isInteger(receipt?.model_calls) || receipt.model_calls < 0) {
-      failures.push(`${id} receipt has invalid model call count`);
-    }
-    if (!nonEmptyString(receipt?.usage_source)) failures.push(`${id} receipt has no usage source`);
-    if (!VALID_PRECISIONS.has(receipt?.usage_precision)) failures.push(`${id} has invalid usage precision`);
-    if (receipt?.usage_precision === "unavailable" && !nonEmptyString(receipt?.usage_unavailable_reason)) {
-      failures.push(`${id} unavailable usage has no unavailable reason`);
-    }
-    for (const field of TOKEN_FIELDS) {
+    if (!nonEmptyString(receipt?.measurement_source)) failures.push(`${id} receipt has no measurement source`);
+    if (!VALID_PRECISIONS.has(receipt?.measurement_precision)) failures.push(`${id} has invalid measurement precision`);
+    for (const field of COST_FIELDS) {
       if (!(field in receipt)) failures.push(`${id} receipt omits ${field}`);
-      if (receipt[field] != null && (!Number.isFinite(receipt[field]) || receipt[field] < 0)) {
+      if (receipt[field] != null && (!Number.isSafeInteger(receipt[field]) || receipt[field] < 0)) {
         failures.push(`${id} receipt has invalid ${field}`);
       }
-    }
-    if (!("raw_total_tokens" in receipt)) failures.push(`${id} receipt omits raw_total_tokens`);
-    if (receipt?.usage_precision === "exact" || receipt?.usage_precision === "derived") {
-      const values = TOKEN_FIELDS.map((field) => receipt[field]).filter(Number.isFinite);
-      if (values.length === 0) failures.push(`${id} ${receipt.usage_precision} usage has no token category`);
-      const sum = values.reduce((total, value) => total + value, 0);
-      if (!Number.isFinite(receipt?.raw_total_tokens) || receipt.raw_total_tokens !== sum) {
-        failures.push(`${id} raw total does not equal reported token categories`);
+      if (receipt[field] == null) {
+        failures.push(`${id} ${receipt.measurement_precision} measurement omits ${field}`);
       }
-    } else if (receipt?.usage_precision === "unavailable" && receipt?.raw_total_tokens != null) {
-      failures.push(`${id} unavailable usage must not invent a raw total`);
+    }
+    if (VALID_RECEIPT_VERDICTS.has(receipt?.verdict) && ["GO", "CONDITIONAL-GO", "NO-GO"].includes(receipt.verdict)) {
+      for (const field of ["model_calls", "input_characters", "output_characters", "wall_clock_ms", "physical_sessions"]) {
+        if (!(receipt[field] > 0)) failures.push(`${id} returned verdict requires positive ${field}`);
+      }
     }
   }
 
@@ -197,7 +207,8 @@ export function evaluateGateState(state) {
       continue;
     }
     const report = matches[0];
-    if (report.revision_hash !== receipt.revision_hash || report.verdict !== receipt.verdict) {
+    if (report.revision_hash !== receipt.revision_hash || report.verdict !== receipt.verdict ||
+        report.review_kind !== receipt.review_kind) {
       failures.push(`${receipt.invocation_id} round report does not match its receipt`);
     }
     if (report.reviewer_output_disclosed !== true) {
@@ -213,6 +224,61 @@ export function evaluateGateState(state) {
     for (const id of duplicates(report.finding_ids)) {
       failures.push(`${receipt.invocation_id} round report has duplicate finding ID: ${id}`);
     }
+    if (["NO-GO", "CONDITIONAL-GO"].includes(report.verdict) && report.finding_ids.length === 0) {
+      failures.push(`${receipt.invocation_id} non-GO verdict requires at least one finding`);
+    }
+    if (!Array.isArray(report.finding_payloads)) {
+      failures.push(`${receipt.invocation_id} round report finding_payloads must be an array`);
+    } else {
+      const payloadIds = report.finding_payloads.map((finding) => finding?.id);
+      if (JSON.stringify(payloadIds) !== JSON.stringify(report.finding_ids)) {
+        failures.push(`${receipt.invocation_id} finding payload IDs do not match finding_ids`);
+      }
+      for (const payload of report.finding_payloads) {
+        if (!nonEmptyString(payload?.id) || !VALID_SEVERITIES.has(payload?.severity) ||
+            !nonEmptyString(payload?.claim) || !nonEmptyString(payload?.evidence) ||
+            !nonEmptyString(payload?.affected_section)) {
+          failures.push(`${receipt.invocation_id} has incomplete finding payload`);
+        }
+        if (payload?.severity === "verification_gap" && !nonEmptyString(payload?.missing_check)) {
+          failures.push(`${receipt.invocation_id} verification-gap payload has no missing check`);
+        }
+        if (payload?.severity === "verification_gap" &&
+            (!['decision_blocking', 'outside_closing_scope'].includes(payload?.gap_scope) ||
+             !nonEmptyString(payload?.gap_scope_reason))) {
+          failures.push(`${receipt.invocation_id} verification-gap payload has invalid scope evidence`);
+        }
+      }
+      if (receipt.review_kind === "blocker-sweep" &&
+          report.finding_payloads.some((finding) => !["blocker", "verification_gap"].includes(finding?.severity))) {
+        failures.push(`${receipt.invocation_id} blocker-sweep report contains a deferred severity`);
+      }
+      if (report.verdict === "GO" &&
+          report.finding_payloads.some((finding) => ["blocker", "should_fix"].includes(finding?.severity))) {
+        failures.push(`${receipt.invocation_id} GO report contains blocker or should-fix findings`);
+      }
+      if (report.verdict === "GO" && receipt.review_kind === "blocker-sweep" &&
+          report.finding_payloads.some((finding) => finding?.severity === "verification_gap" &&
+            finding?.gap_scope === "decision_blocking")) {
+        failures.push(`${receipt.invocation_id} blocker-sweep GO contains a decision-blocking gap`);
+      }
+    }
+    if (["blocker-sweep", "complete"].includes(receipt.review_kind)) {
+      const rubric = Array.isArray(report?.coverage?.rubric_dimensions)
+        ? report.coverage.rubric_dimensions : [];
+      const severities = Array.isArray(report?.coverage?.severities)
+        ? report.coverage.severities : [];
+      if (new Set(rubric).size !== rubric.length || new Set(severities).size !== severities.length) {
+        failures.push(`${receipt.invocation_id} coverage must not contain duplicates`);
+      }
+      const expectedSeverities = receipt.review_kind === "blocker-sweep"
+        ? ["blocker", "verification_gap"]
+        : ["blocker", "optional", "should_fix", "verification_gap"];
+      if (JSON.stringify([...rubric].sort()) !== JSON.stringify(requiredRubric) ||
+          JSON.stringify([...severities].sort()) !== JSON.stringify([...expectedSeverities].sort())) {
+        failures.push(`${receipt.invocation_id} lacks required ${receipt.review_kind} coverage`);
+      }
+    }
   }
   for (const report of reports) {
     const receipt = receipts.filter((item) => item?.invocation_id === report?.invocation_id);
@@ -224,6 +290,14 @@ export function evaluateGateState(state) {
     for (const id of report.finding_ids) {
       const matches = findings.filter((finding) => finding?.id === id && finding?.source_invocation_id === report.invocation_id);
       if (matches.length !== 1) failures.push(`${report.invocation_id} manifest finding ${id} must map to exactly one ledger finding`);
+      const payload = Array.isArray(report.finding_payloads) ? report.finding_payloads.find((item) => item?.id === id) : null;
+      if (matches.length === 1 && payload) {
+        for (const field of ["severity", "claim", "evidence", "affected_section", "missing_check", "gap_scope", "gap_scope_reason"]) {
+          if ((matches[0][field] ?? null) !== (payload[field] ?? null)) {
+            failures.push(`${report.invocation_id} payload for ${id} does not match the ledger`);
+          }
+        }
+      }
     }
   }
   for (const finding of findings) {
@@ -257,6 +331,21 @@ export function evaluateGateState(state) {
     if (receipt.reviewer !== verdict.reviewer || receipt.revision_hash !== verdict.revision ||
         receipt.review_kind !== "complete" || receipt.verdict !== "GO") {
       failures.push(`closing verdict for ${id} does not match its complete GO receipt`);
+    }
+    const sourceReport = reports.find((report) => report?.invocation_id === verdict.invocation_id);
+    const coveredRubric = Array.isArray(sourceReport?.coverage?.rubric_dimensions)
+      ? [...sourceReport.coverage.rubric_dimensions].sort() : [];
+    const coveredSeverities = Array.isArray(sourceReport?.coverage?.severities)
+      ? [...sourceReport.coverage.severities].sort() : [];
+    const requiredSeverities = ["blocker", "optional", "should_fix", "verification_gap"].sort();
+    if (JSON.stringify(coveredRubric) !== JSON.stringify(requiredRubric) ||
+        JSON.stringify(coveredSeverities) !== JSON.stringify(requiredSeverities)) {
+      failures.push(`closing verdict for ${id} lacks complete rubric and severity coverage`);
+    }
+    const closingFindings = findings.filter((finding) => finding.source_invocation_id === verdict.invocation_id);
+    const closingDefects = closingFindings.filter((finding) => ["blocker", "should_fix"].includes(finding.severity));
+    if (closingDefects.length > 0) {
+      failures.push(`closing GO for ${id} contains blocker or should-fix findings: ${closingDefects.map((finding) => finding.id).join(", ")}`);
     }
   }
 

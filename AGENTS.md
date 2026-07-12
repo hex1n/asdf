@@ -1,14 +1,10 @@
 # AGENTS.md for asdf-skills
 
-This repository builds a portable **agent work loop**; the loop is the
-product. Skills under `skills/` are the components the loop calls; the loop
-machinery (contract sources, hooks, installer) lives under `bootstrap/`.
+This repository owns portable **domain skills**. The standalone `taskloop`
+repository owns the work-loop runtime and producer-agnostic `workloop` core.
 
 This file governs the **skill asset family**: authoring, evolution, and
-distribution discipline for `skills/`. The loop subsystem's maintenance
-discipline and semantic boundaries live in
-[bootstrap/README.md](bootstrap/README.md), which reuses this file's Rule
-Harvest Gate. Canonical domain terms for both families live in
+distribution discipline for `skills/`. Canonical domain terms live in
 [CONTEXT.md](CONTEXT.md).
 
 ## Skill Evolution

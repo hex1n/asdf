@@ -1,62 +1,43 @@
-# asdf — agent 循环工程
+# asdf-skills
 
 > [English](README.md) | 简体中文
 
-一套面向本地运行时（如 **Codex** 与 **Claude Code**）的可移植**个人 agent 工作循环**——
-由对本机编码会话的完整分析提炼而来，可装到任意机器、在任意项目零配置生效。
-技能（skills）只是循环调用的一个组件，**循环本身才是产物**。
+面向 Codex、Claude Code 及兼容 agent runtime 的可移植 skills，覆盖规划、调研、
+文档、实现与验证等领域任务。
 
-## 工作循环
+[`skills/`](skills/) 下的每个目录都是独立的源 skill，包含面向任务的指令，以及可选的
+参考资料、脚本或模板。
 
-工作循环把一个任务从接入推进到交付——**判规模 → 必要时收敛 → 落地 → 验证 → 留痕**。
-默认档是轻量的：小而清楚的任务直接带判据落地；`converge` skill 只用于显式要求、
-机制未收敛，或不可逆/高风险改动。你明确拍板后，拍板就是执行许可；除非出现新的
-硬阻塞，不再自动追加一轮方案流程。
+## Skills
 
-```bash
-node bootstrap/install.mjs         # 把循环分发到 ~/.claude 与 ~/.codex
-node ~/bin/taskloop.mjs status      # 安装后检查（读任务状态，或 'no task'）
-```
+每个 skill 只维护一份源资产，并可作为受管安装 skill 分发到一个或多个 agent runtime。
+相关术语见 [CONTEXT.md](CONTEXT.md)。
 
-- [`taskloop/`](taskloop/) — 循环系统：task-first CLI、PreToolUse/Stop hook
-  （envelope + 判据闸门）、结局账、程序卡。见其 [README](taskloop/README.md)。
-- [`bootstrap/`](bootstrap/) — 机器级安装：工作循环契约卡
-  （源在 [`bootstrap/contract/`](bootstrap/contract/)；Claude 侧装为 user rule，
-  Codex 侧合并进 AGENTS.md）、e2e-report-check 适配器种子、幂等安装器
-  （分发 taskloop 并注册其 hook）。其 [README](bootstrap/README.md) 内含
-  **接新需求的工作流程**、分发清单与维护纪律。
-
-## 技能 —— 循环调用的组件
-
-技能是 [`skills/`](skills/) 下的自包含指令单元，循环在各阶段路由到它们。每个技能以
-*源技能（source skill）*的形式编写一次，再作为*受管安装技能（managed installed skill）*
-分发到各运行时——分发模型见 [CONTEXT.md](CONTEXT.md)。
-
-| 技能 | 循环阶段 | 用途 |
+| 技能 | 领域 | 用途 |
 | --- | --- | --- |
-| [`converge`](skills/converge/) | 收敛 | 显式或高风险未收敛决策的只读方案收敛。 |
-| [`workloop`](skills/workloop/) | 落地/验证 | 唯一的工作环：判据溯源（given/recovered/absent）→ 开 taskloop 任务 → 改-验-审-修 → 停在明确终态。 |
-| [`judgment-loop`](skills/judgment-loop/) | 落地/验证 | 品味类交付物的评分表环：先注册 rubric 再动笔，fresh-context 评审，人验收。 |
-| [`meta-loop`](skills/meta-loop/) | 元层 | 循环自身的改进环：loop-health 指标、候选收割、每轮一个证据闸改动。 |
-| [`first-principles-planner`](skills/first-principles-planner/) | 收敛 | 重构根本问题，给出当前最佳方案及其失效条件。 |
-| [`deep-research`](skills/deep-research/) | 收敛 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
-| [`java-stack-craft`](skills/java-stack-craft/) | 落地 | 识别 JDK/Spring profile、匹配本地约定地编写与审查 Java/Spring 代码，含落地契约循环纪律。 |
+| [`first-principles-planner`](skills/first-principles-planner/) | 规划 | 回到根问题，分离约束与假设并比较机制。 |
+| [`plan-review`](skills/plan-review/) | 验证 | 让第二模型或 fresh-context 子代理反复审查同一份完整方案 revision，直到所有必需 reviewer 返回 GO；审查深度随方案风险标定。 |
+| [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
+| [`project-docs-layer`](skills/project-docs-layer/) | 准备 | 审计并修复项目开工所需的最小运行文档层。 |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | 验证 | 基于设计、需求与代码生成可溯源的端到端测试计划。 |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
-| [`project-docs-layer`](skills/project-docs-layer/) | 项目文档 | 用五问（Start/Verify/Conventions/Direction/Danger）审计并最小修复项目文档层,答案尽量下推到可执行之家；只写验证过的事实，循环纪律留在机器里。 |
 
-`skills/loop-core/` 是 loop skills 的共享支持目录，不是可触发技能。
+## 兼容性
+
+这些 skills 不依赖特定编排 runtime。它们可以与独立的
+[taskloop](https://github.com/hex1n/taskloop) 项目组合，但本仓不拥有或分发 taskloop、
+`workloop` 与 `loop-core`。
+`plan-review` 在两个宿主复用同一套可移植流程：Codex 使用已配置的第二模型 connector
+或 fresh collaboration 子代理，Claude Code 使用外部第二模型或 fresh Agent 子代理；
+reviewer 始终只读。
 
 ## 仓库结构
 
 ```
-taskloop/    # 循环系统：task-first CLI + PreToolUse/Stop hook + 结局账
-bootstrap/   # 机器安装：工作循环契约、适配器种子、安装器
 skills/      # 源技能与不可触发支持目录
 docs/        # 设计笔记、计划与调研
-tests/       # 仓库级契约测试：安装器、契约一致性、技能结构
 AGENTS.md    # 技能编写与维护约定
 CONTEXT.md   # 技能分发的领域术语
 CLAUDE.md    # 面向 Claude Code 的运行时指引
@@ -67,23 +48,7 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 ## 测试
 
-bootstrap 运行时脚本使用 Node 内置 `node:test`，其余仓库与技能契约使用 Python 标准库
-`unittest`；无需第三方依赖。CI（[`.github/workflows/tests.yml`](.github/workflows/tests.yml)）
-在每次 push 与 pull request 上以 Node + Python 双运行时跑全量测试。
-
-```bash
-# Node taskloop（循环系统）测试 + 适配器种子测试
-node --test taskloop/tests/taskloop.test.mjs tests/e2e_report_check.test.mjs
-
-# Node taskloop（净室 v2）测试
-node --test taskloop/tests/taskloop.test.mjs
-
-# Python 仓库级契约测试（契约一致性、技能结构）
-python -m unittest discover -s tests
-
-# 单个技能的测试
-python -m unittest discover -s skills/java-stack-craft/tests
-```
+修改 skill 后运行它提供的针对性检查。
 
 ## 参与贡献
 

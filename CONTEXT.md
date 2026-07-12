@@ -2,13 +2,13 @@
 
 Canonical terms for this repository's two asset families: **skill
 distribution** and **loop engineering**. Entries are definitions with
-pointers — the rule bodies live in the named sources
-([AGENTS.md](AGENTS.md), [bootstrap/README.md](bootstrap/README.md),
-[bootstrap/contract/](bootstrap/contract/)) and are not restated here.
+pointers; skill-authoring rule bodies live in [AGENTS.md](AGENTS.md) and are
+not restated here.
 
 ## Skill Distribution
 
-This context defines the language for distributing portable agent skills from this repository into local agent runtimes such as Codex and Claude Code. The same Source / Managed / Cache Drift model governs the other bootstrap-managed assets: contract blocks merged into user-level startup files and `bin/` scripts installed to `~/bin` (see the maintenance discipline in [bootstrap/README.md](bootstrap/README.md)).
+This context defines the language for distributing portable agent skills from
+this repository into local agent runtimes such as Codex and Claude Code.
 
 ### Language
 
@@ -65,14 +65,13 @@ _Avoid_: local update, manual fix
 ## Loop Engineering
 
 Language for the work-loop machinery. The loop system is **taskloop**
-(`taskloop/`); semantics and boundaries live in
-[taskloop/README.md](taskloop/README.md), with the always-loaded default card
-under [bootstrap/contract/](bootstrap/contract/).
+([standalone repository](https://github.com/hex1n/taskloop)); semantics and
+boundaries live in that repository.
 
 ### Language
 
 **Work Loop**:
-The product of this repository: the judge-scope → converge-when-needed → work → verify → stop cycle, distributed into user-level runtime files by `bootstrap/install.mjs`.
+The taskloop product: an external skill or user supplies goal + criterion + alignment + envelope, then the workloop drives verify → stop. taskloop owns the runtime and producer-agnostic workloop core; this repository owns optional skill producers.
 _Avoid_: workflow automation, skill collection
 
 **Task**:
@@ -92,12 +91,16 @@ The Stop-hook machine adjudication that runs the task's `criterion` and closes `
 _Avoid_: test gate, tamper-proof gate
 
 **Terminal State**:
-The closure of a task: `done` (criterion green) is the only machine-written success; `not_needed` and `abandoned` are human-declared closures. Suspend is not a closure — its outcomes `needs_input`/`stuck`/`out_of_budget` keep the task open for the next episode.
+The closure of a task: `done` (criterion green) is the only machine-written success; `not_needed` and `abandoned` are human-declared closures. Suspend is not a closure — its outcomes `needs_input`/`stuck`/`out_of_budget` keep the task open with sticky write suspension until an explicit resume.
 _Avoid_: success, finished
 
 **Driver (驱动器)**:
-The component that re-prompts the loop across turns so a human is not the per-turn clock (`/goal` criterion re-check, or `ralph-loop` fresh-context re-feed). Driver + criterion gate + criterion together close the loop; the taskloop stop gate already blocks a premature stop within a turn.
+The host-provided component that re-prompts the loop across turns so a human is not the per-turn clock. Driver + criterion gate + criterion together close the loop; taskloop does not require or bundle a particular driver.
 _Avoid_: scheduler, cron job
+
+**Plan Review (方案评审)**:
+The optional post-plan skill (`plan-review`) that freezes one plan revision, calibrates review depth to the plan's risk, sends it to a read-only second model or fresh-context subagent, adjudicates every finding, and repeats whole-revision review until every required reviewer returns GO with no open finding. It revises plans, never implementation, and its gate is independent of taskloop's Criterion Gate.
+_Avoid_: Plan Gate (old name), Criterion Gate, one-shot review, self-approval
 
 **Concurrency Mode**:
 How parallel writers share work: worktree fan-out (one worktree per writer, each with its own `.taskloop/` task, one integrator). There is no shared-worktree partitioned mode.
@@ -108,11 +111,11 @@ The single session allowed to run git operations and merge across worktrees afte
 _Avoid_: main session
 
 **Outcome Ledger**:
-`~/.taskloop/outcomes.jsonl` — one out-of-tree, append-only row per task close (state, episodes, criterion_input_drift). The runtime only writes it; it feeds the meta loop and is not tamper-resistant.
+`~/.taskloop/outcomes.jsonl` — an out-of-tree, append-only lifecycle ledger: task open, suspension/resumption events, and terminal close share a task id. The runtime only writes it; external analysis may consume it, and it is not tamper-resistant.
 _Avoid_: audit log
 
 **Episode**:
-One continuous run of a task under a single session. A task suspends and resumes across episodes; the machine records the changed-files half of the snapshot from its own observations, the human supplies the three judgment lines.
+One continuous run of a task under a single session. A user suspension may close an episode; a machine suspension does not invent a session boundary, and resume never refills task-level budgets. The machine records the changed-files half of the snapshot from its own observations; the human supplies the three judgment lines.
 _Avoid_: session (a session may span or drop episodes)
 
 ### Flagged ambiguities

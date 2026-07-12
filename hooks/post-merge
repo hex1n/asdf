@@ -1,8 +1,0 @@
-#!/bin/sh
-# A pull/merge brings in source that passed the evidence loop on the machine
-# that committed it; sync the installed copies here too. Same never-block
-# contract as post-commit, to which this delegates.
-repo="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-[ -f "$repo/hooks/post-commit" ] || exit 0
-sh "$repo/hooks/post-commit"
-exit 0

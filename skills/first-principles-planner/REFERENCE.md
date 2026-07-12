@@ -5,11 +5,11 @@ short process in `SKILL.md` is not enough.
 
 ## Contents
 
+- Localized Request and Output Rules: localized routing signals, examples, and labels
 - Problem Archaeology: root trace, problem statement, assumption audit
-- Solution Reconstruction: option categories, inversion test, recommendation chain
+- Solution Reconstruction: option categories, independent option tournament, inversion test, recommendation chain
 - Bestness Check: fit criteria, closest alternative, stop point
 - Plan Synthesis: priority table, effort/risk/value, action-first structure
-- Localized Request and Output Rules: localized routing signals, examples, and labels
 - Evidence Conventions: verified vs unverified claims
 - Artifact Location: default path rules for saved Markdown plans
 - Plan File Output: saved plan output shape
@@ -126,6 +126,48 @@ For each approach:
 - Evidence that supports or weakens it
 
 If only one approach is viable, explain why alternatives fail.
+
+### Independent Option Tournament
+
+Replaces the lightweight in-context tournament for the runs that pass the
+escalation gate in `SKILL.md` step 4 (the gate's single source of truth); the
+in-context version stays the default.
+
+Options drafted in one context anchor on the first idea; independent drafts buy
+real mechanism diversity. Two biases must be closed by construction: same-model
+drafters converge unless each is assigned a different mechanism family, and the
+judge favors its own prior unless the rubric is fixed before any draft exists.
+
+1. **Prepare in the main context**: finish the root trace and constraint
+   split; write the problem statement and the full constraint split (true
+   constraints, conventions, unverified assumptions). Drafters start with no
+   other context — step 4 lists everything they receive.
+2. **Pre-register the rubric**: write the Bestness Check fit criteria before
+   any draft exists. They are the judging rubric and stay fixed.
+3. **Assign mechanism families**: enumerate fundamentally different mechanism
+   families (per Option Categories) and assign one per drafter — a
+   fresh-context subagent where the runtime supports one, a separate fresh
+   session otherwise. For any independent context in this section (drafters,
+   red team), prefer a different model's runtime when one is available:
+   same-model contexts share blind spots.
+4. **Collect option cards**: each drafter receives the problem statement, the
+   constraint split, and its assigned family, and returns an option card —
+   mechanism, conditions that favor it, failure mode/cost/risk, supporting
+   evidence. A card, not a full plan, so candidates stay comparable and cheap
+   to judge.
+5. **Judge in the main context** against the pre-registered criteria only. A
+   criterion discovered mid-judging never decides in place: add it through a
+   recorded rubric amendment with its reason, re-judge every card against the
+   amended rubric, and name the amendment in the report. Run the
+   [inversion test](#inversion-test) on the winner: the main context rules on whether each failure is
+   mitigable, and may hand failure-hypothesis generation to one fresh-context
+   red team (input: problem statement, constraint split, winning card) — the
+   context that crowned the winner is the least motivated to break it.
+6. **Report** the winner through the normal recommendation chain and Bestness
+   Check, naming the strongest losing card as the closest alternative.
+
+This escalation diversifies option *generation*. Reviewing an already-drafted
+plan belongs to a review skill, not to more tournament rounds.
 
 ### Inversion Test
 

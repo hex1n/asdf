@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plan Review"
+  short_description: "Review plans until every required reviewer passes"
+  default_prompt: "Use $plan-review to review this completed plan until every required reviewer returns GO."

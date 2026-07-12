@@ -101,6 +101,8 @@ Pick the two or three roles most likely to surface genuine disagreement on this 
 
 For codebase-adjacent questions (architecture direction, dependency adoption), replace with domain-appropriate roles — e.g. Maintainer, Downstream Consumer, Security Reviewer, Platform Team, Community Contributor.
 
+Roles run in the main context by default. When the contradiction map will drive a durable decision, or an earlier same-context scan produced only manufactured disagreement, run each role as one fresh-context scanner instead (a subagent where the runtime supports one, a separate fresh session otherwise; prefer a different model's runtime when one is available — same-model contexts share blind spots): each scanner receives the question, the source inventory, and its assigned role lens as its entire briefing — reading and fetching stay free — and returns the Output items below as a stance card. Same-context roles anchor on each other; assignment plus isolation is what buys genuine disagreement. The main context still builds the contradiction map, runs the consensus check, and verifies every stance-card claim it uses back to primary receipts — a scanner's citation is a lead, not a finding.
+
 ### Output
 
 For each role, state:
@@ -227,6 +229,8 @@ Use this before Standard/Deep final answers to convert evidence into a bounded c
 | Stop reason | Why should the investigation stop now, or what one next check is still worth running? |
 
 If the stop reason is weak, run one more distinguishing check or lower confidence. If the flip condition is broad or unknowable, narrow the decision boundary instead of pretending the question is settled.
+
+For a Deep conclusion driving a durable or high-risk decision, the strongest-counterexample field may be filled by one fresh-context red team — prefer a different model's runtime when one is available — (input: the question, the settled answer, the evidence chain) instead of the context that settled the answer — that context is the least motivated to break its own conclusion. The flip ruling stays in the main context, and the red team's counterexample enters as a lead: check it or downgrade confidence, like any counterexample in this table.
 
 ### Saved Artifact Headers
 

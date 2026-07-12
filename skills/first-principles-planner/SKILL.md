@@ -6,12 +6,15 @@ description: >
   returning the current-best path with failure conditions and next verification
   steps. Use when the user asks for a best/better plan, architecture or design
   direction, implementation strategy, tradeoff/adopt/replace/upgrade decision,
-  or explicitly avoids coding while choosing a path; examples include 第一性原理,
+  or explicitly avoids coding while choosing a path, including converging,
+  comparing, or falsifying competing options or an unresolved decision
+  (收敛方案, 方案选型, 多方案对比/证伪); examples include 第一性原理,
   最佳方案, 最佳实现, 给出方案, 先写方案, 先不写代码, 先不要写代码,
   先不coding, 不coding, 不要直接改代码, 还有更好, 是否应该, 最佳了吗, 取舍,
   架构演进, and 优化方案. Do not use for pure fact-finding research, live bug
   diagnosis, implementation, code/plan review, 计划评审, 方案评审, 审查计划,
-  审查方案, durable ADR/CONTEXT capture, or skill-writing audits unless the user
+  审查方案, falsifying or hardening one existing plan (use plan-review),
+  durable ADR/CONTEXT capture, or skill-writing audits unless the user
   explicitly asks to re-plan from first principles.
 ---
 
@@ -64,7 +67,7 @@ Use the user's language for chat and saved artifacts; for localized fixed labels
 1. **Preflight**: gather only context needed for the selected mode; list load-bearing unknowns and research any unknown that could change the root.
 2. **Root trace**: use Five Whys for a single solution-shaped statement; for systems, trace business/user, technical, historical, and operational roots.
 3. **Constraint split**: classify load-bearing factors as true constraints, conventions, or unverified assumptions.
-4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)).
+4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)). For a Deep-depth decision whose wrong choice would be costly to reverse, or when the user explicitly asks for independently drafted options, run the independent option tournament in [REFERENCE.md](REFERENCE.md#independent-option-tournament) instead.
 5. **Recommend**: pick the approach that solves the root under true constraints after the inversion test (skip it only for Light depth or obvious low-risk decisions); if rejecting the user's approach, include what would justify it.
 6. **Bestness Check**: for non-trivial recommendations, including the first response, state the fit criteria, winner, closest alternative, what would beat it, and the marginal-gain stop point. Details: [REFERENCE.md](REFERENCE.md#bestness-check).
 7. **Synthesize**: make Plan outputs specific enough to predict what changes, in what order, and why.

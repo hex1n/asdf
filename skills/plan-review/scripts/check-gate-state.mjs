@@ -7,6 +7,7 @@ const VALID_SEVERITIES = new Set(["blocker", "should_fix", "optional", "verifica
 const VALID_VALIDATIONS = new Set(["confirmed", "challenged", "needs_evidence"]);
 const VALID_DISPOSITIONS = new Set(["fix", "rebut", "accept-risk", "defer-gap", "needs-input"]);
 const VALID_PRECISIONS = new Set(["exact", "derived"]);
+const VALID_BUDGET_SOURCES = new Set(["explicit", "calibrated-default", "user-authorized-unbounded"]);
 const VALID_REVIEW_KINDS = new Set(["blocker-sweep", "complete", "focused", "rebuttal-check"]);
 const VALID_RECEIPT_VERDICTS = new Set([
   "GO",
@@ -147,6 +148,22 @@ export function evaluateGateState(state) {
     : [];
   if (active.length > 0) failures.push(`active reviewer invocations remain: ${active.join(", ")}`);
   if (state.material_change_after_go !== false) failures.push("material change happened after GO");
+
+  const budget = state.resolved_budget;
+  if (!budget || typeof budget !== "object" || Array.isArray(budget)) {
+    failures.push("resolved_budget must be a frozen budget object");
+  } else if (!VALID_BUDGET_SOURCES.has(budget.source)) {
+    failures.push("resolved_budget has invalid source");
+  } else if (budget.source === "user-authorized-unbounded") {
+    if (budget.user_authorization !== true) {
+      failures.push("unbounded budget requires recorded user authorization");
+    }
+  } else {
+    if (!nonEmptyString(budget.unit)) failures.push("resolved_budget has no observable unit");
+    if (!Number.isSafeInteger(budget.threshold) || budget.threshold <= 0) {
+      failures.push("resolved_budget has no positive threshold");
+    }
+  }
 
   if (!Array.isArray(state.attempted_invocations)) failures.push("attempted_invocations must be an array");
   if (!Array.isArray(state.round_receipts)) failures.push("round_receipts must be an array");

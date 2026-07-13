@@ -7,9 +7,10 @@ short process in `SKILL.md` is not enough.
 
 - Localized Request and Output Rules: localized routing signals, examples, and labels
 - Problem Archaeology: root trace, problem statement, assumption audit
+- Value Gate and Decision Envelope: mechanism families, economic evidence, envelope schema
 - Solution Reconstruction: option categories, independent option tournament, inversion test, recommendation chain
 - Bestness Check: fit criteria, closest alternative, stop point
-- Plan Synthesis: priority table, effort/risk/value, action-first structure
+- Plan Synthesis: scope table, decision pricing, decision-first structure
 - Evidence Conventions: verified vs unverified claims
 - Artifact Location: default path rules for saved Markdown plans
 - Plan File Output: saved plan output shape
@@ -22,7 +23,7 @@ Use this section only when request language, route examples, or saved artifact l
 
 | Route | Signals |
 |---|---|
-| Planner | `第一性原理`, `最佳方案`, `最佳实现`, `给出方案`, `先写方案`, `先不写代码`, `先不要写代码`, `先不coding`, `不coding`, `不要直接改代码`, `还有更好`, `是否应该`, `最佳了吗`, `取舍`, `架构演进`, `优化方案` |
+| Planner | `第一性原理`, `最佳方案`, `最佳实现`, `给出方案`, `先写方案`, `先不写代码`, `先不要写代码`, `先不coding`, `不coding`, `不要直接改代码`, `还有更好`, `是否应该`, `最佳了吗`, `取舍`, `架构演进`, `优化方案`, `ROI`, `值不值得做`, `现在要不要做` |
 | Research-first | `深度分析`, `排查`, `定位`, `为什么`, `根因`, `掌握链路` |
 | Review/critique | `计划评审`, `方案评审`, `审查计划`, `审查方案`, `看看这个计划有没有问题` |
 
@@ -45,6 +46,9 @@ For Chinese requests, use Chinese prose and section labels. Keep code identifier
 | Recommendation | 建议 |
 | Current-best path | 当前最佳路径 |
 | Bestness Check | 最佳性检查 |
+| Value Gate | 价值门禁 |
+| Decision Envelope | 决策信封 |
+| Scope table | 范围与成本 |
 | Next verification step | 下一步验证 |
 | Root problem | 根问题 |
 | True constraints | 真实约束 |
@@ -111,6 +115,77 @@ Phase gate: if an assumption can change the root problem or eliminate the
 recommended approach, verify it before solution design, or ask one focused
 question with a recommended default.
 
+## Value Gate And Decision Envelope
+
+Runs after the constraint split, before options are reconstructed or any
+tournament is dispatched. The Bestness Check asks which mechanism wins; the
+Value Gate asks whether the winner beats the status quo by enough to build at
+all.
+
+### Mechanism Families
+
+Compare at least these families as real candidates, not strawmen:
+
+| Family | Typical form |
+|---|---|
+| Status quo | keep current behavior and accept the current incident rate |
+| Existing capability | an already-built feature, configuration, or runbook covers the main value |
+| Human/process adaptation | a checklist, manual step, or cadence change |
+| Build or change capability | new or modified product/system capability |
+
+### Economic Evidence
+
+Judge from evidence already at hand; the gate never launches research to fill
+fields. Weigh:
+
+- how often the problem occurs and how far it reaches;
+- the impact or loss per occurrence;
+- the expected benefit range of the winning family, with the arithmetic;
+- delivery, maintenance, and opportunity cost;
+- the single fact that would flip the decision.
+
+When a load-bearing economic fact is unknown and could flip the decision,
+return `RESEARCH_FIRST` naming that fact and its check instead of guessing.
+Judge the build-or-change family at its cheapest credible mechanism — a
+proposed expensive design is not the family's floor. When family-level
+economics are too close to call, continue to option reconstruction and freeze
+the envelope once the winner is known.
+
+### Decision Envelope
+
+Freeze the outcome in this envelope. A downstream review skill consumes it
+unchanged; it is the contract separating "technically best" from "worth
+building".
+
+```yaml
+decision: BUILD | DEFER | NO_BUILD | RESEARCH_FIRST
+target_outcome: <the outcome the change must move>
+baseline_and_frequency: <status-quo behavior and incident rate>
+expected_benefit: <range, with the arithmetic behind it>
+delivery_and_maintenance_cost: <build + ongoing + opportunity cost>
+status_quo_or_existing_mechanism: <the strongest non-build candidate>
+decision_flip_condition: <the fact that would change the decision>
+review_scope: implementation-authorization | correctness-only
+review_budget: <explicit budget, calibrated default, or user-authorized unbounded>
+```
+
+- `BUILD`: continue to option reconstruction; the envelope accompanies the
+  plan into review.
+- `DEFER` / `NO_BUILD`: answer in Decision mode with the envelope and its flip
+  condition; plan synthesis and independent tournaments stay unrun.
+  `review_scope` and `review_budget` bind only under `decision: BUILD`; for
+  any other decision write `n/a` — a later explicit correctness-only review
+  ask sets its own scope at review entry.
+- `RESEARCH_FIRST`: name the missing fact and the check that resolves it.
+- A user who has already committed to building is the decision source: record
+  `decision: BUILD` and choose the mechanism rather than re-litigating a
+  settled choice.
+
+The same shape fits divergent domains: an incident arriving a few times a year
+with a mature manual runbook rarely beats `DEFER` against a multi-day build,
+while a defect stream causing frequent unrecoverable loss with no safe manual
+containment usually resolves to `BUILD`.
+
 ## Solution Reconstruction
 
 ### Option Categories
@@ -130,7 +205,7 @@ If only one approach is viable, explain why alternatives fail.
 ### Independent Option Tournament
 
 Replaces the lightweight in-context tournament for the runs that pass the
-escalation gate in `SKILL.md` step 4 (the gate's single source of truth); the
+escalation gate in `SKILL.md` step 5 (the gate's single source of truth); the
 in-context version stays the default.
 
 Options drafted in one context anchor on the first idea; independent drafts buy
@@ -224,29 +299,45 @@ The goal is an informed decision, not a veto.
 
 ## Plan Synthesis
 
-For Plan mode, make the plan operationally specific:
+For Plan mode, make the plan specific enough to price and falsify the
+decision:
 
 - What changes, including likely files/modules when known
 - Effort estimate with arithmetic, not vague size words
-- Priority by value/risk ratio
-- Dependencies and sequencing
 - Code examples only when the mechanism is non-obvious
 
-Prefer independently verifiable vertical slices over layer-by-layer work. A
-slice should prove one user/system outcome end to end, even if thin. Avoid
-plans that say "DB first, then API, then UI" unless the ordering is forced by a
-true dependency. Name how each slice is verified: the outcome to observe, plus
-the boundary or failure path that matters when one applies. This is a
-verification cue, not a test matrix — skip categories that do not apply.
+The plan names its next verification step: the cheapest check that could flip
+the decision or reshape the chosen mechanism — a fact to confirm, a log to
+read, a measurement to run; a thin spike only when nothing cheaper can
+falsify it, with its flip condition stated before it runs.
 
-Use a priority table with a total row:
+A BUILD plan also names its acceptance oracle: the observable outcome that
+proves the target outcome, plus the boundary or failure path that matters —
+stated as observations to make, not as a task breakdown. Order-sensitive
+hazards (a change that must land before another to stay safe) are named as
+constraints; task-level slicing and sequencing belong to the implementing
+session.
 
-| Priority | Change | Effort | Risk | Value |
+Price the decision in a scope table. Rows are the scope components the
+decision buys — core (the decision stands on it), supporting (evidence,
+observability, closure), optional (separately decidable, excluded from the
+total) — not steps in an execution order. Every acceptance-oracle obligation,
+named hazard, and true-constraint closure appears as a priced core or
+supporting row; optional holds only work whose omission leaves the target
+outcome intact. Within a tier, choose and trim by value against risk; moving
+a component between tiers reprices the total. The total row finalizes the
+delivery component of the envelope's `delivery_and_maintenance_cost` —
+ongoing maintenance and opportunity cost are priced beside it in that field —
+and a total that materially worsens the Value Gate's economics sends the plan
+back through the gate, not onward to review:
+
+| Scope | Component | Effort | Risk | Value |
 |---|---|---:|---|---|
-| **Total** | | sum | | |
+| **Total (core + supporting)** | | sum | | |
 
-Lead with actionable content in the first 20 lines. Put analysis last. Do not
-repeat the same reasoning in both action plan and analysis.
+Put analysis after the decision content — recommendation, decision, oracle,
+and next check lead within the first 20 lines; do not repeat the same
+reasoning in both.
 
 ## Evidence Conventions
 

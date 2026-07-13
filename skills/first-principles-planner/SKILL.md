@@ -1,21 +1,20 @@
 ---
 name: first-principles-planner
 description: >
-  Creates first-principles recommendations and plans by reframing the root
-  problem, separating constraints from assumptions, comparing mechanisms, and
-  returning the current-best path with failure conditions and next verification
-  steps. Use when the user asks for a best/better plan, architecture or design
-  direction, implementation strategy, tradeoff/adopt/replace/upgrade decision,
-  or explicitly avoids coding while choosing a path, including converging,
-  comparing, or falsifying competing options or an unresolved decision
-  (收敛方案, 方案选型, 多方案对比/证伪); examples include 第一性原理,
-  最佳方案, 最佳实现, 给出方案, 先写方案, 先不写代码, 先不要写代码,
-  先不coding, 不coding, 不要直接改代码, 还有更好, 是否应该, 最佳了吗, 取舍,
-  架构演进, and 优化方案. Do not use for pure fact-finding research, live bug
-  diagnosis, implementation, code/plan review, 计划评审, 方案评审, 审查计划,
-  审查方案, falsifying or hardening one existing plan (use plan-review),
-  durable ADR/CONTEXT capture, or skill-writing audits unless the user
-  explicitly asks to re-plan from first principles.
+  Creates first-principles recommendations and plans: reframes the root
+  problem, separates constraints from assumptions, compares mechanisms, and
+  returns the current-best path with failure conditions and next verification
+  steps. Use for a best/better plan, implementation strategy, or design
+  direction (最佳方案, 还有更好, 优化方案, 架构演进), plan-first / no-coding
+  asks (先写方案, 先不写代码,
+  先不coding), adopt/replace/tradeoff decisions (是否应该, 取舍), converging
+  or falsifying competing options or an unresolved decision (收敛方案,
+  方案选型, 多方案对比/证伪), deciding whether something is worth building or
+  worth doing now (ROI, 值不值得做, 现在要不要做), and 第一性原理 asks. Do
+  not use for pure fact-finding research, live bug diagnosis, implementation,
+  code review, reviewing or falsifying one existing plan (计划评审, 方案评审
+  — use plan-review), durable ADR/CONTEXT capture, or skill-writing audits
+  unless the user explicitly asks to re-plan from first principles.
 ---
 
 # First-Principles Planner
@@ -39,7 +38,7 @@ If running as a subagent, use the full planner only for delegated planning, arch
 
 - If the stated solution is not tied to an outcome, rewrite the problem statement before comparing options.
 - If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default; do not stop at clarification when a safe default exists — state the default, give the current-best path under that default, and name the fact that would flip the recommendation.
-- If the plan has no independently verifiable next step, shrink it to a vertical slice or a decision.
+- If the plan has no independently verifiable next step, shrink it to a decision plus its first check.
 - **Artifact Gate:** use a chat-first plan by default. Do not create durable artifacts unless explicitly asked, a target path is provided, or the result is a reusable handoff into named next work; then use [REFERENCE.md](REFERENCE.md#artifact-location).
 - Saved plans use `docs/plans/` by default; saved decision/tradeoff memos use `docs/decisions/` by default. Chat-only plans still name where an artifact would go if requested.
 
@@ -67,10 +66,11 @@ Use the user's language for chat and saved artifacts; for localized fixed labels
 1. **Preflight**: gather only context needed for the selected mode; list load-bearing unknowns and research any unknown that could change the root.
 2. **Root trace**: use Five Whys for a single solution-shaped statement; for systems, trace business/user, technical, historical, and operational roots.
 3. **Constraint split**: classify load-bearing factors as true constraints, conventions, or unverified assumptions.
-4. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)). For a Deep-depth decision whose wrong choice would be costly to reverse, or when the user explicitly asks for independently drafted options, run the independent option tournament in [REFERENCE.md](REFERENCE.md#independent-option-tournament) instead.
-5. **Recommend**: pick the approach that solves the root under true constraints after the inversion test (skip it only for Light depth or obvious low-risk decisions); if rejecting the user's approach, include what would justify it.
-6. **Bestness Check**: for non-trivial recommendations, including the first response, state the fit criteria, winner, closest alternative, what would beat it, and the marginal-gain stop point. Details: [REFERENCE.md](REFERENCE.md#bestness-check).
-7. **Synthesize**: make Plan outputs specific enough to predict what changes, in what order, and why.
+4. **Value Gate**: decide whether the winner is worth building before designing it. Compare at least four mechanism families as real candidates — keep the status quo, use an existing capability, adapt the human/process workflow, build or change system capability — and judge net gain over the status quo from evidence already at hand: frequency and blast radius, per-incident impact, expected benefit range, delivery plus maintenance plus opportunity cost, and the fact that would flip the decision. Judge the build family at its cheapest credible mechanism, not the user's proposed one; when family-level economics are too close to call, continue to step 5 and settle the decision once the winner is known. Freeze the outcome as a Decision Envelope ([REFERENCE.md](REFERENCE.md#value-gate-and-decision-envelope)) with one decision: `BUILD`, `DEFER`, `NO_BUILD`, or `RESEARCH_FIRST`. `BUILD` continues to step 5; `RESEARCH_FIRST` names the missing decision-flipping fact and routes to research; `DEFER` or `NO_BUILD` ends the run as a compact Decision-mode answer carrying the envelope — plan synthesis and independent option tournaments stay unrun. When the user has already committed to building and asks only how, record `decision: BUILD` with the user as its source and continue. A `BUILD` envelope's cost is provisional until the scope table prices it in step 8; a priced total that materially worsens the gate's economics reruns this gate before any handoff.
+5. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)). For a Deep-depth decision whose wrong choice would be costly to reverse, or when the user explicitly asks for independently drafted options, run the independent option tournament in [REFERENCE.md](REFERENCE.md#independent-option-tournament) instead.
+6. **Recommend**: pick the approach that solves the root under true constraints after the inversion test (skip it only for Light depth or obvious low-risk decisions); if rejecting the user's approach, include what would justify it.
+7. **Bestness Check**: for non-trivial recommendations, including the first response, state the fit criteria, winner, closest alternative, what would beat it, and the marginal-gain stop point. The stop point is enforceable and ends option refinement only: once further selection work cannot change the Value Gate decision, the winning mechanism, or the next verification step, stop comparing mechanisms and complete the plan's required content (rollback, permissions, migration safety, acceptance evidence) for the chosen path. Details: [REFERENCE.md](REFERENCE.md#bestness-check).
+8. **Synthesize**: make Plan outputs specific enough to predict what changes and why.
 
 For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE.md) before writing the final answer.
 
@@ -84,12 +84,13 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 
 ## Acceptance Gate
 
-Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation.
+Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. When the request proposes new or changed capability, the answer carries the Value Gate decision and its flip condition. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation.
 
 ## Anti-Patterns
 
 - Treating "use solution X" as the problem statement.
 - Writing a large plan for a small decision.
+- Treating technical bestness as build authorization: synthesizing or reviewing a plan whose Value Gate decision is `DEFER` or `NO_BUILD`.
 - Re-running research inside planner instead of invoking/using research.
 - Using planner as a plan-review or code-review skill.
 - Turning a plan into ADR/CONTEXT memory without the user asking.

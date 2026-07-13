@@ -129,5 +129,6 @@
   ],
   "attempted_invocations": ["invocation-sweep", "invocation-close"],
   "active_reviewer_invocations": [],
-  "material_change_after_go": false
+  "material_change_after_go": false,
+  "resolved_budget": { "source": "calibrated-default", "unit": "reviewer invocations", "threshold": 6 }
 }

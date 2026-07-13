@@ -1,7 +1,53 @@
 # Plan Review Reference
 
-Load only the branch reached by the current review: compact transfer,
-runtime/invocation handling, focused recheck, or round receipts.
+Load only the branch reached by the current review: entry states, compact
+transfer, runtime/invocation handling, focused recheck, or round receipts.
+
+## Decision Envelope And Entry States
+
+The upstream planner freezes its worth-building decision in this envelope;
+review consumes it unchanged and never recomputes value:
+
+```yaml
+decision: BUILD | DEFER | NO_BUILD | RESEARCH_FIRST
+target_outcome:
+baseline_and_frequency:
+expected_benefit:
+delivery_and_maintenance_cost:
+status_quo_or_existing_mechanism:
+decision_flip_condition:
+review_scope: implementation-authorization | correctness-only
+review_budget:
+```
+
+When no upstream envelope exists, the Entry Gate may freeze a minimal
+user-owned envelope from an explicit user confirmation:
+`decision: BUILD, source: user`. An explicit correctness-only ask sets
+`review_scope: correctness-only`; its closing report carries
+`implementation_decision: UNCHANGED` with an explicit "no implementation
+authorization granted" line.
+
+Non-entry and non-pass outcomes:
+
+- `NOT_READY`: no upstream decision either way, no user confirmation, and no
+  correctness-only ask; the loop was not entered.
+- `DEFERRED`: the upstream decision is `DEFER`, `NO_BUILD`, or
+  `RESEARCH_FIRST`; the loop was not entered and the value question stays
+  with the planner.
+- `WITHDRAWN`: implementation intent ended mid-review.
+- `SUSPENDED`: the gate is unpassed and continuing is blocked or no longer
+  justified — reviewer unavailable, budget expired, envelope invalidated, or
+  user input required.
+
+None of these outcomes is a technical pass, and none of them grants
+implementation authorization.
+
+Envelope invalidation is domain-independent: a required fix that turns a
+three-day migration into a multi-week build with a permanent reconciliation
+layer, and a required fix that turns a one-week process automation into a
+cross-system integration project, both break the frozen
+`delivery_and_maintenance_cost`; in both cases the review suspends and the
+planner re-runs its Value Gate on the revised candidate.
 
 ## Compact Review Packet
 
@@ -130,6 +176,13 @@ The gate state freezes `required_rubric_dimensions`. Every `complete` report
 includes `coverage.rubric_dimensions` matching that set and
 `coverage.severities` containing blocker, should-fix, optional, and
 verification-gap. Closing GO without this coverage evidence fails closed.
+
+The gate state also freezes `resolved_budget`:
+`{source: explicit | calibrated-default | user-authorized-unbounded, unit,
+threshold, user_authorization}`. A bounded source requires a non-empty
+observable unit and a positive safe-integer threshold;
+`user-authorized-unbounded` requires `user_authorization: true`. A missing or
+malformed budget fails closed.
 
 When Node is available:
 

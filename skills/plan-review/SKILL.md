@@ -4,11 +4,9 @@ description: >
   Review one completed design or plan through independent falsification until
   the exact final revision passes. Enter only on an explicit review ask against
   one existing plan: 审查到通过, 方案评审, 计划评审, 证伪/多视角审查现有方案,
-  收敛到无问题, or a second-model/subagent review before implementation; a plan
-  merely being finished is not an ask. For competing options or an unresolved
-  decision, use first-principles-planner. Prefer a read-only second model, fall
-  back to a fresh-context subagent, and never treat missing evidence, reviewer
-  failure, or exhausted budget as a pass.
+  or a second-model review before implementation; a plan merely being finished
+  is not an ask. For competing options or an unresolved decision, use
+  first-principles-planner.
 ---
 
 # Plan Review
@@ -16,24 +14,73 @@ description: >
 Falsify and revise one completed plan. Revise only the named plan artifact;
 implementation remains outside this skill.
 
+## Entry Gate
+
+Review verifies an upstream build decision; it never creates one. Before any
+freeze, resolve what this review may authorize
+([REFERENCE.md](REFERENCE.md#decision-envelope-and-entry-states)):
+
+- The plan carries a Decision Envelope (or equivalent upstream decision
+  record) whose decision is `BUILD`: review with
+  `review_scope: implementation-authorization`. A review ask alone — even
+  "review this before we implement" — never creates that decision; when no
+  envelope exists, ask once whether worth-building has been decided, and only
+  the user's explicit worth-building confirmation freezes a user-owned `BUILD`.
+- The user explicitly asks for a correctness-only review — this takes
+  precedence over any non-`BUILD` upstream decision: review with
+  `review_scope: correctness-only`, and the report states that no
+  implementation authorization is granted.
+- The upstream decision is `DEFER`, `NO_BUILD`, or `RESEARCH_FIRST`, or the
+  user says worth-building is unsettled: return `DEFERRED` without entering
+  the review loop; the value question belongs to the planner, never to a
+  reviewer. With no upstream decision either way and no confirmation, return
+  `NOT_READY`.
+
+Every closing report separates two tracks:
+
+```text
+technical_verdict: GO | NO_GO | SUSPENDED | NONE
+implementation_decision: BUILD | DEFER | NO_BUILD | UNCHANGED
+```
+
+`GO` states only that the exact current revision passed complete review; it
+carries no implementation priority or investment advice. `NONE` records that
+no closing technical verdict exists: the loop was not entered (`NOT_READY`,
+`DEFERRED`) or implementation intent ended (`WITHDRAWN`). The implementation
+decision is copied from the still-valid frozen envelope; `UNCHANGED` means
+this review granted and changed nothing — the standing upstream decision,
+named in the report, still governs, and after envelope invalidation the
+report also states that no valid `BUILD` authorization remains until the
+planner re-decides. Both tracks always carry exactly one of their listed
+tokens; prose may qualify a token, never replace it. A `DEFERRED`,
+`WITHDRAWN`, or exhausted-budget outcome is never a technical pass.
+
 ## Exact Gate
 
 Freeze before dispatch. Use reviewers explicitly named by the user; otherwise
 set by the depth calibration below:
 
 - the exact candidate and content hash;
+- the Decision Envelope and review scope resolved by the Entry Gate;
 - required reviewers and depth;
-- rubric, authority evidence, constraints, and explicit budget;
+- rubric, authority evidence, constraints, and the resolved budget;
 - a ledger for rounds, findings, parent validations, and dispositions.
+
+Budget resolves at freeze to exactly one of: the user's explicit budget, a
+default calibrated from the same irreversibility, blast-radius, and value
+basis as depth, or user-authorized `unbounded`. A bounded budget is recorded
+with an observable unit and threshold — reviewer invocations, wall-clock, or
+output volume — plus its basis; a missing budget never resolves to
+`unbounded`, and `scripts/check-gate-state.mjs` fails closed without this
+record.
 
 Calibrate reviewer strength and expected rounds from irreversibility and blast
 radius, and record that basis here at freeze time. Shallow depth is eligible only
 when the plan is reversible and has no data-destruction,
-external-interface, permission, or funds path: one fresh-context subagent round,
-never less. Otherwise use full depth and require the strongest available
-read-only second model. A self-reread satisfies no depth. When eligibility is
-uncertain or contested, use full depth. The pass condition below is identical
-at every depth.
+external-interface, permission, or funds path: at least one fresh-context
+subagent round. Otherwise use full depth and require the strongest available
+read-only second model. When eligibility is uncertain or contested, use full
+depth. The pass condition below is identical at every depth.
 
 The gate passes only when:
 
@@ -51,13 +98,22 @@ The default rubric covers coherence, feasibility, compatibility,
 migration/rollback, verification, and scope. Existing-system claims require an
 authority source or become verification gaps.
 
+Severity is fixed by consequence, never by review cost: `blocker` — could make
+the result unsafe, wrong, unexecutable, or unverifiable; `should-fix` —
+materially changes execution behavior, compatibility, migration/rollback,
+acceptance evidence, or a key decision; `optional` — wording, non-material
+precision, readability, or convenience. When a confirmed blocker or should-fix
+is no longer worth fixing, withdraw or suspend instead of closing.
+
 ## Evidence Loop
 
 ### 1. Freeze
 
 Take an existing plan. If no plan exists, route to the relevant planner and
 return after it is complete. Record the candidate hash and reviewers, then the
-rubric and evidence scope, depth calibration, budget, and ledger.
+rubric and evidence scope, depth calibration, budget, and ledger. Freeze the
+Decision Envelope beside the candidate; its decision, review scope, and budget
+bind every later round.
 
 Keep review records outside the candidate. A material edit creates a new
 revision and invalidates every prior GO. A post-GO translation or reformat is
@@ -176,6 +232,12 @@ the gate. Use it only for edits contained by finding-linked scope; uncertainty
 or cross-cutting change requires a complete review. See
 [REFERENCE.md](REFERENCE.md#focused-recheck).
 
+A revision that materially raises delivery or maintenance cost, shrinks the
+expected benefit, changes the core mechanism or applicable scope, or breaks a
+key assumption of the frozen Decision Envelope invalidates that envelope:
+suspend the review and return the value decision to the planner rather than
+reviewing the changed economics to GO.
+
 Completion: every finding is validated, owned, and dispositioned; a new hashed
 revision exists or every rebuttal has returned to its reviewer.
 
@@ -187,13 +249,20 @@ and disposition every new finding, then repeat. This closing review returns the
 complete set of currently known findings across all severities, grouped by root cause; it
 does not stop merely because a non-GO verdict is already justified.
 
-Without an explicit budget, new or narrowing findings are progress and continue
-the loop; a round count alone never closes or suspends the gate. Suspend when a required
-reviewer remains unavailable, reviewers disagree, the same blocker survives
-three consecutive revisions, budget expires, or user input is required.
+Within the resolved budget, new or narrowing findings are progress and continue
+the loop; a bare round count outside the frozen budget never closes or suspends
+the gate — an expiring frozen budget is a budget event, not a round count. Each continued
+round also requires live implementation intent and an expectation that the next
+round closes a gate-blocking finding or changes the technical or implementation
+decision. Suspend when a required reviewer remains unavailable, reviewers
+disagree, the same blocker survives three consecutive revisions, budget
+expires, the Decision Envelope is invalidated, or user input is required; when
+continuing is no longer justified while the gate is unpassed, the outcome is
+`SUSPENDED` or `WITHDRAWN`, never a pass.
 
 Before success, apply the Exact Gate mechanically with
-`scripts/check-gate-state.mjs` when Node is available. Report the final revision,
+`scripts/check-gate-state.mjs` when Node is available. Report the two-track
+outcome (technical verdict and implementation decision), the final revision,
 reviewers and independence level, rounds, finding dispositions, remaining
 verification gaps, and each round's model plus observable cost.
 

@@ -1,7 +1,10 @@
 {
   "current_revision": "sha256:fixed",
+  "author_identity": "parent-author",
+  "review_depth": "full",
   "required_rubric_dimensions": ["coherence", "feasibility", "compatibility", "migration/rollback", "verification", "scope"],
   "required_reviewers": ["reviewer-a"],
+  "explicit_second_model_reviewers": [],
   "final_reviewer_verdicts": [{
     "reviewer": "reviewer-a",
     "revision": "sha256:fixed",
@@ -52,6 +55,7 @@
       "provider": "fixture-provider",
       "model": "fixture-model",
       "reviewer": "reviewer-a",
+      "reviewer_role": "required",
       "effort": "fixture",
       "reviewer_session_id_or_opaque_handle": "session-sweep",
       "independence_level": "fresh-context",
@@ -74,6 +78,7 @@
       "provider": "fixture-provider",
       "model": "fixture-model",
       "reviewer": "reviewer-a",
+      "reviewer_role": "required",
       "effort": "fixture",
       "reviewer_session_id_or_opaque_handle": "session-close",
       "independence_level": "fresh-context",

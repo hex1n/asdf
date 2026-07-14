@@ -57,12 +57,15 @@ tokens; prose may qualify a token, never replace it. A `DEFERRED`,
 
 ## Exact Gate
 
-Freeze before dispatch. Use reviewers explicitly named by the user; otherwise
-set by the depth calibration below:
+Freeze before dispatch. Default every required reviewer to the runtime's
+fresh-context read-only reviewer. Replace that default with a read-only
+second-model reviewer only for a reviewer the user explicitly requests as
+second-model. Reviewer class is independent of depth:
 
 - the exact candidate and content hash;
 - the Decision Envelope and review scope resolved by the Entry Gate;
-- required reviewers and depth;
+- author identity; required reviewers, their frozen classes, explicit
+  second-model selections, and depth;
 - rubric, authority evidence, constraints, and the resolved budget;
 - a ledger for rounds, findings, parent validations, and dispositions.
 
@@ -74,13 +77,12 @@ output volume — plus its basis; a missing budget never resolves to
 `unbounded`, and `scripts/check-gate-state.mjs` fails closed without this
 record.
 
-Calibrate reviewer strength and expected rounds from irreversibility and blast
-radius, and record that basis here at freeze time. Shallow depth is eligible only
-when the plan is reversible and has no data-destruction,
-external-interface, permission, or funds path: at least one fresh-context
-subagent round. Otherwise use full depth and require the strongest available
-read-only second model. When eligibility is uncertain or contested, use full
-depth. The pass condition below is identical at every depth.
+Calibrate review depth and expected rounds from irreversibility and blast radius,
+and record that basis here at freeze time. Shallow depth is eligible only when
+the plan is reversible and has no data-destruction,
+external-interface, permission, or funds path: at least one review round.
+Otherwise use full depth. When eligibility is uncertain or
+contested, use full depth. The pass condition below is identical at every depth.
 
 The gate passes only when:
 
@@ -126,12 +128,10 @@ Completion: every reviewer can access the same exact revision and gate contract.
 
 ### 2. Review
 
-Dispatch the strongest required reviewer first: a read-only second model when
-available—required at full depth—or a fresh-context read-only subagent at
-shallow depth or as a recorded fallback. The author is not an independent
-reviewer. At full depth, one diagnostic round by the fallback is allowed when the
-strongest reviewer is unavailable; then suspend rather than repeatedly
-pre-converge.
+Dispatch each required reviewer exactly as frozen by the Exact Gate. The author
+is not an independent reviewer. For an unavailable frozen second-model
+reviewer, one diagnostic fresh-context round is allowed; then suspend rather
+than repeatedly pre-converge.
 
 A self-reread may prepare the packet but cannot satisfy the gate.
 

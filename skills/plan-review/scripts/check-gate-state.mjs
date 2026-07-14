@@ -9,6 +9,9 @@ const VALID_DISPOSITIONS = new Set(["fix", "rebut", "accept-risk", "defer-gap", 
 const VALID_PRECISIONS = new Set(["exact", "derived"]);
 const VALID_BUDGET_SOURCES = new Set(["explicit", "calibrated-default", "user-authorized-unbounded"]);
 const VALID_REVIEW_KINDS = new Set(["blocker-sweep", "complete", "focused", "rebuttal-check"]);
+const VALID_INDEPENDENCE_LEVELS = new Set(["fresh-context", "second-model"]);
+const VALID_REVIEW_DEPTHS = new Set(["shallow", "full"]);
+const VALID_REVIEWER_ROLES = new Set(["required", "diagnostic"]);
 const VALID_RECEIPT_VERDICTS = new Set([
   "GO",
   "CONDITIONAL-GO",
@@ -22,6 +25,10 @@ const COST_FIELDS = ["model_calls", "input_characters", "output_characters", "wa
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function identityString(value) {
+  return nonEmptyString(value) && value === value.trim();
 }
 
 function duplicates(values) {
@@ -50,14 +57,43 @@ export function evaluateGateState(state) {
   if (!Array.isArray(state.required_reviewers)) failures.push("required_reviewers must be an array");
   const required = Array.isArray(state.required_reviewers) ? state.required_reviewers : [];
   if (required.length === 0) failures.push("required reviewers are missing");
-  if (required.some((reviewer) => !nonEmptyString(reviewer))) {
-    failures.push("every required reviewer needs a non-empty identity");
+  if (required.some((reviewer) => !identityString(reviewer))) {
+    failures.push("every required reviewer needs a non-empty identity without surrounding whitespace");
   }
   for (const reviewer of duplicates(required)) failures.push(`duplicate required reviewer: ${reviewer}`);
+  if (!identityString(state.author_identity)) {
+    failures.push("author_identity must be a non-empty identity without surrounding whitespace");
+  } else if (required.includes(state.author_identity)) {
+    failures.push("author identity cannot be a required reviewer");
+  }
+  if (!VALID_REVIEW_DEPTHS.has(state.review_depth)) {
+    failures.push("review_depth must be shallow or full");
+  }
+
+  if (!Array.isArray(state.explicit_second_model_reviewers)) {
+    failures.push("explicit_second_model_reviewers must be an array");
+  }
+  const explicitSecondModel = Array.isArray(state.explicit_second_model_reviewers)
+    ? state.explicit_second_model_reviewers
+    : [];
+  if (explicitSecondModel.some((reviewer) => !identityString(reviewer))) {
+    failures.push("every explicit second-model reviewer needs a non-empty identity without surrounding whitespace");
+  }
+  for (const reviewer of duplicates(explicitSecondModel)) {
+    failures.push(`duplicate explicit second-model reviewer: ${reviewer}`);
+  }
+  for (const reviewer of explicitSecondModel) {
+    if (!required.includes(reviewer)) {
+      failures.push(`explicit second-model reviewer is not required: ${reviewer}`);
+    }
+  }
 
   if (!Array.isArray(state.final_reviewer_verdicts)) failures.push("final_reviewer_verdicts must be an array");
   const verdicts = Array.isArray(state.final_reviewer_verdicts) ? state.final_reviewer_verdicts : [];
   if (verdicts.length !== required.length) failures.push("final_reviewer_verdicts must contain exactly the required reviewers");
+  if (verdicts.some((item) => !identityString(item?.reviewer))) {
+    failures.push("every final reviewer verdict needs an identity without surrounding whitespace");
+  }
   if (new Set(verdicts.map((item) => item?.reviewer)).size !== verdicts.length ||
       verdicts.some((item) => !required.includes(item?.reviewer) || item?.revision !== revision)) {
     failures.push("every final reviewer verdict must uniquely name a required reviewer on the current revision");
@@ -191,12 +227,53 @@ export function evaluateGateState(state) {
     if (!nonEmptyString(receipt?.runtime)) failures.push(`${id} receipt has no runtime`);
     if (!nonEmptyString(receipt?.provider)) failures.push(`${id} receipt has no provider`);
     if (!nonEmptyString(receipt?.model)) failures.push(`${id} receipt has no model`);
-    if (!nonEmptyString(receipt?.reviewer)) failures.push(`${id} receipt has no reviewer identity`);
+    if (!identityString(receipt?.reviewer)) {
+      failures.push(`${id} receipt reviewer needs an identity without surrounding whitespace`);
+    }
     if (!nonEmptyString(receipt?.effort)) failures.push(`${id} receipt has no effort`);
     if (!nonEmptyString(receipt?.reviewer_session_id_or_opaque_handle)) {
       failures.push(`${id} receipt has no reviewer session or handle`);
     }
-    if (!nonEmptyString(receipt?.independence_level)) failures.push(`${id} receipt has no independence level`);
+    if (!VALID_REVIEWER_ROLES.has(receipt?.reviewer_role)) {
+      failures.push(`${id} receipt has invalid reviewer role`);
+    }
+    if (receipt?.reviewer_role === "required" && !required.includes(receipt?.reviewer)) {
+      failures.push(`${id} required reviewer receipt is not in the frozen required_reviewers`);
+    }
+    if (!VALID_INDEPENDENCE_LEVELS.has(receipt?.independence_level)) {
+      failures.push(`${id} receipt has invalid independence level`);
+    }
+    if (required.includes(receipt?.reviewer)) {
+      const selectedSecondModel = explicitSecondModel.includes(receipt.reviewer);
+      if (!selectedSecondModel &&
+          (receipt?.reviewer_role !== "required" || receipt?.independence_level !== "fresh-context")) {
+        failures.push(`${id} required reviewer defaults to fresh-context without an explicit second-model selection`);
+      }
+      if (selectedSecondModel && receipt?.independence_level === "second-model" &&
+          receipt?.reviewer_role !== "required") {
+        failures.push(`${id} second-model invocation must use the required reviewer role`);
+      }
+      if (selectedSecondModel && receipt?.independence_level === "fresh-context" &&
+          receipt?.reviewer_role !== "diagnostic") {
+        failures.push(`${id} fresh-context fallback must use the diagnostic reviewer role`);
+      }
+    }
+    if (receipt?.reviewer_role === "diagnostic") {
+      const sourceId = receipt?.diagnostic_for_invocation_id;
+      const receiptIndex = receipts.indexOf(receipt);
+      const sourceIndex = receipts.findIndex((candidate) => candidate?.invocation_id === sourceId);
+      const source = sourceIndex >= 0 ? receipts[sourceIndex] : null;
+      if (!required.includes(receipt?.reviewer) || !explicitSecondModel.includes(receipt.reviewer) ||
+          receipt?.independence_level !== "fresh-context") {
+        failures.push(`${id} diagnostic fallback must belong to a frozen second-model reviewer`);
+      }
+      if (!nonEmptyString(sourceId) || sourceIndex < 0 || sourceIndex >= receiptIndex ||
+          source?.reviewer !== receipt?.reviewer || source?.reviewer_role !== "required" ||
+          source?.independence_level !== "second-model" ||
+          !["FAILED", "TIMED-OUT"].includes(source?.verdict)) {
+        failures.push(`${id} diagnostic fallback must link to an earlier unavailable second-model invocation`);
+      }
+    }
     if (!nonEmptyString(receipt?.measurement_source)) failures.push(`${id} receipt has no measurement source`);
     if (!VALID_PRECISIONS.has(receipt?.measurement_precision)) failures.push(`${id} has invalid measurement precision`);
     for (const field of COST_FIELDS) {
@@ -212,6 +289,17 @@ export function evaluateGateState(state) {
       for (const field of ["model_calls", "input_characters", "output_characters", "wall_clock_ms", "physical_sessions"]) {
         if (!(receipt[field] > 0)) failures.push(`${id} returned verdict requires positive ${field}`);
       }
+    }
+  }
+
+  for (const reviewer of explicitSecondModel) {
+    const diagnostics = receipts.filter((receipt) =>
+      receipt?.reviewer === reviewer && receipt?.reviewer_role === "diagnostic");
+    if (diagnostics.length > 1) {
+      failures.push(`frozen second-model reviewer ${reviewer} has more than one diagnostic fallback`);
+    }
+    if (diagnostics.length > 0) {
+      failures.push(`diagnostic fallback for ${reviewer} keeps the gate unpassed`);
     }
   }
 
@@ -348,6 +436,15 @@ export function evaluateGateState(state) {
     if (receipt.reviewer !== verdict.reviewer || receipt.revision_hash !== verdict.revision ||
         receipt.review_kind !== "complete" || receipt.verdict !== "GO") {
       failures.push(`closing verdict for ${id} does not match its complete GO receipt`);
+    }
+    if (receipt.reviewer_role !== "required") {
+      failures.push(`closing verdict for ${id} must bind a required reviewer receipt`);
+    }
+    const expectedIndependence = explicitSecondModel.includes(verdict.reviewer)
+      ? "second-model"
+      : "fresh-context";
+    if (receipt.independence_level !== expectedIndependence) {
+      failures.push(`closing verdict for ${id} does not match its frozen ${expectedIndependence} reviewer class`);
     }
     const sourceReport = reports.find((report) => report?.invocation_id === verdict.invocation_id);
     const coveredRubric = Array.isArray(sourceReport?.coverage?.rubric_dimensions)

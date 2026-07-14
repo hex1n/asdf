@@ -74,10 +74,11 @@ silently dropping evidence-dependent rubric criteria.
 
 ## Runtime And Invocation
 
-Prefer an available read-only second-model capability. Otherwise use the
-runtime's fresh-context read-only agent capability as the recorded fallback.
+Bind each reviewer class frozen by the Exact Gate without reselecting it:
+`fresh-context` uses the runtime's read-only agent capability; `second-model`
+uses the available read-only second-model capability.
 Record reviewer identity, independence level, disclosure boundary, and every
-downgrade.
+availability failure or diagnostic fallback.
 
 Use a persistent invocation handle. Before retrying, query the invocation and
 session, recover any result, settle descendants, and prove no invocation for the
@@ -126,7 +127,9 @@ provider
 model
 effort
 reviewer_session_id_or_opaque_handle
-independence_level
+reviewer_role: required | diagnostic
+independence_level: fresh-context | second-model
+diagnostic_for_invocation_id: <failed second-model invocation; diagnostic only>
 model_calls
 input_characters
 output_characters
@@ -166,6 +169,20 @@ require at least one finding. Every manifest payload maps to exactly one ledger 
 every ledger finding maps back to its source manifest and records
 `parent_validation_disclosed: true`. All collection fields are explicit arrays.
 Malformed, missing, or unreconciled collections fail closed.
+
+The gate state freezes `author_identity`, `review_depth: shallow | full`, and
+`explicit_second_model_reviewers` as an array of unique identities drawn from
+`required_reviewers`; the author cannot be a required reviewer. An empty array
+keeps every required reviewer on the fresh-context default. A required-reviewer
+receipt outside that array must record `reviewer_role: required` and
+`independence_level: fresh-context`; a closing receipt for an identity inside it
+must record `reviewer_role: required` and `independence_level: second-model`.
+
+A diagnostic fallback keeps the frozen reviewer identity, records
+`reviewer_role: diagnostic` and `independence_level: fresh-context`, and links
+`diagnostic_for_invocation_id` to an earlier `FAILED` or `TIMED-OUT`
+second-model receipt for that reviewer. At most one diagnostic is allowed per
+frozen second-model reviewer, and its presence keeps the gate unpassed.
 
 A `blocker-sweep` report contains only blocker and verification-gap payloads.
 Each verification gap declares `gap_scope: decision_blocking |

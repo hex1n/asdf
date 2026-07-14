@@ -19,6 +19,160 @@ test("full blocker-sweep to complete-review closing path passes", () => {
   assert.deepEqual(evaluateGateState(closingFixture()), { pass: true, failures: [] });
 });
 
+test("reviewers default to fresh-context and second-model requires an explicit selection", () => {
+  let state = closingFixture();
+  for (const receipt of state.round_receipts) receipt.independence_level = "second-model";
+  assert.match(evaluateGateState(state).failures.join("\n"), /defaults to fresh-context/i);
+
+  for (const depth of ["full", "shallow"]) {
+    state = closingFixture();
+    state.review_depth = depth;
+    state.explicit_second_model_reviewers = ["reviewer-a"];
+    for (const receipt of state.round_receipts) receipt.independence_level = "second-model";
+    assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+  }
+
+  state = closingFixture();
+  state.explicit_second_model_reviewers = ["reviewer-a"];
+  assert.match(evaluateGateState(state).failures.join("\n"), /frozen second-model reviewer class/i);
+
+  state = closingFixture();
+  state.explicit_second_model_reviewers = ["reviewer-not-required"];
+  assert.match(evaluateGateState(state).failures.join("\n"), /not required/i);
+
+  state = closingFixture();
+  delete state.explicit_second_model_reviewers;
+  assert.match(evaluateGateState(state).failures.join("\n"), /must be an array/i);
+
+  state = closingFixture();
+  state.explicit_second_model_reviewers = ["reviewer-a", "reviewer-a"];
+  assert.match(evaluateGateState(state).failures.join("\n"), /duplicate explicit second-model reviewer/i);
+});
+
+test("gate freezes author and depth and diagnostic fallback cannot close", () => {
+  let state = closingFixture();
+  state.author_identity = "reviewer-a";
+  assert.match(evaluateGateState(state).failures.join("\n"), /author identity cannot be a required reviewer/i);
+
+  state = closingFixture();
+  state.review_depth = "banana";
+  assert.match(evaluateGateState(state).failures.join("\n"), /review_depth must be shallow or full/i);
+
+  state = closingFixture();
+  state.explicit_second_model_reviewers = ["reviewer-a"];
+  for (const receipt of state.round_receipts) receipt.independence_level = "second-model";
+  const unavailable = {
+    ...state.round_receipts[0],
+    round_id: "R0-unavailable",
+    invocation_id: "invocation-unavailable",
+    verdict: "FAILED",
+  };
+  const diagnostic = {
+    ...unavailable,
+    round_id: "R0-diagnostic",
+    invocation_id: "invocation-diagnostic",
+    verdict: "FAILED",
+    reviewer_role: "diagnostic",
+    independence_level: "fresh-context",
+    diagnostic_for_invocation_id: unavailable.invocation_id,
+  };
+  state.round_receipts.unshift(unavailable, diagnostic);
+  state.attempted_invocations.unshift(unavailable.invocation_id, diagnostic.invocation_id);
+  assert.match(evaluateGateState(state).failures.join("\n"), /diagnostic fallback.*keeps the gate unpassed/i);
+
+  diagnostic.diagnostic_for_invocation_id = "invocation-missing";
+  assert.match(evaluateGateState(state).failures.join("\n"), /must link to an earlier unavailable second-model invocation/i);
+  diagnostic.diagnostic_for_invocation_id = unavailable.invocation_id;
+
+  state.round_receipts = [diagnostic, unavailable, ...state.round_receipts.slice(2)];
+  assert.match(evaluateGateState(state).failures.join("\n"), /must link to an earlier unavailable second-model invocation/i);
+  state.round_receipts = [unavailable, diagnostic, ...state.round_receipts.slice(2)];
+
+  state.final_reviewer_verdicts[0].invocation_id = diagnostic.invocation_id;
+  assert.match(evaluateGateState(state).failures.join("\n"), /must bind a required reviewer receipt/i);
+  state.final_reviewer_verdicts[0].invocation_id = "invocation-close";
+
+  const secondDiagnostic = {
+    ...diagnostic,
+    round_id: "R0-diagnostic-2",
+    invocation_id: "invocation-diagnostic-2",
+  };
+  state.round_receipts.splice(2, 0, secondDiagnostic);
+  state.attempted_invocations.splice(2, 0, secondDiagnostic.invocation_id);
+  assert.match(evaluateGateState(state).failures.join("\n"), /more than one diagnostic fallback/i);
+});
+
+test("reviewer and author identities reject surrounding whitespace", () => {
+  let state = closingFixture();
+  state.author_identity = " reviewer-a ";
+  assert.match(evaluateGateState(state).failures.join("\n"), /without surrounding whitespace/i);
+
+  state = closingFixture();
+  state.required_reviewers[0] = " reviewer-a ";
+  assert.match(evaluateGateState(state).failures.join("\n"), /without surrounding whitespace/i);
+
+  state = closingFixture();
+  state.explicit_second_model_reviewers = [" reviewer-a "];
+  assert.match(evaluateGateState(state).failures.join("\n"), /without surrounding whitespace/i);
+
+  state = closingFixture();
+  state.round_receipts[0].reviewer = " reviewer-a ";
+  assert.match(evaluateGateState(state).failures.join("\n"), /without surrounding whitespace/i);
+
+  state = closingFixture();
+  state.final_reviewer_verdicts[0].reviewer = " reviewer-a ";
+  assert.match(evaluateGateState(state).failures.join("\n"), /without surrounding whitespace/i);
+});
+
+test("required receipt identities must belong to the frozen reviewer set", () => {
+  const state = closingFixture();
+  const outsider = {
+    ...state.round_receipts[0],
+    round_id: "R-outsider",
+    invocation_id: "invocation-outsider",
+    reviewer: "reviewer-outsider",
+    verdict: "FAILED",
+  };
+  state.round_receipts.push(outsider);
+  state.attempted_invocations.push(outsider.invocation_id);
+  assert.match(evaluateGateState(state).failures.join("\n"), /not in the frozen required_reviewers/i);
+});
+
+test("multiple reviewers may mix only explicitly selected second-model lanes", () => {
+  const state = closingFixture();
+  const closingReceipt = state.round_receipts.find((receipt) => receipt.invocation_id === "invocation-close");
+  const closingReport = state.round_reports.find((report) => report.invocation_id === "invocation-close");
+  state.required_reviewers.push("reviewer-b");
+  state.explicit_second_model_reviewers = ["reviewer-a"];
+  for (const receipt of state.round_receipts) receipt.independence_level = "second-model";
+  state.final_reviewer_verdicts.push({
+    reviewer: "reviewer-b",
+    revision: state.current_revision,
+    review_kind: "complete",
+    verdict: "GO",
+    invocation_id: "invocation-b-close",
+  });
+  state.round_receipts.push({
+    ...closingReceipt,
+    round_id: "R3",
+    invocation_id: "invocation-b-close",
+    reviewer: "reviewer-b",
+    reviewer_session_id_or_opaque_handle: "session-b-close",
+    independence_level: "fresh-context",
+  });
+  state.round_reports.push({
+    ...closingReport,
+    invocation_id: "invocation-b-close",
+    finding_ids: [],
+    finding_payloads: [],
+  });
+  state.attempted_invocations.push("invocation-b-close");
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+
+  state.round_receipts.find((receipt) => receipt.reviewer === "reviewer-b").independence_level = "second-model";
+  assert.match(evaluateGateState(state).failures.join("\n"), /defaults to fresh-context/i);
+});
+
 test("closing fixture fails on same-revision fix, upgraded kind, or missing coverage", () => {
   let state = closingFixture();
   state.findings[0].revision = state.current_revision;

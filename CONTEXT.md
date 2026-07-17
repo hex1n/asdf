@@ -98,9 +98,13 @@ _Avoid_: success, finished
 The host-provided component that re-prompts the loop across turns so a human is not the per-turn clock. Driver + criterion gate + criterion together close the loop; taskloop does not require or bundle a particular driver.
 _Avoid_: scheduler, cron job
 
-**Plan Review (方案评审)**:
-The optional post-plan skill (`plan-review`) that freezes one plan revision, calibrates review depth to the plan's risk, sends it to a read-only second model or fresh-context subagent, adjudicates every finding, and repeats whole-revision review until every required reviewer returns GO with no open finding. It revises plans, never implementation, and its gate is independent of taskloop's Criterion Gate.
-_Avoid_: Plan Gate (old name), Criterion Gate, one-shot review, self-approval
+**Plan Review (方案/计划评审)**:
+The optional post-plan skill (`plan-review`) that verifies one frozen candidate revision against an upstream build decision it consumes but never creates. Its `plan` is the planner's output in the wide sense — a design, an implementation plan, or any artifact stating what will be built and how — not a schedule of steps; 方案 and 计划 are both in scope, and neither alone names it. It enters only on an explicit review ask carrying a `BUILD` Decision Envelope or an explicit correctness-only request, freezes one revision, calibrates review depth to the plan's risk, defaults every required reviewer to a fresh-context read-only reviewer (a second model only where the user names one), adjudicates every finding, and repeats whole-revision review until the exact final revision passes. Its closing report separates a `technical_verdict` from an `implementation_decision`, so a technical GO never reads as implementation authorization. It revises plans, never implementation; `DEFERRED`, `SUSPENDED`, and exhausted budget are never passes; and its gate is independent of taskloop's Criterion Gate.
+_Avoid_: Plan Gate (old name), Criterion Gate, one-shot review, self-approval, GO as implementation authorization, proposal review (a proposal awaits approval; this consumes a decision already made)
+
+**Decision Envelope (决策信封)**:
+The upstream planner's frozen worth-building record (`BUILD | DEFER | NO_BUILD | RESEARCH_FIRST`) plus the target outcome, expected benefit, delivery and maintenance cost, status quo, and flip condition that justify it. `first-principles-planner` writes it at its Value Gate; `plan-review` consumes it unchanged at its Entry Gate and never recomputes value. A revision that breaks the envelope's economics invalidates it and returns the value question to the planner.
+_Avoid_: ROI score, business case, review scope
 
 **Concurrency Mode**:
 How parallel writers share work: worktree fan-out (one worktree per writer, each with its own `.taskloop/` task, one integrator). There is no shared-worktree partitioned mode.

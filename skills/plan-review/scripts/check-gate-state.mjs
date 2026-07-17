@@ -245,10 +245,6 @@ export function evaluateGateState(state) {
     }
     if (required.includes(receipt?.reviewer)) {
       const selectedSecondModel = explicitSecondModel.includes(receipt.reviewer);
-      if (!selectedSecondModel &&
-          (receipt?.reviewer_role !== "required" || receipt?.independence_level !== "fresh-context")) {
-        failures.push(`${id} required reviewer defaults to fresh-context without an explicit second-model selection`);
-      }
       if (selectedSecondModel && receipt?.independence_level === "second-model" &&
           receipt?.reviewer_role !== "required") {
         failures.push(`${id} second-model invocation must use the required reviewer role`);
@@ -440,11 +436,8 @@ export function evaluateGateState(state) {
     if (receipt.reviewer_role !== "required") {
       failures.push(`closing verdict for ${id} must bind a required reviewer receipt`);
     }
-    const expectedIndependence = explicitSecondModel.includes(verdict.reviewer)
-      ? "second-model"
-      : "fresh-context";
-    if (receipt.independence_level !== expectedIndependence) {
-      failures.push(`closing verdict for ${id} does not match its frozen ${expectedIndependence} reviewer class`);
+    if (explicitSecondModel.includes(verdict.reviewer) && receipt.independence_level !== "second-model") {
+      failures.push(`closing verdict for ${id} does not honor its frozen second-model reviewer class`);
     }
     const sourceReport = reports.find((report) => report?.invocation_id === verdict.invocation_id);
     const coveredRubric = Array.isArray(sourceReport?.coverage?.rubric_dimensions)
@@ -460,6 +453,40 @@ export function evaluateGateState(state) {
     const closingDefects = closingFindings.filter((finding) => ["blocker", "should_fix"].includes(finding.severity));
     if (closingDefects.length > 0) {
       failures.push(`closing GO for ${id} contains blocker or should-fix findings: ${closingDefects.map((finding) => finding.id).join(", ")}`);
+    }
+  }
+
+  // Depth must buy something. Full depth is chosen for irreversibility and blast
+  // radius, so it may not close on a same-model reviewer while a second model was
+  // available: that combination was silently passing before.
+  if (state.review_depth === "full") {
+    const closesOnSecondModel = verdicts.some((verdict) => {
+      const receipt = receipts.find((item) => item?.invocation_id === verdict?.invocation_id);
+      return receipt?.independence_level === "second-model";
+    });
+    if (!closesOnSecondModel) {
+      const availability = state.second_model_availability;
+      if (!availability || typeof availability !== "object" || Array.isArray(availability)) {
+        failures.push("full depth closing without a second-model reviewer requires a recorded second_model_availability");
+      } else if (availability.available !== false) {
+        failures.push("full depth requires a second-model reviewer when the runtime has one");
+      } else if (!nonEmptyString(availability.basis)) {
+        failures.push("recorded second-model unavailability needs a basis");
+      } else {
+        // Unavailability is a fact to be traced, not a sentence to be asserted:
+        // hold it to the same standard as the diagnostic fallback — a real
+        // attempt that really failed. Otherwise an agent avoiding an expensive
+        // second-model call just writes `available: false` and full depth
+        // quietly decays into shallow.
+        const probeId = availability.probe_invocation_id;
+        const probe = receipts.find((item) => item?.invocation_id === probeId);
+        if (!nonEmptyString(probeId) || !attempts.includes(probeId)) {
+          failures.push("second-model unavailability must name an attempted probe invocation");
+        } else if (!probe || probe.independence_level !== "second-model" ||
+                   !["FAILED", "TIMED-OUT"].includes(probe.verdict)) {
+          failures.push("second-model unavailability must link a second-model probe receipt that FAILED or TIMED-OUT");
+        }
+      }
     }
   }
 

@@ -2,6 +2,11 @@
   "current_revision": "sha256:fixed",
   "author_identity": "parent-author",
   "review_depth": "full",
+  "second_model_availability": {
+    "available": false,
+    "basis": "no read-only second-model runtime is configured on this host",
+    "probe_invocation_id": "invocation-second-model-probe"
+  },
   "required_rubric_dimensions": ["coherence", "feasibility", "compatibility", "migration/rollback", "verification", "scope"],
   "required_reviewers": ["reviewer-a"],
   "explicit_second_model_reviewers": [],
@@ -45,6 +50,29 @@
     }
   ],
   "round_receipts": [
+    {
+      "round_id": "R0",
+      "invocation_id": "invocation-second-model-probe",
+      "revision_hash": "sha256:original",
+      "review_kind": "complete",
+      "verdict": "FAILED",
+      "runtime": "fixture-runtime",
+      "provider": "fixture-second-model-provider",
+      "model": "fixture-second-model",
+      "reviewer": "reviewer-a",
+      "reviewer_role": "required",
+      "effort": "fixture",
+      "reviewer_session_id_or_opaque_handle": "session-second-model-probe",
+      "independence_level": "second-model",
+      "model_calls": 0,
+      "input_characters": 0,
+      "output_characters": 0,
+      "wall_clock_ms": 5,
+      "physical_sessions": 0,
+      "retries": 0,
+      "measurement_source": "fixture",
+      "measurement_precision": "exact"
+    },
     {
       "round_id": "R1",
       "invocation_id": "invocation-sweep",
@@ -132,7 +160,7 @@
       }
     }
   ],
-  "attempted_invocations": ["invocation-sweep", "invocation-close"],
+  "attempted_invocations": ["invocation-second-model-probe", "invocation-sweep", "invocation-close"],
   "active_reviewer_invocations": [],
   "material_change_after_go": false,
   "resolved_budget": { "source": "calibrated-default", "unit": "reviewer invocations", "threshold": 6 }

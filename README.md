@@ -17,7 +17,7 @@ for the distribution vocabulary.
 | Skill | Focus | Purpose |
 | --- | --- | --- |
 | [`first-principles-planner`](skills/first-principles-planner/) | plan | Reframe the root problem and compare mechanisms before implementation. |
-| [`plan-review`](skills/plan-review/) | verify | Re-review an exact completed-plan revision with a second model or fresh-context subagent until every required reviewer returns GO; review depth follows plan risk. |
+| [`plan-review`](skills/plan-review/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`project-docs-layer`](skills/project-docs-layer/) | prepare | Audit and repair the operating-docs layer a project needs before work starts. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |

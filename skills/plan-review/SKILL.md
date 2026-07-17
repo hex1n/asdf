@@ -3,15 +3,16 @@ name: plan-review
 description: >
   Review one completed design or plan through independent falsification until
   the exact final revision passes. Enter only on an explicit review ask against
-  one existing plan: 审查到通过, 方案评审, 计划评审, 证伪/多视角审查现有方案,
-  or a second-model review before implementation; a plan merely being finished
-  is not an ask. For competing options or an unresolved decision, use
-  first-principles-planner.
+  one existing design or plan: 审查到通过, 方案评审, 计划评审,
+  证伪/多视角审查现有方案或计划, or a second-model review before
+  implementation; a candidate merely being finished is not an ask. For competing
+  options or an unresolved decision, use first-principles-planner.
 ---
 
 # Plan Review
 
-Falsify and revise one completed plan. Revise only the named plan artifact;
+Falsify and revise one completed candidate — a design, a plan, or any artifact
+that says what will be built and how. Revise only the named candidate;
 implementation remains outside this skill.
 
 ## Entry Gate
@@ -57,15 +58,20 @@ tokens; prose may qualify a token, never replace it. A `DEFERRED`,
 
 ## Exact Gate
 
-Freeze before dispatch. Default every required reviewer to the runtime's
-fresh-context read-only reviewer. Replace that default with a read-only
-second-model reviewer only for a reviewer the user explicitly requests as
-second-model. Reviewer class is independent of depth:
+Freeze before dispatch. Reviewer class follows depth: full depth requires a
+read-only second-model reviewer whenever the runtime has one, because a
+different model is a stronger falsifier for same-model blind spots; shallow
+depth defaults to the runtime's fresh-context read-only reviewer. An explicit
+user request for a second-model reviewer overrides the default at any depth.
+When full depth has no second-model reviewer, attempt one and record the failed
+probe and its basis at freeze time, then proceed fresh-context: unavailability
+is a traced fact, never a self-written sentence, and that review is
+independence-limited in its closing report. Freeze:
 
 - the exact candidate and content hash;
 - the Decision Envelope and review scope resolved by the Entry Gate;
 - author identity; required reviewers, their frozen classes, explicit
-  second-model selections, and depth;
+  second-model selections, depth, and second-model availability with its basis;
 - rubric, authority evidence, constraints, and the resolved budget;
 - a ledger for rounds, findings, parent validations, and dispositions.
 
@@ -82,7 +88,8 @@ and record that basis here at freeze time. Shallow depth is eligible only when
 the plan is reversible and has no data-destruction,
 external-interface, permission, or funds path: at least one review round.
 Otherwise use full depth. When eligibility is uncertain or
-contested, use full depth. The pass condition below is identical at every depth.
+contested, use full depth. Depth changes who must review, never what counts as
+a pass; the gate below is identical at every depth.
 
 The gate passes only when:
 
@@ -97,8 +104,12 @@ and no material change happened after those reviews
 ```
 
 The default rubric covers coherence, feasibility, compatibility,
-migration/rollback, verification, and scope. Existing-system claims require an
-authority source or become verification gaps.
+migration/rollback, verification, and scope. Add candidate-specific dimensions
+whenever the candidate carries claims the default six do not reach — fidelity to
+a source record it transcribes, completeness against an upstream inventory it
+compiles — and freeze them with the rest; a claim no rubric dimension names is a
+claim no reviewer is asked to attack. Existing-system claims require an authority
+source or become verification gaps.
 
 Severity is fixed by consequence, never by review cost: `blocker` — could make
 the result unsafe, wrong, unexecutable, or unverifiable; `should-fix` —

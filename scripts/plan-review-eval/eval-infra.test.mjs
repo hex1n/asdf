@@ -19,10 +19,71 @@ test("full blocker-sweep to complete-review closing path passes", () => {
   assert.deepEqual(evaluateGateState(closingFixture()), { pass: true, failures: [] });
 });
 
-test("reviewers default to fresh-context and second-model requires an explicit selection", () => {
-  let state = closingFixture();
+test("a stronger reviewer than the frozen default never fails the gate", () => {
+  // Second-model reviewers used to require an explicit user selection, which
+  // barred the strongest available falsifier unless someone asked by name.
+  const state = closingFixture();
   for (const receipt of state.round_receipts) receipt.independence_level = "second-model";
-  assert.match(evaluateGateState(state).failures.join("\n"), /defaults to fresh-context/i);
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+});
+
+test("full depth cannot close on a same-model reviewer while a second model was available", () => {
+  let state = closingFixture();
+  delete state.second_model_availability;
+  assert.match(evaluateGateState(state).failures.join("\n"), /requires a recorded second_model_availability/i);
+
+  state = closingFixture();
+  state.second_model_availability = { available: true, basis: "second-model runtime is configured" };
+  assert.match(evaluateGateState(state).failures.join("\n"), /requires a second-model reviewer when the runtime has one/i);
+
+  state = closingFixture();
+  state.second_model_availability = { available: false };
+  assert.match(evaluateGateState(state).failures.join("\n"), /unavailability needs a basis/i);
+
+  state = closingFixture();
+  state.second_model_availability = { available: false, basis: "   " };
+  assert.match(evaluateGateState(state).failures.join("\n"), /unavailability needs a basis/i);
+
+  // Unavailability must be traced, not asserted. A prose basis alone is what an
+  // agent writes to dodge an expensive second-model call.
+  state = closingFixture();
+  delete state.second_model_availability.probe_invocation_id;
+  assert.match(evaluateGateState(state).failures.join("\n"), /must name an attempted probe invocation/i);
+
+  state = closingFixture();
+  state.second_model_availability.probe_invocation_id = "invocation-never-attempted";
+  assert.match(evaluateGateState(state).failures.join("\n"), /must name an attempted probe invocation/i);
+
+  // The named probe must be a second-model attempt that actually failed.
+  state = closingFixture();
+  state.second_model_availability.probe_invocation_id = "invocation-close";
+  assert.match(evaluateGateState(state).failures.join("\n"), /probe receipt that FAILED or TIMED-OUT/i);
+
+  state = closingFixture();
+  state.round_receipts.find((receipt) => receipt.invocation_id === "invocation-second-model-probe")
+    .independence_level = "fresh-context";
+  assert.match(evaluateGateState(state).failures.join("\n"), /probe receipt that FAILED or TIMED-OUT/i);
+
+  state = closingFixture();
+  state.round_receipts.find((receipt) => receipt.invocation_id === "invocation-second-model-probe")
+    .verdict = "TIMED-OUT";
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+
+  // An available second model satisfies full depth with no availability record.
+  state = closingFixture();
+  delete state.second_model_availability;
+  for (const receipt of state.round_receipts) receipt.independence_level = "second-model";
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+
+  // Shallow depth is unaffected: a fresh-context close stays legitimate.
+  state = closingFixture();
+  state.review_depth = "shallow";
+  delete state.second_model_availability;
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+});
+
+test("an explicit second-model selection is still honoured exactly", () => {
+  let state = closingFixture();
 
   for (const depth of ["full", "shallow"]) {
     state = closingFixture();
@@ -34,7 +95,7 @@ test("reviewers default to fresh-context and second-model requires an explicit s
 
   state = closingFixture();
   state.explicit_second_model_reviewers = ["reviewer-a"];
-  assert.match(evaluateGateState(state).failures.join("\n"), /frozen second-model reviewer class/i);
+  assert.match(evaluateGateState(state).failures.join("\n"), /does not honor its frozen second-model reviewer class/i);
 
   state = closingFixture();
   state.explicit_second_model_reviewers = ["reviewer-not-required"];
@@ -138,7 +199,7 @@ test("required receipt identities must belong to the frozen reviewer set", () =>
   assert.match(evaluateGateState(state).failures.join("\n"), /not in the frozen required_reviewers/i);
 });
 
-test("multiple reviewers may mix only explicitly selected second-model lanes", () => {
+test("multiple reviewers may mix independence lanes, and a stronger lane is never a failure", () => {
   const state = closingFixture();
   const closingReceipt = state.round_receipts.find((receipt) => receipt.invocation_id === "invocation-close");
   const closingReport = state.round_reports.find((report) => report.invocation_id === "invocation-close");
@@ -169,8 +230,10 @@ test("multiple reviewers may mix only explicitly selected second-model lanes", (
   state.attempted_invocations.push("invocation-b-close");
   assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
 
+  // reviewer-b was not named as second-model, but reviewing with a stronger
+  // independence lane than frozen is an upgrade, not a gate failure.
   state.round_receipts.find((receipt) => receipt.reviewer === "reviewer-b").independence_level = "second-model";
-  assert.match(evaluateGateState(state).failures.join("\n"), /defaults to fresh-context/i);
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
 });
 
 test("closing fixture fails on same-revision fix, upgraded kind, or missing coverage", () => {
@@ -193,8 +256,8 @@ test("every sweep and complete report needs unique exact coverage", () => {
   assert.match(evaluateGateState(state).failures.join("\n"), /lacks required blocker-sweep coverage/);
 
   state = closingFixture();
-  state.round_receipts[0].review_kind = "complete";
-  state.round_reports[0].review_kind = "complete";
+  state.round_receipts.find((receipt) => receipt.invocation_id === "invocation-sweep").review_kind = "complete";
+  state.round_reports.find((report) => report.invocation_id === "invocation-sweep").review_kind = "complete";
   assert.match(evaluateGateState(state).failures.join("\n"), /lacks required complete coverage/);
 
   state = closingFixture();

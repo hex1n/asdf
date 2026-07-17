@@ -1,4 +1,4 @@
 interface:
   display_name: "Plan Review"
-  short_description: "Review plans until every required reviewer passes"
-  default_prompt: "Use $plan-review to review this completed plan until every required reviewer returns GO."
+  short_description: "Independently falsify one completed design or plan revision"
+  default_prompt: "Use $plan-review to review this completed design or plan through independent falsification."

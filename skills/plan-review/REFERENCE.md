@@ -76,7 +76,9 @@ silently dropping evidence-dependent rubric criteria.
 
 Bind each reviewer class frozen by the Exact Gate without reselecting it:
 `fresh-context` uses the runtime's read-only agent capability; `second-model`
-uses the available read-only second-model capability.
+uses the available read-only second-model capability. Resolve second-model
+availability once, at freeze time, from what this runtime actually offers — not
+from whether reaching for it feels expensive — and record the basis either way.
 Record reviewer identity, independence level, disclosure boundary, and every
 availability failure or diagnostic fallback.
 
@@ -170,13 +172,24 @@ every ledger finding maps back to its source manifest and records
 `parent_validation_disclosed: true`. All collection fields are explicit arrays.
 Malformed, missing, or unreconciled collections fail closed.
 
-The gate state freezes `author_identity`, `review_depth: shallow | full`, and
+The gate state freezes `author_identity`, `review_depth: shallow | full`,
 `explicit_second_model_reviewers` as an array of unique identities drawn from
-`required_reviewers`; the author cannot be a required reviewer. An empty array
-keeps every required reviewer on the fresh-context default. A required-reviewer
-receipt outside that array must record `reviewer_role: required` and
-`independence_level: fresh-context`; a closing receipt for an identity inside it
-must record `reviewer_role: required` and `independence_level: second-model`.
+`required_reviewers`, and `second_model_availability: {available, basis}`; the
+author cannot be a required reviewer. A closing receipt for an identity inside
+`explicit_second_model_reviewers` must record `reviewer_role: required` and
+`independence_level: second-model`. Reviewing with a stronger independence lane
+than frozen is an upgrade, never a gate failure.
+
+Depth drives reviewer strength. A `full` depth gate may not close on
+fresh-context reviewers alone unless `second_model_availability` records
+`available: false`, a non-empty `basis`, and a `probe_invocation_id` naming an
+attempted second-model invocation whose receipt is `FAILED` or `TIMED-OUT` —
+the same evidence standard the diagnostic fallback already uses. Unavailability
+is a traced fact, never a self-written sentence; without that trace an agent
+avoiding an expensive second-model call would simply declare it, and full depth
+would decay into shallow. Such a close is independence-limited and every report
+says so. Claiming availability while closing same-model, and claiming
+unavailability without a failed probe, both fail closed. Shallow is unaffected.
 
 A diagnostic fallback keeps the frozen reviewer identity, records
 `reviewer_role: diagnostic` and `independence_level: fresh-context`, and links

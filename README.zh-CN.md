@@ -16,7 +16,7 @@
 | 技能 | 领域 | 用途 |
 | --- | --- | --- |
 | [`first-principles-planner`](skills/first-principles-planner/) | 规划 | 回到根问题，分离约束与假设并比较机制。 |
-| [`plan-review`](skills/plan-review/) | 验证 | 让第二模型或 fresh-context 子代理反复审查同一份完整方案 revision，直到所有必需 reviewer 返回 GO；审查深度随方案风险标定。 |
+| [`plan-review`](skills/plan-review/) | 验证 | 对同一份完整的方案或计划 revision 反复独立证伪，直到所有必需 reviewer 返回 GO 或审查挂起；深度随候选风险标定，并决定 reviewer 强度。 |
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`project-docs-layer`](skills/project-docs-layer/) | 准备 | 审计并修复项目开工所需的最小运行文档层。 |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | 验证 | 基于设计、需求与代码生成可溯源的端到端测试计划。 |

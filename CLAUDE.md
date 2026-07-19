@@ -58,3 +58,8 @@ When adding or changing a skill, follow `AGENTS.md`:
 Before claiming a skill change is done, run the relevant focused checks and
 report the result. Protect load-bearing rules with a small example or test when
 practical.
+
+The repo-wide gate is `node scripts/check-all.mjs`: it runs every local test
+suite — including the local-only `tests/` directories that CI never sees — plus
+the installed-copy check. Run it before and after any skill change; a semantic
+edit that skips the local suites is exactly the failure it exists to catch.

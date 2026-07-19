@@ -32,6 +32,7 @@ Use this section only when request language, route examples, or saved artifact l
 - `是否应该替换 X?` / `还有更好的吗?` / `最佳了吗?` -> Decision.
 - `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan.
 - `深度分析为什么失败` -> Research-first; plan only if the user asks for a fix path.
+- `把方案转成实施计划` / `拆成切片、阶段、工单` -> execution breakdown of a converged 方案: 把收敛后新陈述的事实对照决策翻盘条件扫一遍(只扫会话,不做新分析)— 假设已破、成本或工期恶化、未接受的疑点,任一命中即不过;疑点只有在用户点名风险并选择继续时才算接受,转换请求本身不算。全部通过 -> 交还执行拆解; 任一命中、无已收敛方案、或翻盘条件已不在会话中 -> Plan.
 - `审查这个方案有没有问题` -> use a review skill; re-plan only if asked.
 
 ### Chinese Output Labels

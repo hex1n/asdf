@@ -10,7 +10,11 @@ description: >
   先不coding), adopt/replace/tradeoff decisions (是否应该, 取舍), converging
   or falsifying competing options or an unresolved decision (收敛方案,
   方案选型, 多方案对比/证伪), deciding whether something is worth building or
-  worth doing now (ROI, 值不值得做, 现在要不要做), and 第一性原理 asks. Do
+  worth doing now (ROI, 值不值得做, 现在要不要做), 第一性原理 asks, and
+  mid-conversation follow-ups — a best-fix ask after analysis in this
+  conversation (给出最佳改进方案), or a challenge to a recommendation just
+  given (上面的是最佳方案/改进吗, 是根治吗, 最佳形态了吗) — which re-enter this
+  skill for a fresh mechanism comparison. Do
   not use for pure fact-finding research, live bug diagnosis, implementation,
   code review, reviewing or falsifying one existing plan (计划评审, 方案评审
   — use plan-review), durable ADR/CONTEXT capture, or skill-writing audits
@@ -30,7 +34,7 @@ Choose the route before work:
 - **Planner**: strategic plan, design direction, architecture evolution, improvement proposal, technology tradeoff, or "best/better solution" request.
 - **Research-first**: pure fact-finding requests, including localized investigation phrases in [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules), "investigate", "trace", or "figure out why". If the prompt also includes localized best-plan or no-coding planning signals from that reference, gather facts first, then return to planner mode.
 - **Review/critique**: plan review, document review, or any localized review phrase from [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules) belongs to a review skill. Use this skill only if the user asks to re-plan from first principles.
-- **No full planner**: implementation, testing, approval, durable ADR/CONTEXT capture, or narrow code-change tasks unless the user says to plan first.
+- **No full planner**: implementation, testing, approval, execution breakdown of an already-converged plan (see Route Examples), durable ADR/CONTEXT capture, or narrow code-change tasks unless the user says to plan first.
 
 If running as a subagent, use the full planner only for delegated planning, architecture, strategy, or proposal synthesis. Implementation, testing, review, approval, and narrow research subagents should use at most a short assumption check.
 
@@ -79,6 +83,7 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 - `Should we replace X?` / `Is there a better path?` -> Decision.
 - `Plan first; do not change code yet` / `Give an implementation strategy` -> Plan.
 - `Deeply analyze why X fails` -> Research-first; plan only if the user asks for a fix path.
+- `Turn the plan we converged on into an execution breakdown (slices, phases, tickets)` -> check the facts stated since convergence against the decision's flip conditions — a scan of the conversation, not fresh analysis. A broken assumption, an adverse cost or timeline shift, or an unaccepted doubt fails the check; a doubt is accepted only by naming the risk and choosing to proceed, never by the conversion ask itself. All clear -> hand back for execution shaping. Any hit, no converged plan, or flip conditions no longer visible in this conversation -> run Plan mode.
 - `Review this plan` -> use a review skill; re-plan only if asked.
 - Localized route examples live in [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules).
 

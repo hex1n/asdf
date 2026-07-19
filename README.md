@@ -20,10 +20,34 @@ for the distribution vocabulary.
 | [`plan-review`](skills/plan-review/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`project-docs-layer`](skills/project-docs-layer/) | prepare | Audit and repair the operating-docs layer a project needs before work starts. |
+| [`blindspot-pass`](skills/blindspot-pass/) | prepare | Surface the unknown unknowns between the user and unfamiliar territory before work starts, and turn them into a better prompt. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
+| [`implementation-notes`](skills/implementation-notes/) | land | Keep a deviation log while implementing from an approved plan, so unforeseen edge cases feed the next planning round. |
+| [`merge-quiz`](skills/merge-quiz/) | verify | Quiz the user on a completed change until a perfect pass, gating merge or approval on their comprehension. |
+
+## Lifecycle placement
+
+```
+prepare      project-docs-layer · blindspot-pass      ← fix the docs and the prompt before work
+plan         first-principles-planner → plan-review   ← decide the plan, then falsify it
+implement    implementation-notes                     ← log every deviation from the plan
+verify       e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
+approve      merge-quiz                               ← gate merge on the human's comprehension
+investigate  deep-research                            ← on demand at any stage
+              ↑ deviations and discovered unknowns feed the next plan
+```
+
+Most skills keep the work itself correct. Three keep the human in sync with
+fast agent output: `blindspot-pass` stops unknown unknowns from shaping the
+prompt, `implementation-notes` stops in-flight decisions from vanishing into
+the diff, and `merge-quiz` stops changes nobody understands from being
+approved. Stress-testing a plan the user already holds (interview/grill-style
+skills) sits between planning and review and lives outside this repository.
+On small changes in familiar code under live supervision, the human-sync
+skills stay silent.
 
 ## Compatibility
 

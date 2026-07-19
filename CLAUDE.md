@@ -20,9 +20,10 @@ canonical domain language lives in **[CONTEXT.md](CONTEXT.md)**.
 ## Repository layout
 
 - `skills/` — source skills, one directory each. Current skills:
-  `deep-research`, `e2e-test-executor`,
+  `blindspot-pass`, `deep-research`, `e2e-test-executor`,
   `e2e-test-planner`,
-  `first-principles-planner`, `plan-review`, `generating-api-docs`, `generating-test-scope`,
+  `first-principles-planner`, `implementation-notes`, `merge-quiz`,
+  `plan-review`, `generating-api-docs`, `generating-test-scope`,
   `project-docs-layer`, and other repository-owned domain
   skills. Only `workloop` and `loop-core` come from taskloop.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`).

@@ -295,7 +295,23 @@ export function evaluateGateState(state) {
       failures.push(`frozen second-model reviewer ${reviewer} has more than one diagnostic fallback`);
     }
     if (diagnostics.length > 0) {
-      failures.push(`diagnostic fallback for ${reviewer} keeps the gate unpassed`);
+      // A diagnostic probes an unavailable reviewer; it never substitutes for it.
+      // The gate reopens only when that reviewer really returns: a second-model
+      // complete GO closing the current revision, recorded after the diagnostic
+      // in receipt order — a pre-diagnostic GO is the close the diagnostic put
+      // in doubt, not a recovery from it. An unconditional block would punish
+      // recovery and push the parent toward discarding the ledger.
+      const lastDiagnosticIndex = Math.max(...diagnostics.map((item) => receipts.indexOf(item)));
+      const recovered = verdicts.some((verdict) => {
+        if (verdict?.reviewer !== reviewer || verdict?.revision !== revision) return false;
+        const closingIndex = receipts.findIndex((item) => item?.invocation_id === verdict?.invocation_id);
+        const closing = closingIndex > lastDiagnosticIndex ? receipts[closingIndex] : null;
+        return closing?.independence_level === "second-model" && closing?.review_kind === "complete" &&
+          closing?.verdict === "GO" && closing?.revision_hash === revision;
+      });
+      if (!recovered) {
+        failures.push(`diagnostic fallback for ${reviewer} keeps the gate unpassed until a second-model complete GO closes the current revision`);
+      }
     }
   }
 

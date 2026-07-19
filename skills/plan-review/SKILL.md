@@ -140,9 +140,11 @@ Completion: every reviewer can access the same exact revision and gate contract.
 ### 2. Review
 
 Dispatch each required reviewer exactly as frozen by the Exact Gate. The author
-is not an independent reviewer. For an unavailable frozen second-model
-reviewer, one diagnostic fresh-context round is allowed; then suspend rather
-than repeatedly pre-converge.
+is not an independent reviewer. For an unavailable explicitly selected
+second-model reviewer, one diagnostic fresh-context round is allowed; then
+suspend rather than repeatedly pre-converge. A depth-driven second-model lane
+that fails mid-review has no diagnostic lane: record the failed invocation,
+then close through the Exact Gate's traced-unavailability path or suspend.
 
 A self-reread may prepare the packet but cannot satisfy the gate.
 

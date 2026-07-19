@@ -127,6 +127,7 @@ verdict
 runtime
 provider
 model
+reviewer
 effort
 reviewer_session_id_or_opaque_handle
 reviewer_role: required | diagnostic
@@ -195,7 +196,10 @@ A diagnostic fallback keeps the frozen reviewer identity, records
 `reviewer_role: diagnostic` and `independence_level: fresh-context`, and links
 `diagnostic_for_invocation_id` to an earlier `FAILED` or `TIMED-OUT`
 second-model receipt for that reviewer. At most one diagnostic is allowed per
-frozen second-model reviewer, and its presence keeps the gate unpassed.
+explicitly selected second-model reviewer, and its presence keeps the gate unpassed until
+that reviewer recovers — a second-model complete GO closing the current
+revision, recorded after the diagnostic; the diagnostic never substitutes for
+the reviewer it probed, and a close it postdates is a close it put in doubt.
 
 A `blocker-sweep` report contains only blocker and verification-gap payloads.
 Each verification gap declares `gap_scope: decision_blocking |

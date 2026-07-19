@@ -139,7 +139,22 @@ test("gate freezes author and depth and diagnostic fallback cannot close", () =>
   };
   state.round_receipts.unshift(unavailable, diagnostic);
   state.attempted_invocations.unshift(unavailable.invocation_id, diagnostic.invocation_id);
-  assert.match(evaluateGateState(state).failures.join("\n"), /diagnostic fallback.*keeps the gate unpassed/i);
+  // The frozen second-model reviewer recovered and closed second-model on the
+  // current revision, so the historical diagnostic no longer blocks the gate.
+  assert.deepEqual(evaluateGateState(state), { pass: true, failures: [] });
+
+  const closingReceipt = state.round_receipts.find((receipt) => receipt.invocation_id === "invocation-close");
+  closingReceipt.independence_level = "fresh-context";
+  assert.match(evaluateGateState(state).failures.join("\n"), /diagnostic fallback.*keeps the gate unpassed until a second-model complete GO closes the current revision/i);
+  closingReceipt.independence_level = "second-model";
+
+  // A diagnostic recorded after the close puts that close in doubt: move the
+  // probe pair behind the closing receipt and the earlier GO is no recovery.
+  state.round_receipts = state.round_receipts.filter((receipt) => receipt !== unavailable && receipt !== diagnostic);
+  state.round_receipts.push(unavailable, diagnostic);
+  assert.match(evaluateGateState(state).failures.join("\n"), /diagnostic fallback.*keeps the gate unpassed until a second-model complete GO closes the current revision/i);
+  state.round_receipts = state.round_receipts.filter((receipt) => receipt !== unavailable && receipt !== diagnostic);
+  state.round_receipts.unshift(unavailable, diagnostic);
 
   diagnostic.diagnostic_for_invocation_id = "invocation-missing";
   assert.match(evaluateGateState(state).failures.join("\n"), /must link to an earlier unavailable second-model invocation/i);

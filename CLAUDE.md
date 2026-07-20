@@ -28,7 +28,8 @@ canonical domain language lives in **[CONTEXT.md](CONTEXT.md)**.
   - `scripts/` — stdlib-only helper scripts.
   - `tests/` — stdlib `unittest` tests for that skill.
 - `scripts/` — repository-owned maintenance tooling: `check-all.mjs` (the
-  repo-wide gate), `check-installed-copies.mjs`, and per-skill test directories.
+  repo-wide gate), `install-skills.mjs`, `check-installed-copies.mjs`, and
+  per-skill test directories.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
 - `AGENTS.md` — skill-authoring and maintenance conventions (skill assets).
 - `CONTEXT.md` — canonical domain language for skill distribution.
@@ -43,8 +44,11 @@ When adding or changing a skill, follow `AGENTS.md`:
   detail belongs in `REFERENCE.md`, not in the loaded skill body.
 - **Stay portable** — standard Markdown instructions and stdlib-only scripts; no
   runtime-specific workflow scripts or external dependencies in core skills.
-- **Don't edit managed installed copies** — keep installed runtime copies
-  byte-identical with their source; put personal divergence in a local override skill.
+- **Install by linking, never copying** — `node scripts/install-skills.mjs`
+  links each source skill into `.agents` and `.claude`, the runtimes that load
+  them; the rest of this machine reads `.agents`. A skill therefore exists once
+  on disk, in this repository, so an installed copy cannot drift and personal
+  divergence belongs in a separate local override skill.
 - **Evidence loop for improvements** — capture a baseline, name the failure mode,
   make the narrowest edit, re-validate, and decide with the hard gates + two-axis
   rule in `AGENTS.md` (no point scores).

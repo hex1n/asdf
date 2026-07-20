@@ -1,7 +1,7 @@
 ---
 name: e2e-test-executor
 description: >
-  Executes source-backed E2E test plans in local or test environments and produces evidence-backed reports. Use when the user asks to run, execute, validate, verify, or report on an E2E/end-to-end/端到端/全链路 plan or scenario, especially from e2e-test-planner output, using APIs, RPC/SDK/CLI tools, UI, databases, jobs, callbacks, queues, logs, metrics, stubs, or local services; do not use for creating the original test plan.
+  Executes an existing E2E runnable handoff in local or test environments and produces evidence-backed reports. A runnable handoff is a readable E2E plan, prior execution report, or concrete scenario with target surface, fixtures, steps, and oracles already defined. Use when the user asks to run, execute, rerun, or verify-by-running that handoff, including 执行已有端到端测试计划, 重跑已有 execution-report.md 中的场景, 重跑失败场景, or executing a named plan/report path. Route broad "do/perform E2E testing" asks, including 进行端到端测试, 做端到端测试, 开展端到端测试, 做全链路测试, to e2e-test-planner when the runnable handoff is absent.
 ---
 
 # E2E Test Executor

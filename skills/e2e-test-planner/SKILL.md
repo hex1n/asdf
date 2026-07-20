@@ -1,7 +1,7 @@
 ---
 name: e2e-test-planner
 description: >
-  Creates source-backed end-to-end test plans from design, requirements, plan documents, and codebase behavior. Use when the user asks for an E2E/end-to-end/端到端/全链路 test plan, 端到端测试计划, 全链路测试计划, 端到端测试场景, 全链路测试场景, 链路测试, 全链路回归, an end-to-end cross-system business workflow test plan, an end-to-end dependency-aware workflow test plan, integration/acceptance/regression coverage of an end-to-end flow, or E2E test scenarios from docs/code analysis covering main paths, dependent workflows, boundary cases, performance, consistency, concurrency, idempotency, or stateful business flows; do not use for fixing failing tests or writing test code unless the user asks for planning first.
+  Creates source-backed end-to-end test plans and runnable handoffs from design, requirements, plan documents, and codebase behavior. Use when the user asks to do/perform/arrange E2E/end-to-end/端到端/全链路 testing without an existing runnable handoff, including 进行端到端测试, 做端到端测试, 开展端到端测试, 做全链路测试, 端到端测试计划, 全链路测试计划, 端到端测试场景, 全链路测试场景, 链路测试, 全链路回归, integration/acceptance/regression coverage of an end-to-end flow, or E2E scenarios from docs/code analysis covering main paths, dependent workflows, boundaries, performance, consistency, concurrency, idempotency, or stateful business flows. Do not use for running an existing plan, prior run report, or concrete runnable scenario; use e2e-test-executor when the user explicitly asks to execute that handoff.
 ---
 
 # E2E Test Planner

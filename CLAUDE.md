@@ -4,14 +4,14 @@ Guidance for Claude Code (and other agent runtimes) when working in this reposit
 
 ## What this repo is
 
-`asdf-skills` ships additional portable agent skills. The standalone
-**taskloop** repository owns the loop runtime and producer-agnostic `workloop`
-core; this repository ships:
+`asdf-skills` ships portable agent skills. This repository owns every skill it
+ships:
 
-- **Skills** (`skills/`) — portable components the loop calls at each stage:
-  self-contained directories with Markdown instructions and, where needed,
-  stdlib-only helper scripts and tests, distributed into local agent runtimes
-  such as Codex and Claude Code.
+- **Skills** (`skills/`) — self-contained directories with Markdown
+  instructions and, where needed, stdlib-only helper scripts and tests. Each
+  skill is independently distributable: it carries what it needs, installs into
+  local agent runtimes such as Codex and Claude Code on its own, and depends on
+  neither the other skills here nor any orchestration runtime.
 
 The authoritative conventions for skill assets live in
 **[AGENTS.md](AGENTS.md)** — read it before adding or changing any skill. The
@@ -19,24 +19,19 @@ canonical domain language lives in **[CONTEXT.md](CONTEXT.md)**.
 
 ## Repository layout
 
-- `skills/` — source skills, one directory each. Current skills:
-  `blindspot-pass`, `deep-research`, `e2e-test-executor`,
-  `e2e-test-planner`,
-  `first-principles-planner`, `implementation-notes`, `merge-quiz`,
-  `plan-review`, `generating-api-docs`, `generating-test-scope`,
-  `project-docs-layer`, and other repository-owned domain
-  skills. Only `workloop` and `loop-core` come from taskloop.
+- `skills/` — source skills, one directory each. The full set:
+  `blindspot-pass`, `deep-research`, `e2e-test-executor`, `e2e-test-planner`,
+  `first-principles-planner`, `generating-api-docs`, `generating-test-scope`,
+  `implementation-notes`, `merge-quiz`, `plan-review`, `project-docs-layer`.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`).
   - `REFERENCE.md` / extra `.md` — progressive-disclosure detail loaded on demand.
   - `scripts/` — stdlib-only helper scripts.
   - `tests/` — stdlib `unittest` tests for that skill.
-- [hex1n/taskloop](https://github.com/hex1n/taskloop) — the independently
-  versioned task-first CLI, runtime installer, tests, and design history.
-- `scripts/` — repository-owned maintenance tooling, when present.
+- `scripts/` — repository-owned maintenance tooling: `check-all.mjs` (the
+  repo-wide gate), `check-installed-copies.mjs`, and per-skill test directories.
 - `docs/` — design notes, plans, and research (`docs/plans/`, `docs/research/`).
 - `AGENTS.md` — skill-authoring and maintenance conventions (skill assets).
-- `CONTEXT.md` — canonical domain language: skill distribution and loop
-  engineering.
+- `CONTEXT.md` — canonical domain language for skill distribution.
 
 ## Working conventions
 

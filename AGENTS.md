@@ -1,7 +1,7 @@
 # AGENTS.md for asdf-skills
 
-This repository owns portable **domain skills**. The standalone `taskloop`
-repository owns the work-loop runtime and producer-agnostic `workloop` core.
+This repository owns portable **domain skills**. Each is independently
+distributable and depends on no orchestration runtime.
 
 This file governs the **skill asset family**: authoring, evolution, and
 distribution discipline for `skills/`. Canonical domain terms live in

@@ -47,9 +47,7 @@
 
 ## 兼容性
 
-这些 skills 不依赖特定编排 runtime。它们可以与独立的
-[taskloop](https://github.com/hex1n/taskloop) 项目组合，但本仓不拥有或分发 taskloop、
-`workloop` 与 `loop-core`。
+这些 skills 不依赖特定编排 runtime，且每个都可独立分发。
 `plan-review` 在两个宿主复用同一套可移植流程：Codex 使用已配置的第二模型 connector
 或 fresh collaboration 子代理，Claude Code 使用外部第二模型或 fresh Agent 子代理；
 reviewer 始终只读。

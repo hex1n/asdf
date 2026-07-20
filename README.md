@@ -51,9 +51,8 @@ skills stay silent.
 
 ## Compatibility
 
-These skills are independent of any orchestration runtime. They may compose
-with the standalone [taskloop](https://github.com/hex1n/taskloop) project, but
-this repository does not own or distribute taskloop, `workloop`, or `loop-core`.
+These skills are independent of any orchestration runtime, and each is
+independently distributable.
 `plan-review` binds the same portable workflow to each host's read-only reviewer:
 a configured second-model connector or fresh collaboration subagent in Codex,
 and an external second model or fresh Agent subagent in Claude Code.

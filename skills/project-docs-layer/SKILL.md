@@ -46,7 +46,11 @@ durable untracked artifacts, and require no credentials, installation, network
 access, or shared or production state. Snapshot the existing repository state
 (for example, version-control status) before execution and check it afterward.
 Otherwise, leave the command unexecuted and report the verification gap and
-authority needed to close it. Classify a documented home whose required
+authority needed to close it. If a command run as safe changes tracked content
+or leaves durable artifacts anyway, apply the command-safety recovery rule in
+`REFERENCE.md`: stop running commands under that judgment, restore what the
+snapshots attribute to it, reclassify it as requiring authority, and report
+the effects. Classify a documented home whose required
 evidence cannot be obtained as `unverified`, not `stale`.
 
 Classify each home, then aggregate each question using the precedence and

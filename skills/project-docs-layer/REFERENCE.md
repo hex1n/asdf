@@ -1,8 +1,8 @@
 # Project Docs Layer — Reference
 
-Apply the answer ladder, five-question contract, command-safety rule, and
-multi-home aggregation during every audit. Apply Freshness, Harvest,
-Exclusions, and Canonicalization only when planning or performing a repair.
+Apply the answer ladder, five-question contract, command-safety rule,
+multi-home aggregation, and Exclusions during every audit. Apply Freshness,
+Harvest, and Canonicalization only when planning or performing a repair.
 
 ## The Answer Ladder
 
@@ -99,6 +99,16 @@ version-control status) before execution and check it afterward. When
 uncertain, preserve the gap: report the command, suspected effect, evidence
 inspected, and authority needed to run it.
 
+If the after-check shows changes anyway — tracked content modified or durable
+untracked artifacts left — the safety judgment was wrong. Stop running further
+documented commands under that judgment. Restore exactly what the snapshot
+pair attributes to the command: delete the artifacts it created and revert the
+tracked modifications it made; leave anything the snapshots cannot attribute
+to it untouched and report that residue for the user to disposition.
+Reclassify the command as requiring authority, and report the mis-judgment,
+the observed effects, and the restoration — or the approval needed to
+restore — in the audit output.
+
 ## Multi-Home Aggregation
 
 Record every discoverable home before assigning the question-level verdict.
@@ -163,7 +173,9 @@ entries in the same approved repair.
 
 ## Exclusions
 
-Keep these out of target-project operating docs:
+Keep these out of target-project operating docs. The list binds in both
+phases: during audit, report discovered excluded material as a defect on its
+home; during repair, keep it out of the diff:
 
 - **Host work discipline** — generic budgets, stop rules, review rituals, and
   closeout formats belong to the host workflow, not repository facts.

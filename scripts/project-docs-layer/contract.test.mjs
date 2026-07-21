@@ -57,6 +57,15 @@ test("audit, aggregation, safety, and evidence contracts stay explicit", () => {
   assert.match(skill, /observed\s+outcome matches the documented expectation/i);
 });
 
+test("command-safety recovery and audit-time exclusions stay explicit", () => {
+  assert.match(reference, /safety\s+judgment\s+was\s+wrong/i);
+  assert.match(reference, /snapshot\s+pair\s+attributes\s+to\s+the\s+command/i);
+  assert.match(reference, /Reclassify\s+the\s+command\s+as\s+requiring\s+authority/i);
+  assert.match(skill, /command-safety\s+recovery\s+rule\s+in\s+`REFERENCE\.md`/i);
+  assert.match(reference, /Exclusions\s+during\s+every\s+audit/);
+  assert.match(reference, /report\s+discovered\s+excluded\s+material\s+as\s+a\s+defect/i);
+});
+
 test("blocked evidence has a non-fabricated verdict", () => {
   assert.match(skill, /required\s+evidence cannot be obtained as `unverified`, not `stale`/i);
   assert.match(reference, /durable home exists[\s\S]{0,180}safe execution[\s\S]{0,120}unavailable/i);

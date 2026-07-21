@@ -66,6 +66,127 @@ test("linkSkill replaces an existing real copy rather than nesting inside it", (
   }
 });
 
+test("a failed link creation leaves the existing install in place", () => {
+  const { dir, cleanup } = scratch();
+  try {
+    const target = path.join(dir, "install", "alpha");
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, "stale.md"), "old\n");
+
+    // A null byte makes symlinkSync reject the target before anything is
+    // deleted, standing in for Windows permission or path-locking failures.
+    assert.throws(() => linkSkill(target, "bad\0target"));
+
+    assert.deepEqual(fs.readdirSync(path.dirname(target)), ["alpha"], "no staged leftovers");
+    assert.equal(fs.readFileSync(path.join(target, "stale.md"), "utf8"), "old\n", "old install must survive");
+  } finally {
+    cleanup();
+  }
+});
+
+test("a rename failure after the old install is removed keeps the link recoverable", () => {
+  const { dir, cleanup } = scratch();
+  try {
+    const source = makeSource(path.join(dir, "skills"), ["alpha"]);
+    const alpha = path.join(source, "alpha");
+    const target = path.join(dir, "install", "alpha");
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, "stale.md"), "old\n");
+
+    // One transient rename failure: the retry must still land the link.
+    let failures = 1;
+    const flaky = {
+      ...fs,
+      renameSync: (from, to) => {
+        if (failures-- > 0) throw new Error("EPERM: simulated lock");
+        fs.renameSync(from, to);
+      },
+    };
+    linkSkill(target, alpha, flaky);
+    assert.equal(classify(target, alpha), "linked");
+
+    // Rename keeps failing after the old install is gone: the staged link
+    // must survive on disk so the skill is recoverable, not silently absent.
+    const broken = { ...fs, renameSync: () => { throw new Error("EPERM: simulated lock"); } };
+    assert.throws(() => linkSkill(target, alpha, broken), /staged link kept/);
+    assert.equal(classify(`${target}.staged-link`, alpha), "linked", "staged link must survive");
+  } finally {
+    cleanup();
+  }
+});
+
+test("a removal that fails halfway through the old install keeps the staged link as recovery", () => {
+  const { dir, cleanup } = scratch();
+  try {
+    const source = makeSource(path.join(dir, "skills"), ["alpha"]);
+    const alpha = path.join(source, "alpha");
+    const target = path.join(dir, "install", "alpha");
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, "stale.md"), "old\n");
+
+    // Removing the old install deletes part of it, then fails — the staged
+    // link must survive as the recovery path, not be discarded as if the old
+    // install were still intact.
+    const partial = {
+      ...fs,
+      rmSync: (p, opts) => {
+        if (p === target) {
+          fs.rmSync(path.join(target, "stale.md"), { force: true });
+          throw new Error("EBUSY: simulated lock");
+        }
+        fs.rmSync(p, opts);
+      },
+    };
+    assert.throws(() => linkSkill(target, alpha, partial), /staged link kept/);
+    assert.equal(classify(`${target}.staged-link`, alpha), "linked", "staged link must survive");
+  } finally {
+    cleanup();
+  }
+});
+
+test("an occupied staged path that is not ours stops the install without deleting it", () => {
+  const { dir, cleanup } = scratch();
+  try {
+    const source = makeSource(path.join(dir, "skills"), ["alpha"]);
+    const alpha = path.join(source, "alpha");
+    const target = path.join(dir, "install", "alpha");
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, "stale.md"), "old\n");
+    // A real directory owned by the user happens to sit on the staged path.
+    const occupied = `${target}.staged-link`;
+    fs.mkdirSync(occupied, { recursive: true });
+    fs.writeFileSync(path.join(occupied, "data.md"), "user data\n");
+
+    assert.throws(() => linkSkill(target, alpha), /not this skill's staged link/);
+
+    assert.equal(fs.readFileSync(path.join(occupied, "data.md"), "utf8"), "user data\n", "must not delete");
+    assert.equal(fs.readFileSync(path.join(target, "stale.md"), "utf8"), "old\n", "old install untouched");
+  } finally {
+    cleanup();
+  }
+});
+
+test("a leftover staged link from a prior failed run does not block the next install", () => {
+  const { dir, cleanup } = scratch();
+  try {
+    const source = makeSource(path.join(dir, "skills"), ["alpha"]);
+    const alpha = path.join(source, "alpha");
+    const target = path.join(dir, "install", "alpha");
+    fs.mkdirSync(target, { recursive: true });
+    fs.writeFileSync(path.join(target, "stale.md"), "old\n");
+
+    const broken = { ...fs, renameSync: () => { throw new Error("EPERM: simulated lock"); } };
+    assert.throws(() => linkSkill(target, alpha, broken), /staged link kept/);
+
+    linkSkill(target, alpha);
+
+    assert.equal(classify(target, alpha), "linked");
+    assert.equal(fs.existsSync(`${target}.staged-link`), false, "leftover staged link cleaned up");
+  } finally {
+    cleanup();
+  }
+});
+
 test("planInstall covers every target runtime that exists and skips ones that do not", () => {
   const { dir, cleanup } = scratch();
   try {
@@ -104,6 +225,28 @@ test("findStrays reports our skills outside target runtimes and ignores foreign 
     assert.deepEqual(
       strays.map((s) => `${s.skill} @ ${s.runtime}`),
       ["beta @ .other"],
+    );
+  } finally {
+    cleanup();
+  }
+});
+
+test("only a link back at our source is prunable; a same-name local override is not", () => {
+  const { dir, cleanup } = scratch();
+  try {
+    const source = makeSource(path.join(dir, "skills"), ["alpha", "beta"]);
+    const home = path.join(dir, "home");
+    // A link resolving back at our source under a non-target runtime: ours.
+    linkSkill(path.join(home, ".other", "skills", "alpha"), path.join(source, "alpha"));
+    // A same-name real directory: a user-owned local override, never ours.
+    fs.mkdirSync(path.join(home, ".codex", "skills", "beta"), { recursive: true });
+    fs.writeFileSync(path.join(home, ".codex", "skills", "beta", "SKILL.md"), "# local override\n");
+
+    const strays = findStrays(["alpha", "beta"], home, source);
+
+    assert.deepEqual(
+      strays.map((s) => `${s.skill} @ ${s.runtime}: ${s.ours ? "ours" : "kept"}`),
+      ["beta @ .codex: kept", "alpha @ .other: ours"],
     );
   } finally {
     cleanup();

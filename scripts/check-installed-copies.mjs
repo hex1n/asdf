@@ -11,6 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { TARGET_RUNTIMES, classify } from "./install-skills.mjs";
+
 // Runtimes are discovered, never hard-coded: this machine carries our skills in
 // .agents, .claude, .codex and .factory, and a hard-coded pair silently reported
 // PASS while a third runtime sat two revisions behind.
@@ -63,18 +65,44 @@ export function scanSkills(skillsRoot, runtimeRoots) {
     .sort();
   for (const skill of skills) {
     for (const runtime of runtimeRoots) {
-      const compared = compareSkillTree(path.join(skillsRoot, skill), path.join(runtime.skillsDir, skill));
-      results.push({ skill, runtime: runtime.label, runtimeSkillsDir: runtime.skillsDir, ...compared });
+      const sourceDir = path.join(skillsRoot, skill);
+      const installedDir = path.join(runtime.skillsDir, skill);
+      // Outside the target runtimes only links back at the source are ours; a
+      // same-name real directory or foreign link may be a user-owned local
+      // override (CONTEXT.md), so it is reported, never drift-checked or
+      // overwritten by --fix — the same provenance boundary install-skills
+      // uses for --prune-stray.
+      if (
+        !TARGET_RUNTIMES.includes(runtime.label) &&
+        fs.existsSync(installedDir) &&
+        classify(installedDir, sourceDir) !== "linked"
+      ) {
+        results.push({
+          skill,
+          runtime: runtime.label,
+          runtimeSkillsDir: runtime.skillsDir,
+          installed: true,
+          override: true,
+          drift: [],
+          missing: [],
+          extra: [],
+        });
+        continue;
+      }
+      const compared = compareSkillTree(sourceDir, installedDir);
+      results.push({ skill, runtime: runtime.label, runtimeSkillsDir: runtime.skillsDir, override: false, ...compared });
     }
   }
   return results;
 }
 
 export function summarize(results) {
-  const clean = results.filter((r) => r.installed && !r.drift.length && !r.missing.length && !r.extra.length);
-  const dirty = results.filter((r) => r.installed && (r.drift.length || r.missing.length || r.extra.length));
-  const absent = results.filter((r) => !r.installed);
-  return { clean, dirty, absent, pass: dirty.length === 0 };
+  const overrides = results.filter((r) => r.override);
+  const managed = results.filter((r) => !r.override);
+  const clean = managed.filter((r) => r.installed && !r.drift.length && !r.missing.length && !r.extra.length);
+  const dirty = managed.filter((r) => r.installed && (r.drift.length || r.missing.length || r.extra.length));
+  const absent = managed.filter((r) => !r.installed);
+  return { clean, dirty, absent, overrides, pass: dirty.length === 0 };
 }
 
 export function discoverRuntimes(explicit, skillsRoot, home = os.homedir()) {
@@ -177,11 +205,11 @@ function main(argv) {
     results = scanSkills(skillsRoot, runtimes);
   }
 
-  const { clean, dirty, absent, pass } = summarize(results);
+  const { clean, dirty, absent, overrides, pass } = summarize(results);
 
   if (json) {
     process.stdout.write(
-      `${JSON.stringify({ pass, runtimes, dirty, absent, fixed: fixedLog, skippedBackups }, null, 2)}\n`,
+      `${JSON.stringify({ pass, runtimes, dirty, absent, overrides, fixed: fixedLog, skippedBackups }, null, 2)}\n`,
     );
   } else {
     process.stdout.write(
@@ -202,11 +230,17 @@ function main(argv) {
       if (result.extra.length) parts.push(`extra: ${result.extra.join(", ")}`);
       process.stdout.write(`DRIFT ${result.skill} @ ${result.runtime} — ${parts.join("; ")}\n`);
     }
+    for (const result of overrides) {
+      process.stdout.write(
+        `local override: ${result.skill} @ ${result.runtime} — not a link to this repository; not checked\n`,
+      );
+    }
     for (const result of absent) {
       process.stdout.write(`not installed: ${result.skill} @ ${result.runtime}\n`);
     }
     process.stdout.write(
-      `${pass ? "PASS" : "FAIL"}: ${clean.length} byte-identical, ${dirty.length} drifted, ${absent.length} not installed\n`,
+      `${pass ? "PASS" : "FAIL"}: ${clean.length} byte-identical, ${dirty.length} drifted, ${absent.length} not installed` +
+        `${overrides.length ? `, ${overrides.length} local override(s) not checked` : ""}\n`,
     );
     if (!pass) process.stdout.write("run with --fix to sync source into the installed copies\n");
   }

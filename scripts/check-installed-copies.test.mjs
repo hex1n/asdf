@@ -153,6 +153,36 @@ test("a backup directory is discovered but flagged so --fix will not overwrite i
   );
 });
 
+test("a same-name entry outside target runtimes that is not our link is an override, not drift", () => {
+  const { skillsRoot, root } = tempTree();
+  // A stale same-name real directory under a non-target runtime: possibly a
+  // user-owned local override, so it must not fail the gate or be fixable.
+  const overrideDir = path.join(root, "codex-runtime", "skills", "demo-skill");
+  fs.mkdirSync(overrideDir, { recursive: true });
+  fs.writeFileSync(path.join(overrideDir, "SKILL.md"), "diverged on purpose\n");
+
+  const results = scanSkills(skillsRoot, [{ label: ".codex", skillsDir: path.dirname(overrideDir) }]);
+  const summary = summarize(results);
+
+  assert.equal(results[0].override, true);
+  assert.equal(summary.pass, true, "an override must not fail the gate");
+  assert.deepEqual(summary.dirty, []);
+  assert.equal(summary.overrides.length, 1);
+});
+
+test("inside target runtimes a stale real copy still fails the gate", () => {
+  const { skillsRoot, root } = tempTree();
+  const staleDir = path.join(root, "claude-runtime", "skills", "demo-skill");
+  fs.mkdirSync(staleDir, { recursive: true });
+  fs.writeFileSync(path.join(staleDir, "SKILL.md"), "older revision\n");
+
+  const results = scanSkills(skillsRoot, [{ label: ".claude", skillsDir: path.dirname(staleDir) }]);
+  const summary = summarize(results);
+
+  assert.equal(results[0].override, false);
+  assert.equal(summary.pass, false, "target runtimes stay hard-gated");
+});
+
 test("scanSkills walks every source skill against every runtime", () => {
   const { skillsRoot, runtimeSkills, root } = tempTree();
   fs.mkdirSync(path.join(skillsRoot, "second-skill"), { recursive: true });

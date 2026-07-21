@@ -53,10 +53,48 @@ export function classify(installPath, sourceDir) {
   return "copy";
 }
 
-export function linkSkill(installPath, sourceDir) {
-  fs.mkdirSync(path.dirname(installPath), { recursive: true });
-  fs.rmSync(installPath, { recursive: true, force: true });
-  fs.symlinkSync(sourceDir, installPath, LINK_TYPE);
+export function linkSkill(installPath, sourceDir, io = fs) {
+  io.mkdirSync(path.dirname(installPath), { recursive: true });
+  // Build the link at a staged sibling first: if creation fails (Windows
+  // permissions, locked path, bad target), the existing install must survive
+  // rather than having been deleted ahead of a link that never appeared.
+  const stagedPath = `${installPath}.staged-link`;
+  // The staged path may hold a leftover from a previous failed run — ours to
+  // replace only when it is a link back at this skill's source. Anything else
+  // there is not ours to delete: stop rather than destroy an unrelated
+  // sibling.
+  let stagedStat = null;
+  try {
+    stagedStat = io.lstatSync(stagedPath);
+  } catch {}
+  if (stagedStat) {
+    if (stagedStat.isSymbolicLink() && classify(stagedPath, sourceDir) === "linked") {
+      io.rmSync(stagedPath, { recursive: true, force: true });
+    } else {
+      throw new Error(`staged path ${stagedPath} exists and is not this skill's staged link; move it aside and re-run`);
+    }
+  }
+  io.symlinkSync(sourceDir, stagedPath, LINK_TYPE);
+  // From here the old install may be partially or fully deleted at any point
+  // (a recursive rmSync can fail halfway through), so on any failure the
+  // staged link stays on disk as the recovery path — readdir resolves through
+  // it, so the skill's content remains reachable — and the next run reuses or
+  // replaces it. Retry the whole destructive sequence once for transient
+  // locks, then give up without discarding the staged link.
+  try {
+    io.rmSync(installPath, { recursive: true, force: true });
+    io.renameSync(stagedPath, installPath);
+  } catch (error) {
+    try {
+      io.rmSync(installPath, { recursive: true, force: true });
+      io.renameSync(stagedPath, installPath);
+    } catch {
+      throw new Error(
+        `failed to replace ${installPath}; the old install may be incomplete, staged link kept at ${stagedPath}`,
+        { cause: error },
+      );
+    }
+  }
 }
 
 export function planInstall(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
@@ -75,9 +113,12 @@ export function planInstall(skills, home = os.homedir(), skillsRoot = SKILLS_ROO
   return plan;
 }
 
-// A copy of one of our skills under a non-target runtime. Reported by default
-// and only removed on request: the directory belongs to another tool.
-export function findStrays(skills, home = os.homedir()) {
+// A skill of ours under a non-target runtime. Reported by default and only
+// removed on request, and even then only when provenance is provable: a link
+// resolving back at this repository's source is ours; a same-name real
+// directory or a link elsewhere may be a user-owned local override
+// (CONTEXT.md: user-owned, separate from us) and is never removed.
+export function findStrays(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
   const strays = [];
   const wanted = new Set(skills);
   let entries = [];
@@ -99,7 +140,13 @@ export function findStrays(skills, home = os.homedir()) {
     for (const child of children) {
       if (!wanted.has(child.name)) continue;
       if (!child.isDirectory() && !child.isSymbolicLink()) continue;
-      strays.push({ runtime: entry.name, skill: child.name, installPath: path.join(skillsDir, child.name) });
+      const installPath = path.join(skillsDir, child.name);
+      strays.push({
+        runtime: entry.name,
+        skill: child.name,
+        installPath,
+        ours: classify(installPath, path.join(skillsRoot, child.name)) === "linked",
+      });
     }
   }
   return strays.sort((a, b) => a.runtime.localeCompare(b.runtime) || a.skill.localeCompare(b.skill));
@@ -118,7 +165,15 @@ function main(argv) {
     process.stdout.write(`${apply ? "DO" : "would"} ${verb}: ${item.skill} @ ${item.runtime}\n`);
     if (apply) linkSkill(item.installPath, item.sourceDir);
   }
+  const prunable = strays.filter((stray) => stray.ours);
   for (const stray of strays) {
+    if (!stray.ours) {
+      process.stdout.write(
+        `kept: ${stray.skill} @ ${stray.runtime} — same name but not a link to this repository; ` +
+          `possible local override, never removed\n`,
+      );
+      continue;
+    }
     process.stdout.write(
       `${pruneStray ? (apply ? "DO remove" : "would remove") : "stray"}: ${stray.skill} @ ${stray.runtime}` +
         `${pruneStray ? "" : " — not a target runtime; pass --prune-stray to remove"}\n`,
@@ -132,7 +187,7 @@ function main(argv) {
       `${TARGET_RUNTIMES.join(", ")} — ${linked} already linked, ${changes.length} to change, ` +
       `${strays.length} stray\n`,
   );
-  if (!apply && (changes.length || (pruneStray && strays.length))) {
+  if (!apply && (changes.length || (pruneStray && prunable.length))) {
     process.stdout.write("re-run with --apply to make these changes\n");
   }
 }

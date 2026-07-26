@@ -29,7 +29,9 @@ const LINK_TYPE = process.platform === "win32" ? "junction" : "dir";
 export function listSourceSkills(skillsRoot = SKILLS_ROOT) {
   return fs
     .readdirSync(skillsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    // A skill is a directory carrying SKILL.md; anything else under skills/
+    // (state directories, scratch folders) is not ours to install.
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
     .map((entry) => entry.name)
     .sort();
 }
@@ -45,7 +47,10 @@ export function classify(installPath, sourceDir) {
   }
   if (stat.isSymbolicLink()) {
     try {
-      return path.resolve(fs.realpathSync(installPath)) === path.resolve(sourceDir) ? "linked" : "relinked";
+      // realpath both sides: a symlinked ancestor (macOS /var -> /private/var,
+      // ~/.claude/skills -> ~/.agents/skills) must not make a correct link
+      // read as pointing elsewhere.
+      return fs.realpathSync(installPath) === fs.realpathSync(sourceDir) ? "linked" : "relinked";
     } catch {
       return "relinked"; // dangling link
     }

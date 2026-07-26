@@ -60,7 +60,9 @@ export function scanSkills(skillsRoot, runtimeRoots) {
   const results = [];
   const skills = fs
     .readdirSync(skillsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
+    // Same boundary as install-skills: only a directory carrying SKILL.md is
+    // a source skill; state or scratch directories under skills/ are not.
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
     .map((entry) => entry.name)
     .sort();
   for (const skill of skills) {

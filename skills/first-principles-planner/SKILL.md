@@ -2,23 +2,20 @@
 name: first-principles-planner
 description: >
   Creates first-principles recommendations and plans: reframes the root
-  problem, separates constraints from assumptions, compares mechanisms, and
-  returns the current-best path with failure conditions and next verification
-  steps. Use for a best/better plan, implementation strategy, or design
-  direction (最佳方案, 还有更好, 优化方案, 架构演进), plan-first / no-coding
-  asks (先写方案, 先不写代码,
-  先不coding), adopt/replace/tradeoff decisions (是否应该, 取舍), converging
-  or falsifying competing options or an unresolved decision (收敛方案,
-  方案选型, 多方案对比/证伪), deciding whether something is worth building or
-  worth doing now (ROI, 值不值得做, 现在要不要做), 第一性原理 asks, and
-  mid-conversation follow-ups — a best-fix ask after analysis in this
-  conversation (给出最佳改进方案), or a challenge to a recommendation just
-  given (上面的是最佳方案/改进吗, 是根治吗, 最佳形态了吗) — which re-enter this
-  skill for a fresh mechanism comparison. Do
-  not use for pure fact-finding research, live bug diagnosis, implementation,
-  code review, reviewing or falsifying one existing plan (计划评审, 方案评审
-  — use plan-review), durable ADR/CONTEXT capture, or skill-writing audits
-  unless the user explicitly asks to re-plan from first principles.
+  problem, compares mechanisms, and returns the current-best path with its
+  failure conditions and next verification step. Use for a best/better plan,
+  implementation strategy, or design direction (最佳方案, 还有更好,
+  给出最佳改进), plan-first asks (先不写代码), adopt/replace/tradeoff and
+  worth-building-now decisions (ROI), converging or falsifying competing
+  options or an unresolved decision (收敛方案, 方案选型, 多方案对比/证伪),
+  第一性原理 asks, and mid-conversation follow-ups — a best-fix ask after
+  analysis in this conversation (根据上面分析给出最佳改进方案,
+  基于上面分析还有哪些可以改进的点) or a challenge to the recommendation just given
+  (上面的是最佳方案/改进吗). Do not use for pure fact-finding research, live
+  bug diagnosis, implementation, quick naming or wording polish, code review,
+  reviewing or falsifying one existing plan (计划评审, 方案评审 — use
+  plan-review), durable ADR/CONTEXT capture, or skill-writing audits unless
+  the user explicitly asks to re-plan from first principles.
 ---
 
 # First-Principles Planner

@@ -8,7 +8,7 @@ short process in `SKILL.md` is not enough.
 - Localized Request and Output Rules: localized routing signals, examples, and labels
 - Problem Archaeology: root trace, problem statement, assumption audit
 - Value Gate and Decision Envelope: mechanism families, economic evidence, envelope schema
-- Solution Reconstruction: option categories, independent option tournament, inversion test, recommendation chain
+- Solution Reconstruction: option categories, independent context, independent option tournament, inversion test, recommendation chain
 - Bestness Check: fit criteria, closest alternative, stop point
 - Plan Synthesis: scope table, decision pricing, decision-first structure
 - Evidence Conventions: verified vs unverified claims
@@ -32,7 +32,7 @@ Use this section only when request language, route examples, or saved artifact l
 - `是否应该替换 X?` / `还有更好的吗?` / `最佳了吗?` -> Decision.
 - `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan.
 - `深度分析为什么失败` -> Research-first; plan only if the user asks for a fix path.
-- `把方案转成实施计划` / `拆成切片、阶段、工单` -> execution breakdown of a converged 方案: 把收敛后新陈述的事实对照决策翻盘条件扫一遍(只扫会话,不做新分析)— 假设已破、成本或工期恶化、未接受的疑点,任一命中即不过;疑点只有在用户点名风险并选择继续时才算接受,转换请求本身不算。全部通过 -> 交还执行拆解; 任一命中、无已收敛方案、或翻盘条件已不在会话中 -> Plan.
+- `把方案转成实施计划` / `拆成切片、阶段、工单` -> run the converged-plan conversion check in `SKILL.md` Route Examples.
 - `审查这个方案有没有问题` -> use a review skill; re-plan only if asked.
 
 ### Chinese Output Labels
@@ -47,6 +47,7 @@ For Chinese requests, use Chinese prose and section labels. Keep code identifier
 | Recommendation | 建议 |
 | Current-best path | 当前最佳路径 |
 | Bestness Check | 最佳性检查 |
+| Coverage map | 覆盖映射 |
 | Value Gate | 价值门禁 |
 | Decision Envelope | 决策信封 |
 | Scope table | 范围与成本 |
@@ -203,6 +204,13 @@ For each approach:
 
 If only one approach is viable, explain why alternatives fail.
 
+### Independent Context
+
+An independent context is a fresh-context subagent where the runtime supports
+one, and a separate fresh session otherwise. It receives only the inputs its
+task names — never the authoring context's reasoning. Prefer a different
+model's runtime when one is available: same-model contexts share blind spots.
+
 ### Independent Option Tournament
 
 Replaces the lightweight in-context tournament for the runs that pass the
@@ -221,11 +229,8 @@ judge favors its own prior unless the rubric is fixed before any draft exists.
 2. **Pre-register the rubric**: write the Bestness Check fit criteria before
    any draft exists. They are the judging rubric and stay fixed.
 3. **Assign mechanism families**: enumerate fundamentally different mechanism
-   families (per Option Categories) and assign one per drafter — a
-   fresh-context subagent where the runtime supports one, a separate fresh
-   session otherwise. For any independent context in this section (drafters,
-   red team), prefer a different model's runtime when one is available:
-   same-model contexts share blind spots.
+   families (per Option Categories) and assign one per drafter, each an
+   [independent context](#independent-context).
 4. **Collect option cards**: each drafter receives the problem statement, the
    constraint split, and its assigned family, and returns an option card —
    mechanism, conditions that favor it, failure mode/cost/risk, supporting
@@ -236,9 +241,10 @@ judge favors its own prior unless the rubric is fixed before any draft exists.
    recorded rubric amendment with its reason, re-judge every card against the
    amended rubric, and name the amendment in the report. Run the
    [inversion test](#inversion-test) on the winner: the main context rules on whether each failure is
-   mitigable, and may hand failure-hypothesis generation to one fresh-context
-   red team (input: problem statement, constraint split, winning card) — the
-   context that crowned the winner is the least motivated to break it.
+   mitigable, and may hand failure-hypothesis generation to one red team in an
+   [independent context](#independent-context) (input: problem statement,
+   constraint split, winning card) — the context that crowned the winner is
+   the least motivated to break it.
 6. **Report** the winner through the normal recommendation chain and Bestness
    Check, naming the strongest losing card as the closest alternative.
 
@@ -247,12 +253,24 @@ plan belongs to a review skill, not to more tournament rounds.
 
 ### Inversion Test
 
-For the leading candidate (the option tournament's winner), ask:
+For the leading candidate (the option tournament's winner), ask both
+questions:
 
 > Under what conditions would this be the worst approach?
 
-If the failure is plausible and unmitigated, reconsider. Skip only for Light
-depth or obvious low-risk decisions.
+If the failure is plausible and unmitigated, reconsider.
+
+> Of the problem this option claims to solve, what remains after it lands?
+
+An option can survive the failure question while solving only a slice of its
+claimed problem. Measure the remainder against the claimed problem's own
+definition — the source item's definition when a coverage map exists, the
+root problem statement otherwise — never a restatement narrowed during
+planning. A remainder that hollows out a coverage-map row or the
+recommendation's core claim reopens the choice; any smaller remainder is
+written into the recommendation as residual scope or a named non-goal.
+
+Skip only for Light depth or obvious low-risk decisions.
 
 ### Recommendation Chain
 

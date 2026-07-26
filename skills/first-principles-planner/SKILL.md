@@ -41,6 +41,7 @@ If running as a subagent, use the full planner only for delegated planning, arch
 ## Hard Gates
 
 - If the stated solution is not tied to an outcome, rewrite the problem statement before comparing options.
+- When the request ties the plan to a source framework — any source with enumerable items to answer, such as an article's claims, an audit's findings, or a review checklist — include a coverage map: every source item resolves to a plan item or a named non-goal, judged against the source item's own definition rather than the plan's restatement of it.
 - If a load-bearing unknown could change the recommendation, verify it or ask one focused question with a recommended default; do not stop at clarification when a safe default exists — state the default, give the current-best path under that default, and name the fact that would flip the recommendation.
 - If the plan has no independently verifiable next step, shrink it to a decision plus its first check.
 - **Artifact Gate:** use a chat-first plan by default. Do not create durable artifacts unless explicitly asked, a target path is provided, or the result is a reusable handoff into named next work; then use [REFERENCE.md](REFERENCE.md#artifact-location).
@@ -64,6 +65,7 @@ Use the user's language for chat and saved artifacts; for localized fixed labels
 | User states a solution, not the problem | Standard+ (Standard with a mandatory root reframe) |
 | Recurring/stuck/conventional problem | Deep |
 | Any current-best recommendation with non-obvious tradeoffs | Deep |
+| The request ties the plan to a source framework (coverage map required) | Deep |
 
 ## Process
 
@@ -72,8 +74,8 @@ Use the user's language for chat and saved artifacts; for localized fixed labels
 3. **Constraint split**: classify load-bearing factors as true constraints, conventions, or unverified assumptions.
 4. **Value Gate**: decide whether the winner is worth building before designing it. Compare at least four mechanism families as real candidates — keep the status quo, use an existing capability, adapt the human/process workflow, build or change system capability — and judge net gain over the status quo from evidence already at hand: frequency and blast radius, per-incident impact, expected benefit range, delivery plus maintenance plus opportunity cost, and the fact that would flip the decision. Judge the build family at its cheapest credible mechanism, not the user's proposed one; when family-level economics are too close to call, continue to step 5 and settle the decision once the winner is known. Freeze the outcome as a Decision Envelope ([REFERENCE.md](REFERENCE.md#value-gate-and-decision-envelope)) with one decision: `BUILD`, `DEFER`, `NO_BUILD`, or `RESEARCH_FIRST`. `BUILD` continues to step 5; `RESEARCH_FIRST` names the missing decision-flipping fact and routes to research; `DEFER` or `NO_BUILD` ends the run as a compact Decision-mode answer carrying the envelope — plan synthesis and independent option tournaments stay unrun. When the user has already committed to building and asks only how, record `decision: BUILD` with the user as its source and continue. A `BUILD` envelope's cost is provisional until the scope table prices it in step 8; a priced total that materially worsens the gate's economics reruns this gate before any handoff.
 5. **Reconstruct options**: compare fundamentally different mechanisms by fit, failure mode, cost, and risk. When 3+ options remain or impact is high, run a lightweight option tournament: compare options pairwise against true constraints, drop weaker or duplicate mechanisms, then test the winner against its strongest failure mode (the inversion test in [REFERENCE.md](REFERENCE.md#inversion-test)). For a Deep-depth decision whose wrong choice would be costly to reverse, or when the user explicitly asks for independently drafted options, run the independent option tournament in [REFERENCE.md](REFERENCE.md#independent-option-tournament) instead.
-6. **Recommend**: pick the approach that solves the root under true constraints after the inversion test (skip it only for Light depth or obvious low-risk decisions); if rejecting the user's approach, include what would justify it.
-7. **Bestness Check**: for non-trivial recommendations, including the first response, state the fit criteria, winner, closest alternative, what would beat it, and the marginal-gain stop point. The stop point is enforceable and ends option refinement only: once further selection work cannot change the Value Gate decision, the winning mechanism, or the next verification step, stop comparing mechanisms and complete the plan's required content (rollback, permissions, migration safety, acceptance evidence) for the chosen path. Details: [REFERENCE.md](REFERENCE.md#bestness-check).
+6. **Recommend**: pick the approach that solves the root under true constraints after the inversion test; if rejecting the user's approach, include what would justify it.
+7. **Bestness Check**: for non-trivial recommendations, including the first response, answer the five checks in [REFERENCE.md](REFERENCE.md#bestness-check). The stop point is enforceable and ends option refinement only: once further selection work cannot change the Value Gate decision, the winning mechanism, or the next verification step, stop comparing mechanisms and complete the plan's required content (rollback, permissions, migration safety, acceptance evidence) for the chosen path.
 8. **Synthesize**: make Plan outputs specific enough to predict what changes and why.
 
 For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE.md) before writing the final answer.
@@ -89,15 +91,10 @@ For Plan mode, Deep plans, or ambiguous tradeoffs, read [REFERENCE.md](REFERENCE
 
 ## Acceptance Gate
 
-Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. When the request proposes new or changed capability, the answer carries the Value Gate decision and its flip condition. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation.
+Before final answer, ensure the root problem is named, true constraints are separated from assumptions, at least two mechanisms are compared or one viable path is justified, and the recommendation includes its failure mode plus the next verifiable step. When the request proposes new or changed capability, the answer carries the Value Gate decision and its flip condition. For non-trivial recommendations, include the Bestness Check in the first answer or explain why the decision is low-risk enough to skip it; if any question remains, pair it with the default path and what would change the recommendation. When the plan carries a coverage map, verify it in an independent context ([REFERENCE.md](REFERENCE.md#independent-context)) given only the source material and the final plan.
 
 ## Anti-Patterns
 
-- Treating "use solution X" as the problem statement.
 - Writing a large plan for a small decision.
 - Treating technical bestness as build authorization: synthesizing or reviewing a plan whose Value Gate decision is `DEFER` or `NO_BUILD`.
-- Re-running research inside planner instead of invoking/using research.
-- Using planner as a plan-review or code-review skill.
-- Turning a plan into ADR/CONTEXT memory without the user asking.
-- Letting implementation subagents inherit a full planning workflow.
 - Being contrarian for novelty; first principles means grounding, not automatic disagreement.

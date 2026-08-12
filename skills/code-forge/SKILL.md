@@ -1,7 +1,8 @@
 ---
 name: code-forge
 description: >
-  Forges correct, change-contained production code with only necessary complexity.
+  Forges correct, clear, change-contained production code with only necessary
+  complexity.
   Use while actively implementing or refactoring already-selected behavior: bound
   the semantic blast radius, preserve protected contracts, choose the smallest
   sufficient mechanism and coherent model, and prove target behavior plus
@@ -13,10 +14,11 @@ description: >
 
 # Code Forge
 
-High-quality production code implements the required behavior, contains change to
-the smallest justified semantic boundary, and introduces no more complexity than
-the problem requires. Completion needs evidence for both the target behavior and
-the containment of protected behavior outside that boundary.
+High-quality production code implements the required behavior, communicates it
+through cohesive domain-shaped code that can be understood locally, contains change
+to the smallest justified semantic boundary, and introduces no more complexity than
+the problem requires. Correctness, clarity, containment, and simplicity are separate
+requirements; strength in one does not compensate for failure in another.
 
 Repository rules, verified domain facts, accepted contracts, and accepted
 implementation decisions outrank every general heuristic in this skill. Use it as
@@ -88,15 +90,23 @@ boundary.
 
 ## 2. Choose the smallest sufficient mechanism and coherent model
 
-Before shaping new code, stop at the first mechanism that fully holds:
+Before shaping new code:
 
 1. omit behavior outside the accepted request or contract;
-2. reuse an existing owner, helper, type, or repository pattern;
-3. use the language runtime or standard library;
-4. use a native platform, database, protocol, or infrastructure capability;
-5. use an already-installed dependency whose contract fits;
-6. write direct local code;
-7. add a dependency or abstraction only for a proven capability or stable-boundary
+2. identify the semantic owner and repository contracts that constrain where the
+   behavior belongs;
+3. compare complete viable implementations — reuse of an existing owner, helper, or
+   type whose full contract matches; direct local code built on the language runtime
+   or standard library; a native platform, database, protocol, or infrastructure
+   capability; an already-installed dependency; or a necessary combination — by
+   semantic fit, edge-case burden, blast radius, and total conceptual and maintenance
+   cost:
+   - prefer reuse when the full contract and reason to change match;
+   - prefer the dependency when it is the repository contract or removes meaningful
+     correctness or maintenance risk;
+   - prefer direct code when the behavior is small, domain-specific, and clearer
+     without the dependency;
+4. add a new dependency or abstraction only for a proven capability or stable-boundary
    gap.
 
 A mechanism holds only when it preserves the required behavior, invariants, domain
@@ -105,14 +115,21 @@ and both parts of the behavior proof. A shorter candidate that weakens any of th
 does not hold. Keep explicitly requested scope; surface optional, contradictory, or
 speculative work instead of silently shipping it or scaffolding for it.
 
-Give each rule one authoritative owner. When a value crosses entity or storage
-boundaries, distinguish its semantic owner, canonical read authority, and derived
-targets. Same-shaped fields at different scopes are not interchangeable until
-their semantics are proven identical. A stored derivative can serve audit,
-historical time semantics, performance, or availability; give it explicit
-synchronization or invalidation semantics instead of implicit fallback authority.
+Give each canonical decision one semantic authority.
 
-Use this preference order:
+Repeated enforcement at independent trust boundaries may remain when each boundary
+protects the invariant under its own failure contract. Keep the definition
+consistent; do not remove defensive validation, authorization, idempotency, or
+database constraints merely because the invariant is enforced elsewhere.
+
+When a value crosses entity or storage boundaries, distinguish its semantic owner,
+canonical read authority, and derived targets. Same-shaped fields at different
+scopes are not interchangeable until their semantics are proven identical. A
+stored derivative can serve audit, historical time semantics, performance, or
+availability; give it explicit synchronization or invalidation semantics instead
+of implicit fallback authority.
+
+After selecting the mechanism, use this code-structure preference order:
 
 1. extend an existing owner that already has the responsibility;
 2. write direct local code with domain names;
@@ -163,9 +180,15 @@ transition, selected mechanism, failure policy, and proof obligation.
 
 ## 5. Make the main path obvious
 
-Write core behavior top to bottom. Normalize and validate each input once at its
-boundary, keep transformations free of side effects where practical, and keep
-persistence or integration calls narrow and visible.
+Write core behavior top to bottom. Normalize and validate inputs at each appropriate
+trust boundary using their semantic authority, keep transformations free of side
+effects where practical, and keep persistence or integration calls narrow and
+visible.
+
+Keep each changed unit cohesive around a coherent responsibility at its chosen
+boundary. Use repository and language idioms that reduce surprise. Prefer
+domain-bearing names and explicit control flow when compression would make a reader
+reconstruct intent, state, or failure behavior from incidental syntax.
 
 Shape methods around cohesive business steps, not arbitrary line counts. A method
 earns extraction when its name removes detail from the caller; a wrapper that only
@@ -218,11 +241,11 @@ Once behavior works, inspect the diff as a design artifact:
    evidence for every protected path;
 4. replace or redesign a change whose radius cannot be bounded more cheaply than a
    narrower mechanism;
-5. rerun the mechanism ladder against each addition and replace custom code when an
-   existing owner, standard library, native capability, or installed dependency
-   satisfies the same contract;
-6. collapse duplicate policy, validation, normalization, or defaulting into its
-   authoritative owner;
+5. rerun the mechanism comparison against each addition and replace custom code only
+   when another candidate preserves the contract and wins on the same criteria;
+6. collapse duplicate policy definitions, normalization rules, or default decisions
+   into their semantic authority while preserving independent trust-boundary
+   enforcement and failure contracts;
 7. inline single-use indirection when locality improves and no boundary is lost;
 8. remove speculative branches, future-only extension points, and unrelated edits;
 9. trace the main path and require every new hop to name a real responsibility or
@@ -232,10 +255,11 @@ Treat public APIs, shared helpers, base classes, global configuration, defaults,
 schemas, DTOs, enums, serializers, SQL fragments, transaction boundaries, retry
 policies, cache or idempotency keys, and event contracts as high-leverage surfaces.
 
-Stop and redesign when the same rule appears in multiple lifecycle paths, when an
-abstraction joins different reasons to change, or when helpers hide rather than
-remove decisions. Simplicity removes accidental complexity; it preserves necessary
-domain, safety, transaction, and integration boundaries.
+Stop and redesign when the same canonical decision is independently defined in
+multiple lifecycle paths, when an abstraction joins different reasons to change, or
+when helpers hide rather than remove decisions. Simplicity removes accidental
+complexity; it preserves necessary domain, safety, transaction, and integration
+boundaries.
 
 Make every new dependency, wrapper, configuration switch, interface, factory, or
 layer name the current requirement that pays for it; remove it when no such
@@ -256,7 +280,8 @@ The implementation is complete when:
   containment;
 - state and side-effect semantics use the correct mechanism;
 - one authoritative rule produces each canonical decision;
-- the main path is readable without reconstructing scattered control flow;
+- each changed unit is cohesive, and its responsibility, main path, domain meaning,
+  and failure behavior are understandable from local context;
 - compatibility and failure policies match their risk;
 - relevant tests or runtime evidence pass;
 - every changed production concept has a current requirement that pays for it.

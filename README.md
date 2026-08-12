@@ -25,7 +25,7 @@ for the distribution vocabulary.
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
-| [`code-forge`](skills/code-forge/) | implement | Forge production behavior with the smallest sufficient mechanism and coherent model while preserving state, effect, boundary, and verification semantics. |
+| [`code-forge`](skills/code-forge/) | implement | Forge correct, change-contained production behavior with the smallest sufficient mechanism, explicit blast-radius bounds, and target plus containment evidence. |
 | [`merge-quiz`](skills/merge-quiz/) | verify | Quiz the user on a completed change until a perfect pass, gating merge or approval on their comprehension. |
 
 ## Lifecycle placement

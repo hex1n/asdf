@@ -24,7 +24,7 @@
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
-| [`code-forge`](skills/code-forge/) | 实现 | 以最小充分机制与内聚模型锻造生产代码，同时保留状态、副作用、边界与验证语义。 |
+| [`code-forge`](skills/code-forge/) | 实现 | 以最小充分机制实现正确、影响可控的生产行为，显式限定语义爆炸半径，并同时证明目标行为与边界外非回归。 |
 | [`merge-quiz`](skills/merge-quiz/) | 验证 | 就已完成的改动逐题测验用户，满分通过后才判定可合并。 |
 
 ## 生命周期定位

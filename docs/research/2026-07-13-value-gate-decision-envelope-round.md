@@ -208,7 +208,7 @@ Decision: **accept**。
 
 ## Round 4 — 行动计划 → 范围-成本表（给决策定价，而非排任务）
 
-Supersedes: none（Round 3 之上的同方向修订；用户以 /writing-great-skills 确认执行）
+Supersedes: none（Round 3 之上的同方向修订；用户通过该技能当时的命令入口确认执行，现为 /writing-for-agents）
 Improvement magnitude: clear（表语义从"带工时的任务优先级清单"变为"给决策定价的范围分层"；两处真 blocker 由 Codex 拦下后修复）
 Generalization confidence: 中（仍仅 S2 一个 Plan 域样例；共 3 次复验运行）
 Hard gates: pass

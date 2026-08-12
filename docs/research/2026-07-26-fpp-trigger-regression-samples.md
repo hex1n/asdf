@@ -241,7 +241,7 @@ Every dropped phrase maps to a retained trigger:
 | 值不值得做, 现在要不要做 + "deciding whether…worth doing now" | "worth-building-now decisions (ROI)" | zero organic |
 | 是根治吗, 最佳形态了吗, 最佳了吗 | collapsed challenge example 上面的是最佳方案/改进吗 | all organic challenges use the 最佳 surface (P9, P10, P12) |
 | 给出最佳改进方案 (follow-up example) | P1-verbatim 根据上面分析给出最佳改进方案 | P1 |
-| "which re-enter this skill for a fresh mechanism comparison" | cut — identity, lives in the body | writing-great-skills: cut identity from descriptions |
+| "which re-enter this skill for a fresh mechanism comparison" | cut — identity, lives in the body | writing-for-agents: cut identity from descriptions |
 
 Added: "quick naming or wording polish" to the negative list (recurring
 organic over-match surface for 还有更好 — N13, N14), placed before the

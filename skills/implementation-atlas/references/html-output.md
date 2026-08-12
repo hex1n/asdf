@@ -1,10 +1,10 @@
 # HTML Output
 
-当用户要求 HTML、可视化或更直观的实现地图时，使用 `assets/mastery-map.html` 生成一个可离线打开的自包含页面。
+当用户要求 HTML、可视化或更直观的实现地图时，使用 `assets/atlas-map.html` 生成一个可离线打开的自包含页面。
 
 ## 生成
 
-1. 复制模板到用户指定位置；未指定时使用 `docs/mastery/<target-slug>.html`。
+1. 复制模板到用户指定位置；未指定时使用 `docs/atlas/<target-slug>.html`。
 2. 替换模板中的全部 `{{PLACEHOLDER}}`：
    - `TITLE`、`TARGET`、`REVISION`、`BASELINE`、`EVIDENCE`
    - `SUMMARY_HTML`、`STATS_HTML`、`MAINLINE_HTML`

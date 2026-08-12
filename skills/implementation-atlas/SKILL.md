@@ -1,14 +1,14 @@
 ---
-name: implementation-mastery
+name: implementation-atlas
 description: Build a source-backed implementation map for one named target.
 disable-model-invocation: true
 ---
 
-# Implementation Mastery
+# Implementation Atlas
 
 为用户手动指定的一个需求、函数、模块、分支或 PR 建立实现地图，并遍历到 **closure**。
 
-**Behavioral node**（行为节点）是能改变目标可观察行为的最小分析单元，可以是方法、配置、状态、事件、数据转换或外部契约。inventory 是唯一事实源（canonical），定界时即创建工作文件 `docs/mastery/.work/<target-slug>.inventory.jsonl`（无仓库时放 scratchpad），每行一个节点：`{id, kind, node, why, evidence, state, deps}`。`kind` 分 `behavior` / `context`（evidence frame、范围审计等非行为项）；`state` 只有 `pending`、`explained`、`black-box`；`deps` 是该节点触及的其他节点 ID 列表。工作文件不是交付物——所有交付物从它生成，遍历因此可跨上下文续跑。**Closure = inventory 中 `pending` 为零。**每条新发现的行为影响边当场落为 deps 里的一个 ID——指向新建的 pending 行或 black-box 契约行，不存在第三种去处；deps 全部可解析，判据因此保持二元可查。
+**Behavioral node**（行为节点）是能改变目标可观察行为的最小分析单元，可以是方法、配置、状态、事件、数据转换或外部契约。inventory 是唯一事实源（canonical），定界时即创建工作文件 `docs/atlas/.work/<target-slug>.inventory.jsonl`（无仓库时放 scratchpad），每行一个节点：`{id, kind, node, why, evidence, state, deps}`。`kind` 分 `behavior` / `context`（evidence frame、范围审计等非行为项）；`state` 只有 `pending`、`explained`、`black-box`；`deps` 是该节点触及的其他节点 ID 列表。工作文件不是交付物——所有交付物从它生成，遍历因此可跨上下文续跑。**Closure = inventory 中 `pending` 为零。**每条新发现的行为影响边当场落为 deps 里的一个 ID——指向新建的 pending 行或 black-box 契约行，不存在第三种去处；deps 全部可解析，判据因此保持二元可查。
 
 ## 1. Frame
 
@@ -55,7 +55,7 @@ disable-model-invocation: true
 - 先交付结论和端到端主线，再给行为节点细节、数据与状态、配置、失败与并发、black-box 契约、完整 inventory、风险和证据缺口。
 - **一节点一条目**：`kind=behavior` 且 `explained` 的每个节点在交付物中独立成节并携带其 Node ID，与 inventory 形成 ID 双射；每条目带完整“条件 → 结果/副作用”表、源码锚点和关键代码 / SQL 摘录。节点的 state 标记与风险严重度标记是两个维度，同时呈现、互不替代。
 - 只保留与目标有关且有内容的章节；源码锚点使用分析版本下的 `file:line`。
-- 用户要求直观展示或 HTML 时，完整读取 [html-output.md](references/html-output.md)，并使用 [mastery-map.html](assets/mastery-map.html) 生成自包含页面。
+- 用户要求直观展示或 HTML 时，完整读取 [html-output.md](references/html-output.md)，并使用 [atlas-map.html](assets/atlas-map.html) 生成自包含页面。
 - 交付后主动提出可按自测题检验；题目覆盖关键分支和隐藏前提，全对即通过本轮地图覆盖范围内的理解检查。
 
 **完成条件：**交付物通过 §4 结构校验；当前行为、规格意图、历史演进、风险与证据缺口在交付物中各归其位；所有请求的交付物均已验证可读。

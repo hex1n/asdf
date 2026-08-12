@@ -18,7 +18,7 @@
 | [`first-principles-planner`](skills/first-principles-planner/) | 规划 | 回到根问题，分离约束与假设并比较机制。 |
 | [`plan-review`](skills/plan-review/) | 验证 | 对同一份完整的方案或计划 revision 反复独立证伪，直到所有必需 reviewer 返回 GO 或审查挂起；深度随候选风险标定，并决定 reviewer 强度。 |
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
-| [`implementation-mastery`](skills/implementation-mastery/) | 调研 | 为一个指定目标建立源码支撑的实现地图，将所有影响行为的节点遍历至闭包。 |
+| [`implementation-atlas`](skills/implementation-atlas/) | 调研 | 为一个指定目标建立源码支撑的实现图谱，将所有影响行为的节点遍历至闭包。 |
 | [`blindspot-pass`](skills/blindspot-pass/) | 准备 | 开工前巡查陌生领域，找出用户「未知的未知」并转化为更好的提示词。 |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | 验证 | 基于设计、需求与代码生成可溯源的端到端测试计划。 |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
@@ -35,7 +35,7 @@
 实现   code-forge                               ← 内聚锻造
 验证   e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
 批准   merge-quiz                               ← 以人的理解为合并闸门
-调研   deep-research · implementation-mastery   ← 按需求证，或将实现遍历至闭包
+调研   deep-research · implementation-atlas   ← 按需求证，或将实现遍历至闭包
         ↑ 新发现的未知回馈下一轮规划
 ```
 

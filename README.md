@@ -19,7 +19,7 @@ for the distribution vocabulary.
 | [`first-principles-planner`](skills/first-principles-planner/) | plan | Reframe the root problem and compare mechanisms before implementation. |
 | [`plan-review`](skills/plan-review/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
-| [`implementation-mastery`](skills/implementation-mastery/) | investigate | Build a source-backed implementation map for one named target and traverse every behavior-affecting node to closure. |
+| [`implementation-atlas`](skills/implementation-atlas/) | investigate | Build a source-backed implementation atlas for one named target and traverse every behavior-affecting node to closure. |
 | [`blindspot-pass`](skills/blindspot-pass/) | prepare | Surface the unknown unknowns between the user and unfamiliar territory before work starts, and turn them into a better prompt. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
@@ -36,7 +36,7 @@ plan         first-principles-planner → plan-review   ← decide the plan, the
 implement    code-forge                               ← forge code coherently
 verify       e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
 approve      merge-quiz                               ← gate merge on the human's comprehension
-investigate  deep-research · implementation-mastery   ← answer questions or map code to closure
+investigate  deep-research · implementation-atlas   ← answer questions or map code to closure
               ↑ discovered unknowns feed the next plan
 ```
 

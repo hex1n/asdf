@@ -1,145 +1,124 @@
 ---
 name: e2e-test-planner
 description: >
-  Creates source-backed end-to-end test plans and runnable handoffs from design, requirements, plan documents, and codebase behavior. Use when the user asks to do/perform/arrange E2E/end-to-end/端到端/全链路 testing without an existing runnable handoff, including 进行端到端测试, 做端到端测试, 开展端到端测试, 做全链路测试, a bare 跑端到端测试 or 执行端到端测试 that names no existing plan, report, or scenario, 端到端测试计划, 全链路测试计划, 端到端测试场景, 全链路测试场景, 链路测试, 全链路回归, integration/acceptance/regression coverage of an end-to-end flow, or E2E scenarios from docs/code analysis covering main paths, dependent workflows, boundaries, performance, consistency, concurrency, idempotency, or stateful business flows. Do not use for running an existing plan, prior run report, or concrete runnable scenario; use e2e-test-executor when the user explicitly asks to execute that handoff.
+  Creates source-backed E2E test plans organized as business scenario trees, separating intended business contracts from current implementation evidence and tracing change blast radius across affected flows. Use when the user asks for an end-to-end, full-chain, integration, acceptance, or regression test plan or test scenarios from requirements, designs, decisions, or codebase changes. Do not use to run an existing plan or concrete scenario; use e2e-test-executor for execution.
 ---
 
 # E2E Test Planner
 
-Build a source-backed, dependency-aware test plan. The core move is the **business flow**: draw the flow, then back it with edge IDs, carried data, state changes, and side effects before naming scenarios.
+Write the plan as a business scenario tree. The tree is the single home for scenarios: one primary Happy Path first, then branches attached to the business step or decision they vary, each with its expected result.
 
-Output language: use the language the user explicitly requests; otherwise infer from the user's latest prompt, then the dominant source-document language. For mixed-language input, write prose in the user's conversational language and preserve code identifiers, paths, API names, enum values, logs, and quoted source text as-is. If the language choice remains ambiguous, state the assumed output language once.
+Use the user's language unless explicitly asked otherwise. Preserve identifiers, paths, API names, enum values, commands, and quoted source text exactly.
 
-Primary consumer: a downstream agent that will implement or execute the plan. Optimize for an executable handoff dashboard: stable IDs, stable field labels, machine-scannable headings and tables, exact sourced locators, named variables, probes, waits, data-retention policy, cleanup commands, dependency DAG facts, and blockers. When execution will be delegated, also emit the compact Executor Handoff Index described after the Execution DAG. Avoid approval-only template sections unless the user asks for a formal QA document.
+Read [REFERENCE.md](REFERENCE.md) before drafting; it defines the plan shape and leaf contract.
 
-Plan weight must match request scope. When the user scopes the request to a bounded change — a diff, a commit, a single rule, endpoint, mapping, or config value — produce a **Delta Plan**, not a full-feature plan: name the mode once, anchor scenarios to the changed behavior plus its blast radius (existing consumers of the changed contract), and keep only the load-bearing core — the scenario inventory rows with, per scenario, a concrete data recipe (which entities to create or find, with the field values and states that matter) and probes with expected outcomes. Compress the rest: journey graph reduced to touched edges, Risk Map to implicated families, DAG and Executor Handoff Index only when the selected scenarios actually have dependencies or delegation is requested. Sections 1–8 below then apply at that reduced scope; provenance tags and the Document-Code Semantic Diff still apply to the changed contract. If blast-radius analysis reveals the "small" change actually reaches system-wide behavior, escalate to a full plan and say why. A one-rule change should yield a plan a reviewer reads in one sitting, not hundreds of lines.
+## 1. Frame the Business Outcome
 
-Lead the plan with a short `Overview` digest so a reader sees the shape before the section-by-section detail: the coverage in brief (journey edges, scenario count, scenario groups when present, plus the Core Slice), the top risks, and the open gaps with their disposition. The Overview restates facts sourced in the sections below — a navigation digest, never a new source of truth — so it stays a few lines, not an approval template. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized heading and field labels.
+State:
 
-When saving the plan, default to a per-feature folder `docs/e2e-test/<feature>/` inside a repo (otherwise a stated path whose full location the response names), as `<date>-<feature>-e2e-test-plan.md`, so the plan and its later execution runs sit together under one feature directory.
+- The actor, legitimate entry, intended business outcome, and observable completion state.
+- The requested scope and explicit non-goals.
+- The source that defines the intended result and who approved it.
+- The implementation evidence that shows current behavior, reachability, and risk.
+- Any conflict or missing authority that prevents a correctness verdict.
 
-## 1. Source Inventory
+Keep these evidence roles separate:
 
-Read the smallest authority set that can prove behavior:
+- **Expected-result authority** defines what should happen: explicit user direction, an approved requirement, design, decision, business policy, or published external contract.
+- **Implementation evidence** shows what currently happens: code, configuration, schemas, existing tests, and logs.
+- **Runtime evidence** shows what happened in one observed execution.
 
-- Named design, requirement, and plan documents, plus nearby indexes.
-- The current conversation, when a proposal, requirement, or decision lives only there: quote its load-bearing content into the plan and cite that plan section as the receipt — a receipt names something a fresh reader can re-read, never the conversation itself.
-- Relevant code entry points, domain models, state machines, persistence, async jobs, external clients, and existing tests.
-- Config, feature flags, permissions, queues, schedulers, and transaction or idempotency hooks that affect end-to-end behavior.
-- Prior executor run reports, when the feature has already been executed — with or without a prior plan: fold their `Emergent Scenarios` into the Risk Map and Coverage Matrix so out-of-plan findings are not lost, and absorb any `ad-hoc` `plan-snapshot.md` a planner-less run left behind, recording it as a superseded source so future runs start from this plan rather than the snapshot.
+Code and existing tests do not prove business correctness merely because they agree. They may define a verdict only when the user or an approved source explicitly designates them as the contract. If only implementation evidence exists, write a current-behavior characterization, mark the intended result `NEEDS-DECISION`, and do not turn implementation agreement into a pass condition. If sources conflict, name the selected expected-result authority and its approval basis; when that choice is not established, keep the semantic unresolved.
 
-Document-code semantic diff: where a source document states a behavioral contract — such as a rule, default, mapping, ordering, or invariant — extract it and compare it against the code's actual behavior. The highest-value defects often live in this gap. Emit a `Document-Code Semantic Diff` ([REFERENCE.md](REFERENCE.md#document-code-semantic-diff)) capturing each contract, the code behavior, the delta, its risk, and the scenario or decision that resolves it; use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized section labels.
+For a bounded change, plan the changed branch and every affected business flow in its blast radius. For a broad feature, cover the full business outcome.
 
-Completion criterion: every named source is accounted for; every claimed behavior has a source receipt or is marked unverified; out-of-scope surfaces are named. Documented contracts that diverge from code behavior are captured in the Document-Code Semantic Diff, and every P0/P1 divergence maps to a verification scenario or an explicit closed/blocked decision rather than a line buried in risk or assumptions. If a later scenario cites a new source, add it to the inventory before finalizing.
+Completion criterion: the plan names one testable outcome, its expected-result authority, its implementation evidence, and the surfaces deliberately excluded. Every later business rule points to an approved authority or is marked `NEEDS-DECISION`.
 
-## 2. Business Flow Diagram + Journey Graph
+## 2. Trace the Change Blast Radius
 
-Before scenarios, draw a Mermaid business flow diagram, then back it with a journey graph table. Capture:
+For a change-scoped request, resolve the actual change set before drafting scenarios. Translate changed files and lines into changed contracts: business rules, state transitions, data meaning or schema, API or event payloads, permissions, ordering, idempotency, timing, and external effects.
 
-- Actors and systems.
-- Business entities and states.
-- Ordered actions and transitions with stable edge IDs such as `J1`, `J2`, or domain-prefixed equivalents.
-- Preconditions, produced outputs, generated identifiers, tokens, persisted records, emitted events, locks, caches, jobs, and external calls.
-- Branches, retries, rollbacks, timeouts, duplicate delivery, and eventual consistency windows.
+Then trace outward:
 
-Completion criterion: every important diagram edge appears in the table with consumes, produces, state or side effects, and source receipts; every later scenario cites the edge IDs it covers. Missing, ambiguous, or source-only suspected edges are explicit gaps or hypotheses.
+`changed artifact -> changed contract/state/data -> writers, readers, callers, and subscribers -> affected business flows -> observable outcomes`
 
-## 3. Agent Execution Contract
+Inspect direct callers and also alternate entry points, shared readers, scheduled or async work, callbacks, retries, recovery, administrative operations, reports, compatibility paths, and flows that compete for the same state. Treat code as reachability evidence here, not as proof that the reached behavior is correct.
 
-Before risk mapping, define what a follow-on agent can execute without rediscovering the business analysis:
+Add every materially affected flow to the plan:
 
-- Target surfaces: APIs, UI routes/selectors, events, jobs, tables, commands, harnesses, profiles, feature flags, permissions, and external stubs or mocks.
-- Data fixtures and named variables: how required entities are created or found, which IDs or tokens each journey edge produces, and how later steps consume them.
-- Probes/oracles: where to assert user-visible, API, DB, event, log, metric, audit, cache, and external-system outcomes.
-- Waits and budgets: polling or subscription points, eventual consistency windows, timeout budgets, performance thresholds, and retry limits.
-- Data policy and cleanup: default to preserve traces for local/test executor runs unless explicitly overridden; name ownership of records, provider stubs, queues, locks, caches, schedulers, idempotency keys, TTL, cleanup command, and what must not be cleaned before issue diagnosis or rerun.
-- Required vs optional capability: split the surfaces above into **required capabilities** (the run cannot proceed without them) and **optional probes** (extra signal only). A missing required capability is a pre-run gate recorded in `Agent-ready Gates`, never something the executor only discovers mid-run.
+- Put the changed flow under its normal business branch.
+- Put preservation checks for other flows under their own regression branches or business roots.
+- Attach shared-state and concurrency cases to the earliest transition where the flows can interfere.
+- If a possible impact cannot be resolved, keep it as `NEEDS-DECISION`, `BLOCKED`, or `OUT-OF-SCOPE` with evidence; do not silently omit it.
 
-Use stable field labels so another agent can parse the handoff: `Target surfaces`, `Fixtures`, `Named variables`, `Probes/Oracles`, `Waits`, `Cleanup`, and `Blockers/Gaps`; put the data policy inside `Cleanup` rather than inventing a new field label. Keep these labels exact; put longer wording in the field body, not the label. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized equivalents.
+Completion criterion: every changed contract maps to a direct scenario leaf, and every affected flow maps to a regression leaf or an explicit disposition. Testing only the changed entry point is incomplete.
 
-Tag the provenance of every runtime fact, not only its value. A target surface, trigger channel, datasource, schema or DDL state, credential, permission, feature flag, or external dependency is `confirmed by source` only when a read source proves it now; otherwise it is `assumed until executor probe`, and a known-unavailable prerequisite is `blocked`. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized status labels. Any runtime state a static read cannot prove live — reachability, connectivity, service registration, readiness, and the like — is an assumption until the executor probes it; do not assert it as established because the plan happens to name it.
+## 3. Prove the Business Trunk
 
-Completion criterion: every scenario can be assigned to an execution agent with no hidden setup, hidden prior result, or ambiguous oracle; unknown locators, unavailable test hooks, unsafe cleanup or retention, and unowned dependencies are blockers or gaps; every runtime fact carries one of `confirmed by source`, `assumed until executor probe`, or `blocked`.
+Reconstruct the normal business flow before inventing scenarios:
 
-## 4. Risk Map
+1. Entry and eligibility.
+2. Ordered business actions and decisions.
+3. State transitions and externally visible effects.
+4. Async continuations, callbacks, retries, or scheduled work.
+5. The committed outcome.
 
-Derive scenarios from the journey graph, not from a generic checklist. Cover each relevant risk family:
+Give important steps stable IDs such as B1, B2, and B3. Give affected independent flows their own stable prefixes when useful. A small Mermaid flow or ordered table is enough; model business behavior, not internal call stacks.
 
-- Main path and alternate valid paths.
-- Boundary values, empty or large inputs, invalid state transitions, validation errors, and permission failures.
-- Cross-step consistency: DB records, external side effects, events, caches, search indexes, invoices, emails, or reports agree after each committed state.
-- Read-path equivalence (most commonly a DB migration; the same holds for any shared read surface an existing reader consumes): when a change alters the shape or contents of that surface, every existing downstream reader of it — especially readers that predate the change and do not filter on the new discriminator — still returns equivalent results or is explicitly changed.
-- Concurrency: duplicate submissions, simultaneous updates, callback races, lock contention, optimistic or pessimistic conflicts, and lost updates. For each entity the flow mutates or reads over time, enumerate every concurrent path — user-triggered, automatic, admin/manual, scheduled — and cover each pair that can race with a scenario or an explicit gap.
-- Idempotency and recovery: retries, duplicate callbacks, partial failure, rollback or compensation, and resume after async failure.
-- Mixed-state populations from partial progress: when a flow can halt or stage mid-way — a paused rollout, partial migration, interrupted batch — the population left behind is mixed (some entities upgraded, migrated, or notified; others not). Cover how the next stage, a resumed run, and any second flow behave against that mixed population, and cover the resume path itself, not only the halt.
-- Performance and scale: latency budgets, throughput, queue lag, item counts, fan-out, pagination, memory pressure, or connection pressure. A performance scenario enters the inventory only with a checkable budget or threshold from the sources or the user; without one, record a gap requesting the budget instead of a scenario whose evidence would duplicate functional runs.
-- Observability and operability: logs, metrics, traces, alerts, audit trails, and support diagnostics for critical failures.
+Select the shortest source-backed route that reaches the normal committed outcome as the Primary Happy Path. A normal positive-outcome tree has exactly one. Other successful routes are alternate branches at the decision where they diverge.
 
-Migration read-path branch: when that family applies, do not stop at writer correctness. Enumerate the readers of each changed table or column and emit a `Migration Read-Path Risk Matrix` ([REFERENCE.md](REFERENCE.md#migration-read-path-risk-matrix)); map each changed shape that has an existing reader to a read-path equivalence scenario or a blocker, not only a write-success scenario. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized section labels.
+If the requested contract has no meaningful successful route, such as a negative-only rule or verification-only migration, say No source-backed Happy Path and give the reason, then put the canonical verification path first. Never manufacture a positive flow.
 
-Completion criterion: each requirement, API variant, required-input branch, state transition, business-flow edge, dependency edge, and high-risk failure mode is covered by at least one scenario or listed as a gap. An undefined semantic the sources leave open — snapshot vs live reads during long operations, rounding, counting denominators, ordering guarantees — is itself a gap entry with a disposition; naming an undefined semantic anywhere in the plan and then dropping it before the Gaps list is a coverage failure. When the migration read-path branch applies, every changed table or column with an existing reader maps to a read-path equivalence scenario or a blocker. Treat source-only suspected defects as verification targets unless runtime evidence or tests reproduce them.
+Completion criterion: the trunk begins at a legitimate entry, ends at an observable committed outcome, and every transition has separate expected-result authority and implementation evidence, or an explicit unresolved disposition.
 
-## 5. Scenario Inventory
+## 4. Grow the Business Scenario Tree
 
-Before detailed scenario cards, emit a matrix-first `Scenario Inventory` ([REFERENCE.md](REFERENCE.md#scenario-inventory-and-matrix-first-scale)). This table is the unique scenario index: every scenario ID later used by the DAG, coverage matrix, document-code diff, migration matrix, gaps, or executor handoff must appear here exactly once.
+Use one Business Scenario Tree section. Represent hierarchy with nested headings from outcome to business branch to scenario leaf. Keep the scenario fields directly beneath their leaf; do not create a separate scenario inventory, group summary, or detached detailed-scenario section.
 
-Use stable columns: `Scenario`, `Group`, `Priority`, `Slice`, `Risk/Purpose`, `Probe/Oracle`, `Edges`, `Channel`, `Side-effect Class`, `Data policy`, and `Related issue`; `Probe/Oracle` states in one line what to check and what to expect, so every row carries a checkable oracle even before expansion (oracle content obeys the §6 `Expected` source rule: unstated contracts are tagged or routed to Gaps, never asserted bare); use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized labels. `Related issue` points only to an existing or future executor-generated issue document; the planner does not create bug issue files before runtime evidence exists.
+Order each normal tree as:
 
-For large or naturally grouped plans, keep the document single-file and matrix-first: add a compact `Scenario Group Summary` immediately before the inventory, classify rows as `Core Slice`, `Extended Slice`, or `Hazardous/Defer`, and expand the Core/default rows and every P0 row below. A row is P0 when it is the sole coverage of a risk that moves funds, causes irreversible external effects, crosses a permission boundary, or is a racing pair from the Concurrency enumeration. A slice label defers execution, never specification: a deferred row keeps its one-line `Probe/Oracle`, so no scenario ships without a checkable oracle. For small plans, the inventory still exists, but every row may also have a detailed scenario card.
+1. Primary Happy Path.
+2. Blast-radius regression branches that prove other affected business flows still reach their intended outcomes.
+3. Alternate valid routes at their divergence point.
+4. Input, rule, state, and permission branches under the earliest affected business step.
+5. Dependency failure, timeout, partial success, rollback, recovery, retry, idempotency, and concurrency branches under the step they disturb.
+6. Cross-cutting performance or operability branches only when they span several steps and have an approved acceptance threshold.
 
-Completion criterion: every scenario has one inventory row with priority, slice, journey edges, probe/oracle, side-effect class, data policy, and issue placeholder/status; at least one Core/default row is identified; deferred or hazardous rows are explicit rather than hidden in prose.
+The business flow supplies branch names. Labels such as boundary, concurrency, recovery, or performance classify leaves; they do not replace business stages as the tree's top-level structure.
 
-## 6. Test Scenarios
+Every leaf follows the contract in [REFERENCE.md](REFERENCE.md#scenario-leaf-contract). In particular:
 
-Write detailed scenario cards at the level a downstream implementation agent can execute without rediscovering the analysis. Expand every Core/default scenario, every P0 row (per the §5 rule), and any scenario whose setup, oracle, side effect, or safety decision cannot be represented safely in the inventory row. Do not expand every non-P0 Extended or Hazardous/Defer row in a large plan just to repeat matrix text.
+- Expected Results is mandatory and observable.
+- Expected Authority names the approved source for every verdict assertion.
+- Implementation Evidence names the code, test, schema, or runtime path that made the scenario necessary.
+- An unstated or implementation-only behavior becomes `NEEDS-DECISION` plus a non-verdict observation; it is never silently promoted to a pass condition.
+- The leaf names every business step it covers.
 
-Lead each detailed scenario with a one-line **index/handle** — its DAG node id, priority, `Side-effect Class`, and a readiness-gate reference — so reading a single scenario is self-sufficient for how it schedules and how risky it is, without hopping to the DAG, gates, and slice sections. The index denormalizes only those cheap, closed-set tokens; the Execution DAG (§7) stays the single source of scheduling facts, and each field below stays the home for its own detail. For each detailed scenario include:
+Put shared preconditions at the nearest common branch and repeat only leaf-specific differences. Large trees stay readable by factoring shared context upward, not by moving leaves into a flat matrix.
 
-- `Purpose/Risk`, `Priority`, `Sources`, `Edges`, `Setup`, `Steps`, `Expected`, `Automation`, and `Isolation/Cleanup`.
-- Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized scenario field labels.
-- In `Setup`, include target surfaces, environment assumptions, and any required stubs or test hooks.
-- In `Steps`, include the named-variable dependency chain: what each step consumes from previous steps and what it produces.
-- In `Expected`, include probes, waits, and invariants at user, API, data, event, external-system, and async levels. Every `Expected` assertion states a contract the named sources actually prove. When a probe targets a contract the sources do not state — audit records, alert or notification uniqueness, idempotent re-delivery semantics, response wording, internal state-machine steps — tag it `assumed until executor probe` and phrase it observe-and-report, or move it to Gaps with a disposition; an untagged invented rule in an oracle position makes the executor emit false verdicts. Downgrading an assertion to observe-and-report must not cost the scenario its pass/fail teeth: the scenario keeps at least one source-backed hard invariant in `Expected`, or is explicitly classed as an observation probe that cannot pass or fail. An observation probe still names the minimum evidence it must actually retrieve — the specific records, IDs, or states to look up — so completing it means having looked, not having reported; an executor may never book an observation probe as a pass. When a boundary's exact-point semantic is undefined by the sources, split the oracle: keep hard source-backed assertions on each defined side (the value that must succeed and the value that must fail), and treat only the undefined point itself as observe-and-report — an undefined point never strips the defined sides of their pass/fail assertions.
-- In `Automation`, name the level: E2E, API integration, contract, load/performance, chaos/recovery, or manual exploratory. The level classifies coverage; it does not direct an executor to author test code.
-- In `Isolation/Cleanup`, name the retention policy, owner marker, TTL, cleanup command, determinism, and flake risks; default to preserving self-owned traces for local/test executor runs unless explicitly overridden, and match any cleanup command to real transaction boundaries rather than assuming outer test rollback works for committed end-to-end calls.
-- `Side-effect Class`: classify each scenario by what it does to shared state — `read-only`, `additive-retained`, `soft-delete`, `destructive-delete`, `config-change`, `external-file`, or `async-replay`. A `soft-delete`, `destructive-delete`, or scope-mutating scenario requires explicit user authorization or a dedicated fixture before an executor may run it, and is re-risked whenever a data-retention override is in force ([REFERENCE.md](REFERENCE.md#side-effect-class)). Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized field labels.
+Completion criterion: the first ordinary branch is the complete Happy Path; every other leaf is reachable through a named business or blast-radius branch; every verdict has an approved expected authority; every business step, changed contract, affected flow, state transition, and material failure is covered by a leaf or an explicit disposition.
 
-Completion criterion: no detailed scenario assumes an impossible state, hidden setup, or unavailable previous result; every Core/default scenario and every P0 row has a detailed card, while matrix-only rows are deliberately classified as non-P0 Extended, Hazardous/Defer, manual, or blocked in the inventory.
+## 5. Close Coverage
 
-## 7. Execution DAG
+End with:
 
-After the inventory and selected detailed scenario cards, provide an executor-consumable DAG. The DAG states scheduling facts; it does not decide the runtime schedule for a specific machine or environment.
+- A compact coverage map from requirements, business-step IDs, changed contracts, and affected flows to scenario leaf IDs.
+- Gaps and Decisions, with each unresolved item marked `NEEDS-DECISION`, `ASSUMED`, `BLOCKED`, or `OUT-OF-SCOPE`.
+- The smallest first test slice. For a normal positive-outcome plan, start with the Primary Happy Path, then add the highest-risk branches needed by the request.
 
-Use a table with one row per executable node. Nodes usually map to scenarios; split setup, probe, disruptive, or cleanup nodes only when a downstream executor needs different dependencies or isolation. Every inventory scenario gets a node — deferred and matrix-only rows included, each as at least a one-line node — because a deferred scenario still needs its dependencies stated for whichever run eventually executes it; a truly independent row states `Depends on: none`. Include:
+Use `ASSUMED` only for a temporary premise explicitly accepted by the user or responsible decision owner, and name that acceptance. Unknown approval status is `NEEDS-DECISION`, not `ASSUMED`.
 
-- Node ID and scenario ID.
-- Depends on: predecessor nodes, business-flow edges, and required produced variables.
-- Consumes and produces: named variables such as IDs, tokens, event IDs, records, and evidence handles.
-- Required capabilities: API, RPC, CLI, UI, DB, MQ, job, log, metric, stub, or local service controls.
-- Side-effect scope and isolation key: affected tables, queues, caches, external stubs, tenant/account, batch ID, trace ID, or data prefix.
-- Parallel safety: `safe`, `unsafe`, or `unknown`, with a short reason.
-- Cleanup dependency: when cleanup may run under the retention policy and which produced variables it needs.
-- Disruptive marker: concurrency, recovery, compensation, load, callback race, or none.
+Coverage is a reconciliation aid, not a second scenario catalog. It contains IDs and dispositions only; scenario meaning remains in the tree.
 
-Use stable table headers: `Node`, `Scenario`, `Depends on`, `Consumes`, `Produces`, `Required capabilities`, `Side-effect scope`, `Isolation key`, `Parallel safety`, `Cleanup dependency`, and `Disruptive marker`. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized equivalents.
+Completion criterion: every approved rule, trunk step, changed contract, and affected flow maps to at least one leaf; every uncovered item has an explicit disposition; no new scenario is introduced outside the tree.
 
-Completion criterion: every inventory scenario appears in the DAG (non-selected rows keep their Extended, Hazardous/Defer, manual, or blocked classification in Scenario Inventory — a DAG node defers execution decisions to the slice, it only states dependencies); every `unsafe` or `unknown` node has a reason; every variable used across scenarios has a producer or source-supported fixture and a consumer; produced variables consumed by a node come from predecessor nodes named in `Depends on`, not from later or unrelated nodes; the DAG is acyclic; execution order can be derived from `Depends on` without rereading the prose.
+## Deliverable
 
-Delegated execution branch: add Level-2 `Executor Handoff Index` immediately after the DAG when execution will be delegated to `e2e-test-executor`, a separate agent session, or automation. Use [REFERENCE.md](REFERENCE.md#executor-handoff-index) for the fields and [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized section labels.
+Use this top-level order:
 
-## 8. Closure
+1. Overview
+2. Sources and Business Flow
+3. Business Scenario Tree
+4. Coverage and Gaps
 
-End with the sections below. Use [REFERENCE.md](REFERENCE.md#localized-output-labels) for localized section labels:
-
-- Level-2 `Coverage Matrix` mapping requirements, business-flow edges, journey graph edges, and risk families to scenario IDs.
-- Level-2 `Gaps, Assumptions, Questions` naming doc/code conflicts, assumptions, and questions that could change the plan. Each gap carries a **disposition** ([REFERENCE.md](REFERENCE.md#gap--defect-disposition)) so an accepted, conditional, or out-of-scope item is never read as a pending one.
-- Mark plan defaults the user may later override — data policy (`preserve traces` for local/test executor runs unless explicitly overridden), cleanup command timing, and the run's exit/completion criteria — as `default unless overridden`, so an executor can supersede them cleanly rather than report a superseded criterion as unmet.
-- Project-specific technical facts found at run time (wire ID types, real pagination/field names, replay triggers, cache-refresh behavior) are recorded as plan revisions or emergent findings here, never promoted into generic rules.
-- Optional Level-2 `Execution Order`, only when a human reader wants a ready-made sequence: a recommended dependency order derived from the Execution DAG, not a replacement for it. The executor derives order from the DAG `Depends on`, so this section is not required for agent handoff.
-- Level-2 `Agent-ready Gates`: prerequisites that must hold before automation starts, evidence that marks exit, and blockers that should suspend execution. Keep these gates consistent with the run facts asserted elsewhere in the plan: a fact stated as `confirmed by source` must not also appear here as an unmet prerequisite or blocker, and any runtime fact the executor must still probe — trigger-channel reachability, datasource or DDL readiness, credentials, or dependency availability — is `assumed until executor probe`, not presented as established.
-- Level-2 `Scenario Slices`: identify the `Core Slice` — the smallest set of scenarios that closes the main risk in a single executor run — so an executor can start there without re-triaging priority. When the full scenario set is larger than that Core Slice, also classify the rest as `Extended Slice` (valuable follow-on coverage) or `Hazardous/Defer` (disruptive, costly, or blocked scenarios to isolate or postpone), naming why each non-core scenario is deferred. The `Minimal First Automation Slice`, when the user asks for it, names the Core Slice's concrete starting scenarios.
-- Level-2 `Minimal First Automation Slice` if the user asks how to start, with the scenario IDs and source-backed target surfaces to implement first.
-
-For a full plan on a high-risk flow — a migration read-path branch, a P0 business chain, or irreversible side effects — the coverage claim may be red-teamed before delivery: one fresh-context reviewer (prefer a different model's runtime when one is available — same-model contexts share blind spots) receives the named sources themselves, the Journey Graph and Risk Map, the Scenario Inventory with the Coverage Matrix, and the Gaps, Assumptions, Questions list, and names requirements, edges, or failure modes that are neither covered by a scenario nor already dispositioned as a gap — the author of a coverage claim is the least likely to see past it. The main context rules on each finding: add a scenario, record a gap with its disposition, or reject with a reason. Delta Plans skip this.
-
-Do not write test code unless the user asks. Label unverified source-derived defect claims as hypotheses.
+Save a requested repository artifact under docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md unless the user gives another path. Do not execute tests or write test code unless the user asks.

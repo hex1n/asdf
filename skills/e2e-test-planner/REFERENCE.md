@@ -1,228 +1,164 @@
 # E2E Test Planner Reference
 
-## Executor Handoff Index
+## Canonical Plan Shape
 
-Use this when the plan will be executed by `e2e-test-executor`, a separate agent session, or automation. The Markdown plan remains the source of truth; the index is a compact locator so an executor can start without scraping every scenario body.
+# {feature} E2E Test Plan
 
-Place the index after `Execution DAG` and before the closure sections. Use `## Executor Handoff Index`; use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading.
+## Overview
 
-Include these fields:
+- Business outcome: ...
+- Primary Happy Path: HP-001, or No source-backed Happy Path with the reason.
+- Scope: ...
+- Change set and blast-radius summary: ...
+- Highest-risk branches: ...
+- Unresolved decisions: ...
+
+## Sources and Business Flow
+
+### Sources
+
+| Source | Evidence role | Authority status | Proven fact |
+|---|---|---|---|
+| {locator} | {expected authority, implementation evidence, or runtime evidence} | {approved by whom, or not established} | {intended rule or current behavior} |
+
+### Change Blast Radius
+
+| Changed artifact | Changed contract, state, or data | Direct flow | Other affected flows | Tree roots or branches | Evidence |
+|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... |
+
+### Business Flow
+
+| Step | Business action or decision | State or effect | Expected authority | Implementation evidence |
+|---|---|---|---|---|
+| B1 | ... | ... | ... | ... |
+
+## Business Scenario Tree
+
+### Outcome: {observable committed outcome}
+
+#### 1. Primary Happy Path
+
+##### HP-001 {scenario title}
+
+- Priority: P0
+- Business Path: {outcome} to Primary Happy Path to {leaf}
+- Covers: B1 through Bn
+- Purpose: ...
+- Preconditions: ...
+- Actions: ...
+- Expected Results:
+  - ...
+- Expected Authority: ...
+- Implementation Evidence: ...
+
+#### 2. {business step or decision}
+
+##### {scenario-id} {scenario title}
+
+- Priority: ...
+- Business Path: {outcome} to {branch} to {leaf}
+- Covers: ...
+- Purpose: ...
+- Preconditions: ...
+- Actions: ...
+- Expected Results:
+  - ...
+- Expected Authority: ...
+- Implementation Evidence: ...
+
+## Coverage and Gaps
+
+### Coverage
+
+| Contract, step, or affected flow | Scenario leaves | Disposition |
+|---|---|---|
+| ... | ... | covered, NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE |
+
+### Gaps and Decisions
+
+| Item | Disposition | Effect on plan |
+|---|---|---|
+| ... | NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE | ... |
+
+### First Test Slice
+
+1. ...
+
+The heading hierarchy is the tree. Scenario IDs may be referenced by coverage and gaps, but their definitions appear only below their business branch.
+
+## Scenario Leaf Contract
 
 | Field | Required content |
 |---|---|
-| Artifact ID | Stable plan ID or filename plus timestamp/version if available. |
-| Contract version | `e2e-plan/v1`. |
-| Plan source | Requirement/design/code sources, commit or document version, and unverified source gaps. |
-| Scenario set | Scenario IDs, selected/default nodes, and intentionally manual or blocked scenarios. |
-| DAG nodes | Node IDs, scenario IDs, dependency roots, and disruptive markers. |
-| Variable ledger | Produced variables, source-supported fixtures, consumers, and cleanup/data-policy consumers. |
-| Required capabilities | API/RPC/CLI/UI/DB/MQ/job/log/metric/stub/local-service capabilities and missing gates. |
-| Data policy anchors | Default run data policy (`preserve traces` unless explicitly overridden), owner marker, isolation key, TTL, cleanup command, cleanup timing, cleanup dependency, and retention risk for each mutable side effect. |
-| Execution blockers | Missing locators, unsafe data, unavailable hooks, ambiguous oracles, and environment assumptions. |
+| Priority | P0, P1, or P2; the Primary Happy Path is P0. |
+| Business Path | Outcome to business branch to leaf. |
+| Covers | Stable business-step IDs exercised by the leaf. |
+| Purpose | The rule, risk, or variation this leaf proves. |
+| Preconditions | Only the starting state and input facts needed to understand the scenario. |
+| Actions | Business actions in order; preserve important inputs and decisions. |
+| Expected Results | Observable pass conditions at the relevant user, API, state, data, event, or external-effect level. If authority is missing, state the unresolved decision instead of asserting a verdict. |
+| Expected Authority | Exact approved requirement, design, decision, policy, external contract, or explicit user direction that defines each intended result; otherwise `NEEDS-DECISION` and the missing decision owner. |
+| Implementation Evidence | Exact code, configuration, schema, existing-test, or runtime locators that show current behavior, reachability, or risk. This field does not establish correctness by itself. |
 
-Completion criterion: an executor can choose nodes, locate variable producers and consumers, see missing capabilities, and find retention or cleanup blockers without reading every scenario body first.
-## Scenario Inventory and Matrix-First Scale
+Shared preconditions may live on the parent branch. A leaf then states only its overrides, but it still owns its actions, expected results, expected authority, and implementation evidence.
 
-Use this for every generated plan. The `Scenario Inventory` is the scenario dashboard and the single source of scenario IDs: every ID later used in detailed scenario cards, the DAG, coverage matrix, document-code diff, migration matrix, gaps, or executor handoff must appear here exactly once.
+## Expected-Result Rules
 
-Place `## Scenario Inventory` after `Risk Map` and any conditional risk matrix, and before `Test Scenarios`. Use [Localized Output Labels](#localized-output-labels) when the generated plan needs localized headings and columns.
+- Assert outcomes, not implementation activity.
+- Cover all committed effects that define the business result. If data, events, external calls, or user-visible state must agree, state each one.
+- Include time bounds only when an approved authority supplies a threshold. Otherwise mark the threshold `NEEDS-DECISION`.
+- Never derive the intended result solely from the current implementation or from tests that merely encode it. Use those sources to describe current behavior and locate risk.
+- Split known and unknown semantics. Known parts remain pass or fail assertions. An unknown part is an Observation with disposition `NEEDS-DECISION`, names the evidence to inspect, and cannot pass.
+- A source contradiction is not resolved by wording or execution. Observation can establish what the implementation does; only an approved decision can establish what it should do.
 
-Use these columns:
+## Disposition Rules
 
-| Column | Required content |
+- `NEEDS-DECISION`: no approved expected authority exists, or authorities conflict. The item is non-verdict until the named owner decides it.
+- `ASSUMED`: the user or responsible owner explicitly accepted a temporary premise. Name who accepted it and keep the conclusion provisional.
+- `BLOCKED`: the intended result is known, but required evidence or a safe test surface is unavailable.
+- `OUT-OF-SCOPE`: the user or governing scope explicitly excludes the item; name the boundary and any residual risk.
+
+Do not use `ASSUMED` merely because a document is published, a test passes, or the current implementation is internally consistent.
+
+## Blast-Radius Rules
+
+- Start from changed contracts, not changed filenames. One file can affect several contracts; one contract can span several files.
+- Trace both producers and consumers of changed state, data, APIs, events, permissions, and external effects.
+- Include synchronous, async, scheduled, retry, recovery, administrative, reporting, compatibility, and alternate-entry flows when they can observe or mutate the changed contract.
+- Put every affected business outcome in the scenario tree. Direct-flow coverage does not close an affected neighboring flow.
+- Reconcile every changed contract and affected flow in Coverage and Gaps, including explicit non-coverage decisions.
+
+## Tree Construction Rules
+
+- Attach a leaf to the earliest business decision that makes it different from its parent path.
+- Keep exactly one Primary Happy Path for the requested normal outcome. An affected independent outcome gets a preservation-regression branch or root, not a competing Primary Happy Path.
+- Place a race under the shared state transition it overlaps; place recovery under the failure state it repairs.
+- Use a cross-cutting branch only when no single business step owns the behavior.
+- When independent outcomes cannot share a meaningful root, create a business forest. Order roots by the user's named outcome, then source-backed criticality and dependency; state when no default root exists.
+
+## Localized Labels
+
+For Chinese output, use:
+
+| English | Chinese |
 |---|---|
-| Scenario | Stable scenario ID and short title. |
-| Group | Functional or risk group, such as setup, main path, import/export, recovery, permission, or performance. |
-| Priority | `P0`, `P1`, `P2`, or an equivalent localized priority. |
-| Slice | `Core Slice`, `Extended Slice`, `Hazardous/Defer`, `manual`, or `blocked`. |
-| Risk/Purpose | The one-line risk or contract the scenario closes. |
-| Edges | Journey edge IDs covered by the scenario. |
-| Channel | API/RPC/UI/DB/MQ/job/log/local-service/manual channel needed to execute it. |
-| Side-effect Class | One value from [Side-effect Class](#side-effect-class). |
-| Data policy | Read-only/no-write, or preserve/retention details: owner marker, TTL, cleanup command, and cleanup timing. |
-| Related issue | Existing issue link, future executor issue placeholder, or `none`; planners do not create bug issue files before runtime evidence exists. |
-
-For large or naturally grouped plans, add `## Scenario Group Summary` immediately before `Scenario Inventory`:
-
-| Column | Required content |
-|---|---|
-| Group | Group name or prefix. |
-| Focus | What risk family or workflow the group covers. |
-| Count | Number of scenarios in the group. |
-| Default slice | Which IDs belong to the first executor run. |
-| Deferred/Hazardous | IDs delayed because of cost, permissions, side effects, or missing tooling. |
-| Execution note | How the executor should sequence or isolate that group. |
-
-The group summary is a reconciled dashboard, not a second source of truth: `Count`, `Default slice`, and `Deferred/Hazardous` must match the rows and IDs in `Scenario Inventory`.
-
-Matrix-first scale rule: when the scenario set is large, keep the Markdown plan single-file and make the inventory table the broad coverage layer. Expand detailed scenario cards only for Core/default rows and rows whose setup, oracle, side effect, or safety decision cannot be safely carried by one inventory row. A checkout plan with two scenarios can expand both; a device-provisioning plan with setup, permission, firmware, recovery, and load groups should expand the core setup/update path and keep deferred load or destructive recovery rows in the matrix until selected for execution.
-
-Completion criterion: a reviewer can see total coverage, groups, first-run slice, deferred risk, data policy, and issue linkage without reading detailed cards; an executor can start with Core/default rows and does not need per-scenario files to understand the plan.
-
-## Plan Readability: Overview & Self-Contained Scenarios
-
-A plan is read two ways: a reviewer skims top-down to judge coverage and risk before greenlighting, and an executor reads one scenario at a time to run it. Both fail the same way when a scenario's facts are scattered — purpose in the scenario body, scheduling in the DAG, side-effect risk and gates in other sections — forcing a multi-section join. Co-locate just enough to answer the two recurring questions: *what does this plan cover and what is unresolved?* and *for this one scenario, how does it schedule and how risky is it?*
-
-**Overview digest (leads the plan).** A short `Overview` block above the first numbered section, using [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading, restating facts sourced below — never a new source of truth:
-
-- Coverage in brief: journey-edge span, scenario count, and the `Core Slice`.
-- Top risks: the one or two highest risk families the plan exists to close.
-- Open gaps: the unresolved items, each with its disposition token (`OPEN`/`CONDITIONAL`/`OUT-OF-SCOPE`/…), so a reviewer never mistakes a settled item for a pending one.
-
-Keep it a few lines. It is a navigation digest, not an approval template, and it adds no fact absent from the sections below.
-
-**Self-contained scenario index line.** Lead each scenario with a one-line handle carrying its cross-section coordinates as cheap, closed-set tokens:
-
-```text
-### {scenario-id} {one-line title}
-- Index: node `{node-id}` | priority {ENUM} | Side-effect Class `{ENUM}` | readiness gate → {gate ref}
-- Purpose/Risk: …            (the dedicated fields stay; the index only points to them)
-```
-
-- The index denormalizes only tokens that are near-zero drift (a node id, a priority enum, the `Side-effect Class` enum, a section reference). Never copy a field's prose onto the index.
-- The Execution DAG section stays the single source of scheduling facts (depends/consumes/produces/parallel-safety); the index is a pointer to the node, not a second copy of its row. The full reason/detail stays in each dedicated field.
-- The same shape is domain-neutral: a checkout scenario reads `node N1 | priority P0 | Side-effect Class additive-retained | gate → entry stub ready`; a device-provisioning OTA scenario reads `node N3 | priority P1 | Side-effect Class config-change | gate → firmware-mirror reachable` — only the {node}/{ENUM}/{gate} differ, the handle is identical.
-
-Completion criterion: a reviewer learns coverage, top risk, and open gaps from the Overview alone; a reader learns a single scenario's node, priority, side-effect class, and gate from its index line without opening the DAG or gates sections; no scheduling fact is duplicated out of the DAG and no field's prose is copied onto the index.
-
-## Localized Output Labels
-
-Use this when the output language is not English. The planner's contract names the English label; the generated plan should use the matching localized label below while preserving code identifiers, paths, enum values, commands, and literal source text.
-
-Chinese labels:
-
-| Contract item | English label | Chinese label |
-|---|---|---|
-| Overview heading | `Overview` | `概览` |
-| Scenario group summary heading | `Scenario Group Summary` | `场景分组摘要` |
-| Scenario inventory heading | `Scenario Inventory` | `场景总览` |
-| Scenario inventory header | `Scenario` | `场景` |
-| Scenario inventory header | `Group` | `分组` |
-| Scenario inventory header | `Slice` | `切片` |
-| Scenario inventory header | `Risk/Purpose` | `风险/目的` |
-| Scenario inventory header | `Channel` | `通道` |
-| Scenario inventory header | `Data policy` | `数据策略` |
-| Scenario inventory header | `Related issue` | `关联 Issue` |
-| Document-code diff heading | `Document-Code Semantic Diff` | `文档-代码语义差异` |
-| Agent contract field | `Target surfaces` | `目标面` |
-| Agent contract field | `Fixtures` | `测试数据` |
-| Agent contract field | `Named variables` | `变量传递` |
-| Agent contract field | `Probes/Oracles` | `探针/Oracle` |
-| Agent contract field | `Waits` | `等待/预算` |
-| Agent contract field | `Cleanup` | `隔离/清理` |
-| Agent contract field | `Blockers/Gaps` | `阻塞/缺口` |
-| Runtime fact provenance | `confirmed by source` | `已确认` |
-| Runtime fact provenance | `assumed until executor probe` | `待验证` |
-| Runtime fact provenance | `blocked` | `阻塞` |
-| Scenario field | `Purpose/Risk` | `目的` |
-| Scenario field | `Priority` | `优先级` |
-| Scenario field | `Sources` | `来源` |
-| Scenario field | `Edges` | `覆盖边` |
-| Scenario field | `Setup` | `准备` |
-| Scenario field | `Steps` | `步骤和依赖` |
-| Scenario field | `Expected` | `期望` |
-| Scenario field | `Automation` | `自动化级别` |
-| Scenario field | `Isolation/Cleanup` | `隔离/清理` |
-| Scenario field | `Side-effect Class` | `副作用类型` |
-| DAG header | `Node` | `节点` |
-| DAG header | `Scenario` | `场景` |
-| DAG header | `Depends on` | `依赖` |
-| DAG header | `Consumes` | `消费` |
-| DAG header | `Produces` | `产出` |
-| DAG header | `Required capabilities` | `所需能力` |
-| DAG header | `Side-effect scope` | `副作用范围` |
-| DAG header | `Isolation key` | `隔离键` |
-| DAG header | `Parallel safety` | `并行安全` |
-| DAG header | `Cleanup dependency` | `清理依赖` |
-| DAG header | `Disruptive marker` | `扰动标记` |
-| Executor handoff heading | `Executor Handoff Index` | `执行器交接索引` |
-| Coverage heading | `Coverage Matrix` | `覆盖矩阵` |
-| Gap heading | `Gaps, Assumptions, Questions` | `缺口、假设与问题` |
-| Execution order heading | `Execution Order` | `执行顺序` |
-| Agent gate heading | `Agent-ready Gates` | `Agent 就绪门禁` |
-| Scenario slice heading | `Scenario Slices` | `场景切片` |
-| Minimal slice heading | `Minimal First Automation Slice` | `最小自动化切片` |
-| Migration read-path heading | `Migration Read-Path Risk Matrix` | `迁移读路径风险矩阵` |
-
-Completion criterion: generated plans use one label set consistently for their output language; English labels and localized labels are not mixed within the same table or field group except for code tokens such as `Oracle`, identifiers, paths, and enums.
-
-## Migration Read-Path Risk Matrix
-
-Use this when a change alters the shape or contents of a table or column that existing code already reads — backfilling a column, changing a table/column shape, or copying/de-duplicating rows are common triggers. It forces read-path coverage: a migration can make every writer succeed yet still break an existing query that predates the change and does not filter on the new discriminator. Use `## Migration Read-Path Risk Matrix`; use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading. Place it after the Risk Map and before the Test Scenarios and Execution DAG.
-
-Enumerate one row per (changed table or column) × (downstream reader). Include these columns:
-
-| Column | Required content |
-|---|---|
-| Changed table/column | The table or column whose shape or contents this migration alters. |
-| Change kind | How the shape or contents change — e.g. backfill, shape/DDL change, row copy/duplication, de-duplication. |
-| Reader | The downstream read path and its exact locator: query/mapper/endpoint/report/job; include readers that predate this change. |
-| Old assumption | What the reader assumed about row shape, cardinality, or filters before the change. |
-| New shape | How the migration changes what that reader now sees (duplicated rows, new nullable column, widened set). |
-| Equivalence scenario | The scenario ID asserting the reader's result stays equivalent or its intended new result; or `blocker` when no safe scenario exists. |
-| Expected decision | `equivalent`, `must-change`, `blocker`, or `accepted-divergence`. |
-
-Completion criterion: every changed table or column with at least one existing reader has a row; each row names an existing reader locator and either a scenario ID present in Test Scenarios or a blocker; readers that do not filter on the new discriminator are listed explicitly, not assumed safe.
-
-Worked example (illustrative; names are generic):
-
-| Changed table/column | Change kind | Reader | Old assumption | New shape | Equivalence scenario | Expected decision |
-|---|---|---|---|---|---|---|
-| `summary.tenant_id` (new column) | backfill of a new discriminator column | a daily report query that filters by `date` but not by `tenant_id` | one aggregate per day | rows split per tenant after backfill | `EX-E2E-014` | must-change: report query must add the `tenant_id` filter |
-
-Beyond DB migrations: the same risk — writers all succeed yet an existing reader silently breaks — applies when the changed surface is an API response shape, an event schema, a cache, or a search index an existing consumer reads. This matrix is DB-shaped (table/column); cover those surfaces as read-path-equivalence scenarios or blockers in Test Scenarios rather than forcing them into this table.
-
-## Document-Code Semantic Diff
-
-Use this when a source document states a behavioral contract — such as a rule, default, mapping, ordering, or invariant — that the plan can compare against the code's actual behavior. The most valuable defects often live in this gap: the document says one thing, the code does another. Use `## Document-Code Semantic Diff`; use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized heading. Place it after the Source Inventory and before the Test Scenarios.
-
-Enumerate one row per documented contract that could diverge. Include these columns:
-
-| Column | Required content |
-|---|---|
-| Contract | The documented rule/default/mapping/ordering/invariant and its source locator (doc + section). |
-| Code behavior | What the code actually does, with a file:line receipt. |
-| Delta | How the contract and the code diverge, or `match` when verified equal. |
-| Risk | `P0`, `P1`, or `P2` by blast radius if the delta is a real defect. |
-| Resolution | The scenario ID that verifies the delta, or `closed`/`blocked` with the reason. |
-
-Completion criterion: every contract with a non-`match` delta at `P0` or `P1` risk names a scenario ID present in Test Scenarios, or is explicitly `closed`/`blocked`; a delta is never left only as a line in the Risk Map or Gaps section.
-
-Worked example (illustrative; names are generic):
-
-| Contract | Code behavior | Delta | Risk | Resolution |
-|---|---|---|---|---|
-| Doc: display name uses a code→label alias (`spec §7`) | code emits the raw code value (`Service.java:120`) | alias never applied | P1 | `EX-E2E-021` |
-| Doc: child records deleted when the parent is removed (`spec §7.2`) | code keeps orphaned child records | unconfirmed product call | P1 | blocked: product owner to confirm intended semantics |
-
-## Side-effect Class
-
-Tag every scenario with one side-effect class so an executor knows, before running, what the scenario does to shared state and whether it needs authorization. The tag lives on each scenario (the `Side-effect Class` field); use [Localized Output Labels](#localized-output-labels) when the generated plan needs a localized field label.
-
-| Class | What it does | Authorization gate |
-|---|---|---|
-| `read-only` | Reads state, writes nothing. | None. |
-| `additive-retained` | Creates self-owned data that is kept. | Owner marker + retention note + TTL + cleanup command. |
-| `soft-delete` | Logically hides or removes rows (status flag, tombstone). | Explicit authorization or a dedicated fixture. |
-| `destructive-delete` | Physically deletes rows, files, or queue state. | Explicit authorization or a dedicated fixture. |
-| `config-change` | Mutates shared config, flags, templates, or dictionaries. | Authorization + a restore plan. |
-| `external-file` | Reads or writes an external store / object storage. | Capability + retention note, TTL, and cleanup command when cleanup is allowed. |
-| `async-replay` | Re-triggers a job, message, or callback. | A legitimate trigger plus a dedicated failure-injection fixture; never mutate already-succeeded state. |
-
-Completion criterion: every scenario names a class; every `soft-delete`/`destructive-delete`/`config-change`/scope-mutating scenario names its authorization or fixture, and is flagged for re-risk under a data-retention override.
-
-## Gap & Defect Disposition
-
-One disposition vocabulary, shared by the planner's gaps and the executor's `Failures / Defects / Plan Gaps`, so a reader never mistakes a settled item for a pending failure. The token is a closed set; specifics (which tool is missing, which decision closed it) go in the item's reason, not the token — that keeps the vocabulary portable.
-
-| Disposition | Meaning |
-|---|---|
-| `OPEN` | Real, unresolved, must be acted on. As a plan gap: must be resolved before the run. |
-| `CLOSED` | Verified done, or no longer applicable. |
-| `MITIGATED` | A workaround is in place; residual risk is noted. |
-| `ACCEPTED` | Known and deliberately accepted; no action planned. |
-| `CONDITIONAL` | Actionable only once a stated precondition holds; the precondition is named. |
-| `BLOCKED-BY-TOOLING` | Cannot proceed for lack of a specific capability; the missing capability is named in the reason. |
-| `OUT-OF-SCOPE` | Excluded from this plan or run by scope or user override. |
-
-Plans use the pre-run subset (`OPEN`/`CONDITIONAL`/`OUT-OF-SCOPE`/`ACCEPTED`); executors may use all seven. A `CONDITIONAL`, `BLOCKED-BY-TOOLING`, or `OUT-OF-SCOPE` item never appears as a plain to-do or `Next Action` — only `OPEN` items do.
+| Overview | 概览 |
+| Sources and Business Flow | 来源与业务流程 |
+| Business Scenario Tree | 业务场景树 |
+| Outcome | 业务结果 |
+| Primary Happy Path | 主流程 Happy Path |
+| Priority | 优先级 |
+| Business Path | 业务路径 |
+| Covers | 覆盖步骤 |
+| Purpose | 目的 |
+| Preconditions | 前置条件 |
+| Actions | 测试动作 |
+| Expected Results | 预期结果 |
+| Expected Authority | 预期依据 |
+| Implementation Evidence | 实现证据 |
+| Change Blast Radius | 变更爆炸半径 |
+| Affected Flows | 受影响流程 |
+| Coverage and Gaps | 覆盖与缺口 |
+| Gaps and Decisions | 缺口与决策 |
+| First Test Slice | 首轮测试切片 |

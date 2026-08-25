@@ -10,10 +10,11 @@
 - Primary Happy Path: HP-001, or No source-backed Happy Path with the reason.
 - Scope: ...
 - Change set and blast-radius summary: ...
+- Coverage criteria: {state graph}, {input space}, {decision logic}
 - Highest-risk branches: ...
 - Unresolved decisions: ...
 
-## Sources and Business Flow
+## Sources and Models
 
 ### Sources
 
@@ -21,17 +22,37 @@
 |---|---|---|---|
 | {locator} | {expected authority, implementation evidence, or runtime evidence} | {approved by whom, or not established} | {intended rule or current behavior} |
 
-### Change Blast Radius
-
-| Changed artifact | Changed contract, state, or data | Direct flow | Other affected flows | Tree roots or branches | Evidence |
-|---|---|---|---|---|---|
-| ... | ... | ... | ... | ... | ... |
-
 ### Business Flow
 
 | Step | Business action or decision | State or effect | Expected authority | Implementation evidence |
 |---|---|---|---|---|
 | B1 | ... | ... | ... | ... |
+
+### Change Blast Radius
+
+| Changed artifact | Changed contract, state, or data | Direct flow | Other affected flows | Modes of each affected flow | Tree roots or branches | Evidence |
+|---|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... | ... |
+
+### Input Space
+
+| Characteristic | Blocks | Expected authority | Implementation evidence |
+|---|---|---|---|
+| {operation, target state, direction, field, bound, subject class, mode} | {block 1; block 2; ...} | ... | ... |
+
+### Decision Logic
+
+| Rule or error code | Condition | Outcome | Judgment order | Expected authority | Implementation evidence |
+|---|---|---|---|---|---|
+| ... | ... | ... | ... | ... | ... |
+
+### Coverage Criteria
+
+| Model | Criterion | Reason and residual risk |
+|---|---|---|
+| State graph | ... | ... |
+| Input space | ... | ... |
+| Decision logic | ... | ... |
 
 ## Business Scenario Tree
 
@@ -44,6 +65,7 @@
 - Priority: P0
 - Business Path: {outcome} to Primary Happy Path to {leaf}
 - Covers: B1 through Bn
+- Requirements: TR-001, ...
 - Purpose: ...
 - Preconditions: ...
 - Actions: ...
@@ -59,6 +81,7 @@
 - Priority: ...
 - Business Path: {outcome} to {branch} to {leaf}
 - Covers: ...
+- Requirements: ...
 - Purpose: ...
 - Preconditions: ...
 - Actions: ...
@@ -69,11 +92,11 @@
 
 ## Coverage and Gaps
 
-### Coverage
+### Test Requirements
 
-| Contract, step, or affected flow | Scenario leaves | Disposition |
-|---|---|---|
-| ... | ... | covered, NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE |
+| TR | Model | Criterion | Model row covered | Scenario leaves | Disposition |
+|---|---|---|---|---|---|
+| TR-001 | ... | ... | ... | ... | covered, infeasible, NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE |
 
 ### Gaps and Decisions
 
@@ -85,7 +108,7 @@
 
 1. ...
 
-The heading hierarchy is the tree. Scenario IDs may be referenced by coverage and gaps, but their definitions appear only below their business branch.
+The heading hierarchy is the tree. Scenario IDs may be referenced by the ledger and gaps, but their definitions appear only below their business branch.
 
 ## Scenario Leaf Contract
 
@@ -94,6 +117,7 @@ The heading hierarchy is the tree. Scenario IDs may be referenced by coverage an
 | Priority | P0, P1, or P2; the Primary Happy Path is P0. |
 | Business Path | Outcome to business branch to leaf. |
 | Covers | Stable business-step IDs exercised by the leaf. |
+| Requirements | Test-requirement IDs the leaf instantiates. |
 | Purpose | The rule, risk, or variation this leaf proves. |
 | Preconditions | Only the starting state and input facts needed to understand the scenario. |
 | Actions | Business actions in order; preserve important inputs and decisions. |
@@ -105,7 +129,7 @@ Shared preconditions may live on the parent branch. A leaf then states only its 
 
 ## Expected-Result Rules
 
-- Assert outcomes, not implementation activity.
+- Assert outcomes, not implementation activity (propagation). State each data outcome as a concrete value computed from the authority (revealability).
 - Cover all committed effects that define the business result. If data, events, external calls, or user-visible state must agree, state each one.
 - Include time bounds only when an approved authority supplies a threshold. Otherwise mark the threshold `NEEDS-DECISION`.
 - Never derive the intended result solely from the current implementation or from tests that merely encode it. Use those sources to describe current behavior and locate risk.
@@ -118,16 +142,33 @@ Shared preconditions may live on the parent branch. A leaf then states only its 
 - `ASSUMED`: the user or responsible owner explicitly accepted a temporary premise. Name who accepted it and keep the conclusion provisional.
 - `BLOCKED`: the intended result is known, but required evidence or a safe test surface is unavailable.
 - `OUT-OF-SCOPE`: the user or governing scope explicitly excludes the item; name the boundary and any residual risk.
+- `infeasible` (test requirements only): the criterion demands a combination the models rule out; name the constraint.
 
 Do not use `ASSUMED` merely because a document is published, a test passes, or the current implementation is internally consistent.
 
-## Blast-Radius Rules
+## Model Rules
 
-- Start from changed contracts, not changed filenames. One file can affect several contracts; one contract can span several files.
-- Trace both producers and consumers of changed state, data, APIs, events, permissions, and external effects.
-- Include synchronous, async, scheduled, retry, recovery, administrative, reporting, compatibility, and alternate-entry flows when they can observe or mutate the changed contract.
-- Put every affected business outcome in the scenario tree. Direct-flow coverage does not close an affected neighboring flow.
-- Reconcile every changed contract and affected flow in Coverage and Gaps, including explicit non-coverage decisions.
+State graph:
+
+- One file can affect several contracts; one contract can span several files. Each affected business outcome is its own node; direct-flow coverage does not close an affected neighboring flow.
+
+Input space:
+
+- A bound on an input partitions into a boundary block and an interior block, for every operation the bound governs.
+- When a step's outcome or settlement timing differs by subject class (product type, account tier, region), each class with a distinct outcome is its own block, the class named in the leaf title.
+- A business mode of an affected flow is a block of that flow's characteristic.
+
+Decision logic:
+
+- Each error code is a rule with its own row; when several rules can fire at once, record the judgment order as a rule.
+
+## Coverage Criteria Defaults
+
+| Model | Default criterion |
+|---|---|
+| State graph | Every trunk edge, every affected flow, and the producer flow reached by the Primary Happy Path. |
+| Input space | All-Combinations up to three characteristics, Pairwise beyond, with the criterion named in the ledger; both blocks of every bound. |
+| Decision logic | Every rule and error code with at least one direct assertion; judgment order asserted where rules overlap. |
 
 ## Tree Construction Rules
 
@@ -144,21 +185,31 @@ For Chinese output, use:
 | English | Chinese |
 |---|---|
 | Overview | 概览 |
-| Sources and Business Flow | 来源与业务流程 |
+| Sources and Models | 来源与模型 |
+| Business Flow | 业务流程 |
+| Change Blast Radius | 变更爆炸半径 |
+| Affected Flows | 受影响流程 |
+| Modes of each affected flow | 各受影响流程的运行模式 |
+| Input Space | 输入空间 |
+| Characteristic | 特征 |
+| Blocks | 取值块 |
+| Decision Logic | 决策逻辑 |
+| Judgment order | 判定顺序 |
+| Coverage Criteria | 覆盖判据 |
 | Business Scenario Tree | 业务场景树 |
 | Outcome | 业务结果 |
 | Primary Happy Path | 主流程 Happy Path |
 | Priority | 优先级 |
 | Business Path | 业务路径 |
 | Covers | 覆盖步骤 |
+| Requirements | 测试需求 |
 | Purpose | 目的 |
 | Preconditions | 前置条件 |
 | Actions | 测试动作 |
 | Expected Results | 预期结果 |
 | Expected Authority | 预期依据 |
 | Implementation Evidence | 实现证据 |
-| Change Blast Radius | 变更爆炸半径 |
-| Affected Flows | 受影响流程 |
 | Coverage and Gaps | 覆盖与缺口 |
+| Test Requirements | 测试需求清单 |
 | Gaps and Decisions | 缺口与决策 |
 | First Test Slice | 首轮测试切片 |

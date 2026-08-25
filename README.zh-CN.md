@@ -18,6 +18,7 @@
 | [`first-principles-planner`](skills/first-principles-planner/) | 规划 | 回到根问题，分离约束与假设并比较机制。 |
 | [`plan-review`](skills/plan-review/) | 验证 | 对同一份完整的方案或计划 revision 反复独立证伪，直到所有必需 reviewer 返回 GO 或审查挂起；深度随候选风险标定，并决定 reviewer 强度。 |
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
+| [`arborist`](skills/arborist/) | 实现 | 通过预期契约、深 Module、爆炸半径追踪和回归证据实施复杂系统变更。 |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | 验证 | 基于设计、需求与代码生成可溯源的端到端测试计划。 |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
@@ -28,6 +29,7 @@
 
 ```
 规划   first-principles-planner → plan-review   ← 先定方案，再证伪
+实现   arborist                                 ← 先追根系，再做最小安全改造
 验证   e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
 调研   deep-research                            ← 按需求证
         ↑ 新发现的未知回馈下一轮规划

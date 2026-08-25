@@ -19,6 +19,7 @@ for the distribution vocabulary.
 | [`first-principles-planner`](skills/first-principles-planner/) | plan | Reframe the root problem and compare mechanisms before implementation. |
 | [`plan-review`](skills/plan-review/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
+| [`arborist`](skills/arborist/) | implement | Implement complex system changes through intended contracts, deep modules, traced blast radius, and regression evidence. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
@@ -29,6 +30,7 @@ for the distribution vocabulary.
 
 ```
 plan         first-principles-planner → plan-review   ← decide the plan, then falsify it
+implement    arborist                                 ← trace the roots, then shape the smallest safe change
 verify       e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
 investigate  deep-research                            ← answer questions from evidence
               ↑ discovered unknowns feed the next plan

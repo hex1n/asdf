@@ -32,8 +32,9 @@ Optional and overflow artifacts must not introduce facts absent from `execution-
 
 A delegated executor's report is machine-checkable. A valid `execution-report.md` must:
 
-- Carry these sections, with `Execution Summary` first: `Execution Summary`, `Run Metadata`, `Environment & Capability Map`, `DAG Schedule`, `Scenario Results`, `Evidence & Failure Scenes`, `Failures / Defects / Plan Gaps`, `Data Created & Cleanup`, `Re-run Instructions`, `Next Actions for Agent`.
-- Give every scenario in `Scenario Results` a terminal status from `passed`, `failed`, `blocked`, `skipped` - no other word stands in for a status.
+- Carry these sections, with `Execution Summary` first: `Execution Summary`, `Run Lineage & Emergent Scenarios`, `Environment State Ledger`, `Execution Contract Override` (when the user overrode plan defaults), `Run Metadata`, `Environment & Capability Map`, `DAG Schedule`, `Scenario Results`, `Evidence & Failure Scenes`, `Failures / Defects / Plan Gaps`, `Data Created & Cleanup`, `Re-run Instructions`, `Next Actions for Agent`.
+- Give every scenario in `Scenario Results` a terminal status from `passed`, `failed`, `blocked`, `skipped`, `unverified` - no other word stands in for a status - and an [oracle type](#oracle-types).
+- Carry the [SUT Boundary](#sut-boundary) table inside `Environment & Capability Map`, and cite a [root-cause row](#scheduling-by-root-cause) for every node in `DAG Schedule`.
 - Link any `failed` scenario row directly to an evidence/scene anchor in the same report or to an `attachments/` artifact; a failure with no evidence/scene link is a contract breach, not a pass.
 - Include scenario-keyed proof chains in `Evidence & Failure Scenes`: probe, expected, actual, raw evidence summary or attachment paths, retained scene, cleanup safety, and rerun cue.
 - Link every `OPEN` actionable root cause in `Failures / Defects / Plan Gaps` to a local `issues/ISSUE-*.md` document on the same item, and link the same issue from every affected `Scenario Results` row.
@@ -47,12 +48,14 @@ A delegated report is read scenario-first. The recurring failure it prevents: a 
 
 **Self-contained `Scenario Results` row.** Beside its terminal status, each row carries the expected outcome, the actual outcome, a diagnosis-classification token, an issue link when the row is affected by an actionable root cause, and one evidence/scene link:
 
-| Scenario | Status | Expected | Actual | Diagnosis | Issue | Evidence / scene |
-|---|---|---|---|---|---|---|
-| {scenario-id} | `failed` | {what the probe asserts} | {what was observed} | `ENUM_VALUE` | issues/ISSUE-001-{slug}.md | #scenario-evidence-scene |
+| Scenario | Status | Oracle | Expected | Actual | Diagnosis | Issue | Evidence / scene |
+|---|---|---|---|---|---|---|---|
+| {scenario-id} | `failed` | `specified` | {what the probe asserts} | {what was observed} | `ENUM_VALUE` | issues/ISSUE-001-{slug}.md | #scenario-evidence-scene |
+
+- `Oracle` is the [oracle type](#oracle-types) token; an `implicit` row cannot show `passed`.
 
 - `Expected`/`Actual` are one-line deltas, not full prose - depth lives in the evidence/scene block the row links to. Keep cells terse so the table stays scannable when scenarios are many.
-- `Diagnosis` is the section 5 classification token only (`product`/`plan`/`environment`/`tooling`/`unknown`) - a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
+- `Diagnosis` is the section 3 classification token only (`product`/`plan`/`environment`/`tooling`/`unknown`) - a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
 - `Issue` is a local `issues/ISSUE-*.md` link for each affected `OPEN` actionable root cause. Use a dash when the row has no actionable issue. A row affected by an `OPEN` actionable root cause must not omit the issue link.
 - `Evidence / scene` links to a same-report anchor by default; use `attachments/` only for bulky raw data. Do not create `evidence/`, `preserved-scenes/`, or per-scenario directories by default.
 - This is healthy denormalization: a status or enum token restated on the index row is near-zero drift; a paragraph restated is not. Never copy the failure-reason prose onto the row.
@@ -69,11 +72,11 @@ Completion criterion: a reader learns a scenario's verdict and why from its row 
 
 Keep run provenance and out-of-plan backflow in one place near the top of `execution-report.md`, so a follow-up agent or a later rerun can reconstruct the full chain from the report alone, without grepping the feature's `docs/e2e-test/<feature>/` folder.
 
-Lineage block — a short list naming (use `none` for a field that does not apply):
+Lineage block — a PROV triple as a short list (use `none` for a field that does not apply):
 
-- `Upstream plan` — the source plan path or ID, and contract version when present;
-- `Upstream run` — the prior run directory this run continues, or `none`;
-- `Downstream` — reruns or investigation documents spawned by this run, or `none`;
+- Entities — `Upstream plan` (the source plan path or ID, and contract version when present); `Upstream run` (the prior run directory this run continues); `Downstream` (reruns or investigation documents spawned by this run);
+- Activity — `Run` (this run directory, start and end, selection set, and any `Execution Contract Override`);
+- Agents — `Executor` (the runtime and model that ran it) and `Trigger` (the user instruction or automation that started it);
 - `Status` — `open` or `closed`.
 
 Emergent scenarios table (only when the run discovered out-of-plan scenarios): one row per finding, with columns. Record every emergent finding as a row here — a finding described only in prose is not tracked and does not satisfy backflow.
@@ -113,7 +116,7 @@ Completion criterion: an agent reading only the ledger knows whether the environ
 
 The §2 completion criterion blocks the first real trigger until three contract facts hold *resolved* values. This is the preflight subset of the [Environment State Ledger](#environment-state-ledger) — the same facts, enforced before the run rather than reported after it. The recurring failure it prevents is starting execution on an *assumed* environment: trusting a profile name, an inherited PATH, or a reachable process instead of the resolved fact.
 
-Scope the contract to what the selected scenarios actually reach — the datasource, toolchain, and process the run will exercise. An in-scope target that cannot be resolved is a blocker; a remote dependency that is merely unreachable follows the §5 dependency-availability rule (mark the dependent scenario `blocked`, or use the declared stub), not a whole-run halt.
+Scope the contract to what the selected scenarios actually reach — the datasource, toolchain, and process the run will exercise. An in-scope target that cannot be resolved is a blocker; a remote dependency that is merely unreachable follows the [SUT Boundary](#sut-boundary) rule (switch to the declared double, or mark the dependent scenario `blocked`), not a whole-run halt.
 
 `Resolved` means a concrete value read from the effective state and recorded verbatim — never inferred from a name and never `reachable`:
 
@@ -140,7 +143,7 @@ One row per override:
 | Source | Where the constraint came from — the user turn or instruction. |
 | Affected | Scenarios, gates, or report sections this override changes. |
 
-A superseded plan requirement is marked `superseded` wherever it appears (gates, exit criteria, scenario results) — never `failed`, `incomplete`, or left looking unmet. A data-retention override additionally triggers the §3 re-risk of every destructive, soft-delete, or scope-mutating scenario.
+A superseded plan requirement is marked `superseded` wherever it appears (gates, exit criteria, scenario results) — never `failed`, `incomplete`, or left looking unmet. A data-retention override additionally triggers the §2 re-risk of every `destructive-delete`, `soft-delete`, `scope-mutation`, `config-change`, or `external-effect` scenario.
 
 Completion criterion: every constraint the user changed after planning appears as an override row; no plan default an override replaced is reported as an unmet requirement.
 
@@ -155,6 +158,43 @@ Do not copy adapter-specific invocation, navigation, or query rules into this sk
 If more than one adapter or tool is available, choose the one declared by the plan, project docs, repository scripts, or environment contract. If none is declared, use a safe read-only describe/list/probe command before any real trigger; when no safe adapter, tool, or command can trigger the scenario, record `BLOCKED-BY-TOOLING` with the missing adapter or tool capability. Do not hand-roll surface payloads or UI actions, or author new test code, merely to avoid the blocker.
 
 Completion criterion: the report can separate E2E orchestration evidence from adapter/tool action evidence, names the adapter or tool used or the missing capability, and preserves enough raw artifacts for a follow-up agent to replay through the same declared surface without copying surface-specific rules into this executor.
+
+## SUT Boundary
+
+Declared before the first trigger as a facet of `Environment & Capability Map`, one row per dependency the selected scenarios reach. A verdict rests only on dependencies that have a row.
+
+| Dependency | Kind | Source | Owner | Scenarios |
+|---|---|---|---|---|
+| {service, database, queue, cache, callback endpoint, clock, external API} | `real` or `double` (`stub`, `record-replay`, `fixture`) | {live target, or the double's location and the recording/fixture it plays} | {who maintains the double or the live target} | {scenario IDs that reach it} |
+
+- A `real` dependency that is unreachable at run time switches to its declared double; with no double declared, the dependent scenario is `blocked` with an `environment defect`, except a scenario whose declared purpose is the dependency-down path.
+- A `double` on a path the plan's Expected Results depend on is named in the scenario's evidence, so a reader knows which part of the outcome was computed by a stand-in.
+- The clock is a dependency: a scenario that reads time or randomness names its injection as a `double`; without one its verdict is `unverified`.
+
+## Scheduling by Root Cause
+
+Each row is one way scenarios interfere with each other — the flaky-test root causes — and the placement it forces. Every node in `DAG Schedule` cites the row that placed it.
+
+| Root cause | Judged from | Decision |
+|---|---|---|
+| Order dependency | `Depends on`, `Consumes`, `Produces` | Topological order; produced variables passed explicitly. |
+| Shared mutable state | Overlap in `Target locator`, closed edge `Effects` / `Readers/receivers`, `External target/stub` — a common route, table, queue, job, flag, cache, or external endpoint | Serialize; differing isolation keys alone never prove safety. Unstated overlap serializes, with the reason. |
+| Asynchronous wait | The scenario's `Wait` condition | Wait on the condition, never on a duration; a scenario with no stated condition is `blocked`. |
+| Resource leak | Cleanup dependencies between scenarios | Cleanup is a DAG edge; a scenario that reuses another's namespace runs after its cleanup or is isolated. |
+| Time or randomness | The scenario reads a clock, sequence, or random source | Inject a fixed value through a declared double; otherwise `unverified`. |
+| Disruptive load | Concurrency, recovery, compensation, callback-race, or load scenario | Run in isolation, after the chains it could disturb; final consistency and cleanup checks follow. |
+
+## Oracle Types
+
+Every verdict names one oracle type in its `Scenario Results` row. Only an oracle that can tell a wrong value from a right one can support `passed`.
+
+| Type | Meaning | Strongest verdict |
+|---|---|---|
+| `specified` | The plan's Expected Results give the concrete expected value, computed from the expected-result authority. | `passed` |
+| `derived` | The expected value is computed independently of the implementation under test — a differential run, a replay, an invariant, or a metamorphic relation — and the derivation is recorded. | `passed` |
+| `implicit` | Only "no crash, no error, request accepted" is checked. | `unverified` |
+
+A `derived` oracle whose derivation reads the same code path it judges is `implicit`.
 
 ## Gap & Defect Disposition
 

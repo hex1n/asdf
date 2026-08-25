@@ -2,13 +2,14 @@
 
 ## Run Artifact Contract
 
-Use this whenever creating an E2E run directory. The Markdown report remains the agent handoff source of truth and the default home for run, scenario, evidence, and failure-scene facts. Produce the default file by default. Produce conditional core directories only when their trigger exists. Produce optional files only when a programmatic consumer, rerun/comparison tooling, or the user asks for them.
+Use this whenever creating an E2E run directory. The Markdown report remains the agent handoff source of truth and the default home for run, scenario, evidence, and failure-scene facts. Produce both default core files unless the user explicitly requests Markdown-only. Produce conditional core directories only when their trigger exists. Produce optional files only when a programmatic consumer or rerun/comparison tooling needs them.
 
 Default core file:
 
 | File | Required content |
 |---|---|
 | `execution-report.md` | Human and agent-readable report with run metadata, per-scenario results, inline evidence/scene proof chains, defect dispositions, cleanup state, and rerun instructions. |
+| `execution-report.html` | Picture-first, few-words [Reader View](#reader-view-contract) projected from the Markdown facts. |
 
 Conditional core directories:
 
@@ -24,7 +25,6 @@ Optional files (only when a consumer needs them):
 |---|---|---|
 | `run-metadata.json` | A programmatic consumer needs machine-readable run metadata. | Plan path or ID, plan contract version when present, environment kind, repo commit, selected scenario IDs, command surface, started/finished timestamps, status counts, toolchain versions, cache/dependency sources, and operator/agent identifier when available. |
 | `scenario-results.jsonl` | Rerun or comparison tooling consumes per-node rows. | One JSON object per DAG node or scenario with node ID, scenario ID, status, dependency status, consumed variables, produced variables, evidence/scene links, issue IDs, cleanup status, and diagnosis. |
-| `execution-report.html` | A human stakeholder asks for a rendered report. | Human-readable rendering generated from the same facts as the Markdown report and attachments. |
 
 Optional and overflow artifacts must not introduce facts absent from `execution-report.md`; they only preserve bulky raw data or accelerate programmatic and human consumers.
 
@@ -41,6 +41,25 @@ A delegated executor's report is machine-checkable. A valid `execution-report.md
 - Give `Re-run Instructions` at least one executable command, not prose alone.
 
 Completion criterion: a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using `execution-report.md` plus any referenced attachments; `OPEN` actionable root causes have local issue documents; optional files are added only when a named consumer needs them.
+
+## Reader View Contract
+
+`execution-report.html` is the human entry point; `execution-report.md` remains the canonical report and sole evidence source. Build the HTML only after Markdown is final. A visible count, status, scenario, diagnosis, disposition, issue, environment fact, rerun item, or next action must already exist in Markdown and link back to its heading or evidence/defect row.
+
+Use a picture-first opening screen with large status shapes and short labels:
+
+- **Verdict distribution** — cards for `passed`, `failed`, `blocked`, `unverified`, and `skipped`, including zeroes. The headline names every nonzero non-passing bucket and never implies green/pass merely because execution finished.
+- **Trust strip** — target, deployment/freshness evidence, selected scope, and cleanup/retention state from the Environment State Ledger.
+- **Failure and blocker lane** — each failed, blocked, or unverified root cause with diagnosis, disposition text/icon, affected scenario IDs, and an evidence or issue link.
+- **Rerun lane** — the exact rerun set and only the `OPEN` items eligible for `Next Actions for Agent`; keep conditional and blocked work visibly distinct.
+
+On a standard desktop opening screen, all four groups are visible together. The non-passing lane is **index-only**: one compact row per root cause containing ID, diagnosis, disposition, affected scenarios, and a detail link — no reason prose or separate scenario chips. Every root cause remains visible in this opening index. The rerun lane expands every explicitly named dependent into the exact ID set; a dependent mentioned only in prose but absent from that set is an omission.
+
+Below the opening screen, render every scenario result once as a compact item with status, oracle, expected-versus-actual delta, diagnosis, and links to its canonical evidence/scene and issue. Link to raw evidence in Markdown or attachments rather than copying it into HTML. Use `<details>` for secondary environment, lineage, and cleanup summaries when useful.
+
+The Reader View follows the resolved audience language from `SKILL.md` for headings, buttons, cards, and explanatory text — this can differ from a legacy report's language when the upstream plan or user establishes the audience. Do not add bilingual UI labels unless the resolved audience artifact is bilingual or the user asks. Translate generic field and section labels; preserve identifiers, commands, logs, enum tokens, and quoted evidence as-is, showing preserved machine tokens as code/badges rather than appending them to translated labels. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, responsive HTML and inline CSS that works offline. Communicate status with labels/icons in addition to color. Use no external fonts, scripts, CDNs, or automatic browser opening.
+
+Before handoff, reconcile the projection against Markdown: status counts equal the Scenario Results rows; every scenario and affected-scenario link resolves; displayed diagnoses, dispositions, issues, rerun IDs including named dependents, next actions, fingerprint, and cleanup facts agree; the canonical relative link resolves; no HTML-only fact exists. Inspect serialized visible text for a bare backtick or table-pipe residue outside `<code>`/`<pre>`; any hit fails the audit. Then render and inspect the opening screen at desktop width, checking that every root-cause index row and the exact rerun set are visible, contrast and overflow are readable, and the four questions above are answerable without scrolling into raw detail. This pass is required: structural rules alone do not catch a layout that renders wrong. Without a render capability, hand off the canonical Markdown alone and say the Reader View was withheld for lack of a render pass; never hand off an unrendered view.
 
 ## Scenario Results & Evidence Legibility
 
@@ -169,7 +188,7 @@ Declared before the first trigger as a facet of `Environment & Capability Map`, 
 
 - A `real` dependency that is unreachable at run time switches to its declared double; with no double declared, the dependent scenario is `blocked` with an `environment defect`, except a scenario whose declared purpose is the dependency-down path.
 - A `double` on a path the plan's Expected Results depend on is named in the scenario's evidence, so a reader knows which part of the outcome was computed by a stand-in.
-- The clock is a dependency: a scenario that reads time or randomness names its injection as a `double`; without one its verdict is `unverified`.
+- The clock is a dependency: a scenario that reads time or randomness names either its injected `double` or an independently observed `real` value the run recorded and recomputed its expected values from. Inferring that value from the same response being judged is circular and does not count as observation; a verdict whose expectation depends on a value the run neither controlled nor independently observed is `unverified`.
 
 ## Scheduling by Root Cause
 
@@ -179,9 +198,9 @@ Each row is one way scenarios interfere with each other — the flaky-test root 
 |---|---|---|
 | Order dependency | `Depends on`, `Consumes`, `Produces` | Topological order; produced variables passed explicitly. |
 | Shared mutable state | Overlap in `Target locator`, closed edge `Effects` / `Readers/receivers`, `External target/stub` — a common route, table, queue, job, flag, cache, or external endpoint | Serialize; differing isolation keys alone never prove safety. Unstated overlap serializes, with the reason. |
-| Asynchronous wait | The scenario's `Wait` condition | Wait on the condition, never on a duration; a scenario with no stated condition is `blocked`. |
+| Asynchronous wait | The scenario's `Wait` condition | Wait on the stated condition. Use an approved business threshold when one exists; otherwise record an execution-safety bound as `NEEDS-DECISION`, never as a product oracle. A missing condition or unavailable wait/probe capability is `blocked`. When a valid trigger and reachable dependencies/probe are established, exceeding an approved threshold is `failed`; exceeding only the execution-safety bound is `blocked` as incomplete observation, while evidence that localizes the delay to environment or tooling keeps the scenario blocked under that diagnosis. |
 | Resource leak | Cleanup dependencies between scenarios | Cleanup is a DAG edge; a scenario that reuses another's namespace runs after its cleanup or is isolated. |
-| Time or randomness | The scenario reads a clock, sequence, or random source | Inject a fixed value through a declared double; otherwise `unverified`. |
+| Time or randomness | The scenario reads a clock, sequence, or random source | Inject a fixed value through a declared double, or record the observed value and recompute expectations from it. |
 | Disruptive load | Concurrency, recovery, compensation, callback-race, or load scenario | Run in isolation, after the chains it could disturb; final consistency and cleanup checks follow. |
 
 ## Oracle Types
@@ -202,12 +221,13 @@ One disposition vocabulary, shared with the planner (its gaps) and used here for
 
 | Disposition | Meaning |
 |---|---|
-| `OPEN` | Real, unresolved, must be acted on. |
+| `OPEN` | Real, unresolved, and executable now by the acting agent within its authority. |
 | `CLOSED` | Verified done, or no longer applicable. |
 | `MITIGATED` | A workaround is in place; residual risk is noted. |
 | `ACCEPTED` | Known and deliberately accepted; no action planned. |
-| `CONDITIONAL` | Actionable only once a stated precondition holds; the precondition is named. |
+| `CONDITIONAL` | Actionable only once a stated precondition holds, including a required user or owner decision; the precondition and decision owner are named. |
 | `BLOCKED-BY-TOOLING` | Cannot proceed for lack of a specific capability; the missing capability is named in the reason. |
+| `BLOCKED-BY-ENVIRONMENT` | Cannot proceed because a dependency, sample, or fixture the scenario needs is unavailable in this environment; the missing dependency or data is named in the reason. |
 | `OUT-OF-SCOPE` | Excluded from this run by scope or user override. |
 
-Only `OPEN` items belong in `Next Actions for Agent`. A `CONDITIONAL`, `BLOCKED-BY-TOOLING`, or `OUT-OF-SCOPE` item stays in `Failures / Defects / Plan Gaps` with its precondition, missing capability, or scope reason named — never copied into Next Actions as a plain to-do.
+Only `OPEN` items belong in `Next Actions for Agent`. A `CONDITIONAL`, `BLOCKED-BY-TOOLING`, `BLOCKED-BY-ENVIRONMENT`, or `OUT-OF-SCOPE` item stays in `Failures / Defects / Plan Gaps` with its precondition, missing capability, missing dependency or fixture, or scope reason named — never copied into Next Actions as a plain to-do.

@@ -60,7 +60,7 @@ Inspect direct callers and also alternate entry points, shared readers, schedule
 
 ### Input space
 
-List every characteristic that varies the outcome and the blocks it partitions into: operation, target state, direction of change, each mutable field, each bound with its boundary and interior blocks, each subject class with a distinct outcome or settlement timing, and each business mode an affected flow runs in.
+List every characteristic that varies the outcome, the committed observable it affects, and the blocks it partitions into relative to that observable: operation, target state, direction of change, each mutable field, each bound with its boundary and interior blocks, each subject class with a distinct outcome or settlement timing, and each business mode an affected flow runs in.
 
 ### Decision logic
 
@@ -76,9 +76,9 @@ Completion criterion: each model has a named criterion, and every weakening is w
 
 ## 4. Derive Test Requirements
 
-Expand each criterion over its model into a numbered test-requirement ledger. Each requirement names its model, its criterion, and the row of the model it covers. Mark an infeasible requirement with the reason instead of deleting it. Merge requirements one leaf can satisfy together and record the merge.
+Expand each criterion over its model into a numbered test-requirement ledger. Each requirement names its model, criterion, criterion-generated coverage obligation, and committed observable. For input space, enumerate one base tuple plus one tuple per non-base block under Base-Choice, every feasible cross-characteristic block pair under Pairwise, and every feasible complete tuple under All-Combinations. A requirement closes only through a leaf that instantiates its blocks and whose Observes covers its observable; a rejection leaf cannot close an accepted block's committed outcome. Mark an infeasible requirement with the reason instead of deleting it. Merge compatible requirements one leaf can satisfy and record the merge.
 
-Completion criterion: the ledger is the mechanical expansion of the criteria; every model row appears in at least one requirement or an infeasibility note.
+Completion criterion: the ledger is the mechanical expansion of the criteria; every generated obligation appears as a requirement or an infeasibility note.
 
 ## 5. Instantiate the Scenario Tree
 
@@ -90,7 +90,7 @@ If the requested contract has no meaningful successful route, such as a negative
 
 Order each normal tree as:
 
-1. Primary Happy Path, then the rest of the success matrix in the same branch: one leaf per success-side input-space cell.
+1. Primary Happy Path, then the rest of the success matrix in the same branch: enough leaves to instantiate every generated success-side input-space requirement, with compatible requirements merged explicitly in the ledger.
 2. Blast-radius regression branches that prove other affected business flows still reach their intended outcomes.
 3. Alternate valid routes at their divergence point.
 4. Input, rule, state, permission, and subject-class branches under the earliest affected business step.
@@ -128,4 +128,4 @@ Use this top-level order:
 3. Business Scenario Tree
 4. Coverage and Gaps
 
-Save a requested repository artifact under docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md unless the user gives another path. Do not execute tests or write test code unless the user asks.
+Save the canonical Markdown under docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md unless the user gives another path. Unless the user explicitly requests Markdown-only or the Reader View is withheld under its contract, also create the same-stem `.html` **Reader View** defined in [REFERENCE.md](REFERENCE.md#reader-view-contract): a picture-first, few-words projection for humans, never a second fact source. Link the Reader View first and the canonical plan second in the final response. Do not execute tests or write test code unless the user asks.

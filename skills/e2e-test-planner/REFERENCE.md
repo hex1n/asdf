@@ -36,9 +36,9 @@
 
 ### Input Space
 
-| Characteristic | Blocks | Expected authority | Implementation evidence |
-|---|---|---|---|
-| {operation, target state, direction, field, bound, subject class, mode} | {block 1; block 2; ...} | ... | ... |
+| Characteristic | Observable affected | Blocks | Expected authority | Implementation evidence |
+|---|---|---|---|---|
+| {operation, target state, direction, field, bound, subject class, mode} | {committed observable from the Business Flow table} | {block 1; block 2; ...} | ... | ... |
 
 ### Decision Logic
 
@@ -98,9 +98,9 @@
 
 ### Test Requirements
 
-| TR | Model | Criterion | Model row covered | Scenario leaves | Disposition |
-|---|---|---|---|---|---|
-| TR-001 | ... | ... | ... | ... | covered, infeasible, NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE |
+| TR | Model | Criterion | Coverage obligation | Observable | Scenario leaves | Disposition |
+|---|---|---|---|---|---|---|
+| TR-001 | ... | ... | {edge, rule, base tuple, block pair, or complete tuple} | {committed observable} | ... | covered, infeasible, NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE |
 
 ### Gaps and Decisions
 
@@ -113,6 +113,25 @@
 1. ...
 
 The heading hierarchy is the tree. Scenario IDs may be referenced by the ledger and gaps, but their definitions appear only below their business branch.
+
+## Reader View Contract
+
+The same-stem `.html` file is the human entry point; the Markdown plan is the canonical agent handoff and sole fact source. Build the HTML only after the Markdown is final. It is a projection: a visible fact, scenario, requirement, priority, risk, gap, disposition, or slice item must already exist in Markdown and link back to its heading or row.
+
+Use a picture-first opening screen with large shapes and short labels:
+
+- **Outcome** — one short plain-language sentence naming what the plan proves; keep scope and risk detail out of this card.
+- **Business path** — ordered boxes and arrows from legitimate entry to committed observable. Preserve the Business Flow order and give every adjacent pair a visible connector. Prefer one unbroken row when it remains readable; otherwise use a vertical stepper or snake whose wrap connector visibly joins the last box of one row to the first box of the next. A trailing arrow into whitespace is invalid. Never arrange independent rows so they imply a false transition.
+- **Risks and decisions** — the highest-risk branches and every unresolved item that changes whether the plan can give a verdict, each with its disposition text/icon as well as color.
+- **First Test Slice** — the exact ordered scenario IDs from Markdown, with one-line purposes.
+
+On a standard desktop opening screen, all four groups are visible together. Compress labels and put explanations below the fold rather than letting one large outcome card, a long flow, or expanded risk prose push another group out of view.
+
+Below the opening screen, render the complete scenario tree as compact business-branch groups. Include every scenario ID and priority, but link to the canonical leaf for actions, expected results, authority, implementation evidence, and other detail instead of copying those paragraphs. Use `<details>` for secondary branches when useful.
+
+The Reader View follows the canonical plan's language for headings, buttons, cards, and explanatory text; do not add bilingual UI labels unless the canonical plan is bilingual or the user asks. Preserve identifiers and source text as-is. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, responsive HTML and inline CSS that works offline. Communicate meaning with labels/icons in addition to color. Use no external fonts, scripts, CDNs, or automatic browser opening.
+
+Before handoff, reconcile the projection against Markdown: every scenario and First Test Slice ID resolves; every displayed priority, risk, gap, and disposition agrees; the canonical relative link resolves; no HTML-only fact exists. Then render and inspect the opening screen at desktop width, checking ordered flow, readable contrast, overflow, and whether the four questions above are answerable without scrolling into detail. This pass is required: structural rules alone do not catch a flow that renders into a false transition. Without a render capability, hand off the canonical Markdown alone and say the Reader View was withheld for lack of a render pass; never hand off an unrendered view.
 
 ## Scenario Leaf Contract
 
@@ -135,6 +154,7 @@ Shared preconditions may live on the parent branch. A leaf then states only its 
 
 ## Expected-Result Rules
 
+- Authority status identifies the accountable authority: an approving person or dated decision, a governing policy or versioned external contract, or explicit user direction. An implementation artifact such as a class or enum with no designation as the contract reads `not established` and backs no verdict.
 - Assert outcomes, not implementation activity (propagation). State each data outcome as a concrete value computed from the authority (revealability).
 - Cover all committed effects that define the business result. If data, events, external calls, or user-visible state must agree, state each one.
 - Include time bounds only when an approved authority supplies a threshold. Otherwise mark the threshold `NEEDS-DECISION`.
@@ -160,7 +180,8 @@ State graph:
 
 Input space:
 
-- A bound on an input partitions into a boundary block and an interior block, for every operation the bound governs.
+- Blocks are partitioned relative to an observable: two inputs that reach the same decision but a different committed observable are different blocks for that observable, so a characteristic that affects several observables has one row per observable. Several observable-specific partitions of the same input are alternative views, not distinct characteristics to cross-combine.
+- A bound on an input partitions into a boundary block and an interior block.
 - When a step's outcome or settlement timing differs by subject class (product type, account tier, region), each class with a distinct outcome is its own block, the class named in the leaf title.
 - A business mode of an affected flow is a block of that flow's characteristic.
 
@@ -173,7 +194,7 @@ Decision logic:
 | Model | Default criterion |
 |---|---|
 | State graph | Every trunk edge, every affected flow, and the producer flow reached by the Primary Happy Path. |
-| Input space | All-Combinations up to three characteristics, Pairwise beyond, with the criterion named in the ledger; both blocks of every bound. |
+| Input space | Base-Choice over each success-path input model as the floor: first separate accepted blocks that reach the same committed outcome from rejection-only blocks, then use a feasible Primary Happy Path as the base and vary each accepted non-base block once while every other distinct characteristic stays at a compatible base block, keeping the oracle on the affected committed observable. Treat source or blast-radius evidence that an outcome depends jointly on characteristics as an identified interaction; add All-Combinations for up to three distinct characteristics and Pairwise for larger identified interaction sets. Name every applied criterion in the ledger. |
 | Decision logic | Every rule and error code with at least one direct assertion; judgment order asserted where rules overlap. |
 
 ## Tree Construction Rules

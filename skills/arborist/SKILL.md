@@ -68,7 +68,10 @@ Code and existing tests are not expected authority merely because they agree.
 Use them to characterize current behavior and reachability. If an unresolved
 authority conflict can change the architecture or externally observable
 result, stop with `NEEDS-DECISION` instead of choosing the current code by
-default.
+default. When expected authority prescribes an architecture and implementation
+evidence contradicts it, `NEEDS-DECISION` is the only permitted disposition:
+recording it as a logged deviation, a noted tradeoff, or a justified departure
+does not discharge the obligation, however strong the evidence.
 
 Completion: every load-bearing behavior is classified as intended, conserved,
 assumed with an accepted owner, or `NEEDS-DECISION`.

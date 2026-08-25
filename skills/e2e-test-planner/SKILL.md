@@ -46,7 +46,7 @@ Reconstruct the normal business flow:
 
 1. Entry and eligibility; when eligibility needs state another flow produces, the trunk starts at that producer flow.
 2. Ordered business actions and decisions.
-3. State transitions and externally visible effects.
+3. State transitions and the committed observable each step leaves — the store, event, or external effect a probe can read.
 4. Async continuations, callbacks, retries, or scheduled work.
 5. The committed outcome.
 
@@ -103,7 +103,7 @@ Every leaf follows the contract in [REFERENCE.md](REFERENCE.md#scenario-leaf-con
 
 Put shared preconditions at the nearest common branch and repeat only leaf-specific differences. Large trees stay readable by factoring shared context upward, not by moving leaves into a flat matrix.
 
-Completion criterion: the first ordinary branch is the complete Happy Path and its success matrix; every leaf passes RIPR; every verdict has an approved expected authority; every test requirement is instantiated by a leaf or carries an explicit disposition.
+Completion criterion: the first ordinary branch is the complete Happy Path and its success matrix; every leaf carries its four RIPR fields — Actions (reach), Requirements (infect), Observes (propagate), Oracle with Expected Authority (reveal); every test requirement is instantiated by a leaf or carries an explicit disposition.
 
 ## 6. Close Coverage
 

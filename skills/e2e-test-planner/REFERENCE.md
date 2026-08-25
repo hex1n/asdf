@@ -24,7 +24,7 @@
 
 ### Business Flow
 
-| Step | Business action or decision | State or effect | Expected authority | Implementation evidence |
+| Step | Business action or decision | Committed observable | Expected authority | Implementation evidence |
 |---|---|---|---|---|
 | B1 | ... | ... | ... | ... |
 
@@ -66,6 +66,8 @@
 - Business Path: {outcome} to Primary Happy Path to {leaf}
 - Covers: B1 through Bn
 - Requirements: TR-001, ...
+- Observes: {committed observable of Bn}
+- Oracle: specified, {authority}
 - Purpose: ...
 - Preconditions: ...
 - Actions: ...
@@ -82,6 +84,8 @@
 - Business Path: {outcome} to {branch} to {leaf}
 - Covers: ...
 - Requirements: ...
+- Observes: ...
+- Oracle: ...
 - Purpose: ...
 - Preconditions: ...
 - Actions: ...
@@ -114,10 +118,12 @@ The heading hierarchy is the tree. Scenario IDs may be referenced by the ledger 
 
 | Field | Required content |
 |---|---|
-| Priority | P0, P1, or P2; the Primary Happy Path is P0. |
+| Priority | P0, P1, or P2. Default: the Primary Happy Path, its success matrix, and every changed contract's direct leaf are P0; every other model row is P1; cross-cutting branches are P2. Deviate only with a stated reason. |
 | Business Path | Outcome to business branch to leaf. |
 | Covers | Stable business-step IDs exercised by the leaf. |
 | Requirements | Test-requirement IDs the leaf instantiates. |
+| Observes | The committed observable, from the Business Flow table, where the leaf's probe reads the outcome — the store, event, or external effect at the end of propagation, never the entry response. |
+| Oracle | `specified` (the concrete expected value and its authority) or `derived` (a differential run, replay, invariant, or metamorphic relation, with what it is computed from). A plan never emits `implicit`. |
 | Purpose | The rule, risk, or variation this leaf proves. |
 | Preconditions | Only the starting state and input facts needed to understand the scenario. |
 | Actions | Business actions in order; preserve important inputs and decisions. |
@@ -203,6 +209,9 @@ For Chinese output, use:
 | Business Path | 业务路径 |
 | Covers | 覆盖步骤 |
 | Requirements | 测试需求 |
+| Observes | 观察点 |
+| Oracle | 判定器 |
+| Committed observable | 提交后可观察结果 |
 | Purpose | 目的 |
 | Preconditions | 前置条件 |
 | Actions | 测试动作 |

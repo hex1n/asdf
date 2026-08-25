@@ -18,31 +18,23 @@
 | [`first-principles-planner`](skills/first-principles-planner/) | 规划 | 回到根问题，分离约束与假设并比较机制。 |
 | [`plan-review`](skills/plan-review/) | 验证 | 对同一份完整的方案或计划 revision 反复独立证伪，直到所有必需 reviewer 返回 GO 或审查挂起；深度随候选风险标定，并决定 reviewer 强度。 |
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
-| [`implementation-atlas`](skills/implementation-atlas/) | 调研 | 为一个指定目标建立源码支撑的实现图谱，将所有影响行为的节点遍历至闭包。 |
-| [`blindspot-pass`](skills/blindspot-pass/) | 准备 | 开工前巡查陌生领域，找出用户「未知的未知」并转化为更好的提示词。 |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | 验证 | 基于设计、需求与代码生成可溯源的端到端测试计划。 |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
-| [`code-forge`](skills/code-forge/) | 实现 | 以最小充分机制实现正确、影响可控的生产行为，显式限定语义爆炸半径，并同时证明目标行为与边界外非回归。 |
-| [`merge-quiz`](skills/merge-quiz/) | 验证 | 就已完成的改动逐题测验用户，满分通过后才判定可合并。 |
+| [`skill-ab-trial`](skills/skill-ab-trial/) | 验证 | 用对照实验实测一条候选指令是否真的改变 agent 的交付物。 |
 
 ## 生命周期定位
 
 ```
-准备   blindspot-pass                           ← 开工前改进提示词
 规划   first-principles-planner → plan-review   ← 先定方案，再证伪
-实现   code-forge                               ← 内聚锻造
 验证   e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
-批准   merge-quiz                               ← 以人的理解为合并闸门
-调研   deep-research · implementation-atlas   ← 按需求证，或将实现遍历至闭包
+调研   deep-research                            ← 按需求证
         ↑ 新发现的未知回馈下一轮规划
 ```
 
-大多数技能保证「事情做对」；其中两个保证「人跟得上」高速的 agent 产出：
-`blindspot-pass` 防止未知的未知污染提示词，`merge-quiz` 防止批准无人理解的改动。
-对用户已有方案的拷问（访谈 / grill 类技能）位于规划与评审之间，不在本仓范围。
-小改动、熟悉的代码、全程盯着的会话中，这两个人机同步技能应保持沉默。
+这些技能保证「事情做对」。对用户已有方案的拷问（访谈 / grill 类技能）位于
+规划与评审之间，不在本仓范围。
 
 ## 兼容性
 

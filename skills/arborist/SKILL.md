@@ -1,7 +1,7 @@
 ---
 name: arborist
 description: >
-  Implements complex changes in existing systems by separating intended contracts from current behavior, tracing blast radius across affected flows, shaping deep modules at stable seams, and proving unaffected behavior. Use across languages and architectures for feature, fix, or refactor requests where behavior crosses modules, state, data, APIs, events, jobs, or compatibility paths. Do not use for planning-only, diagnosis-only, review-only, test-scope-only, documentation-only, or mechanical edits.
+  Lands a change in a live system: pins what must stay true, traces blast radius to every affected flow, shapes the seam, and proves the untouched behavior still holds. Use for any change to code that already has users, stored data, or tests to keep working — 实现, 修复, 改造, 重构, 继续做完 X, 按设计文档落地, implement, fix, refactor, migrate. Fires broadly; its first step demotes scoped work in four lines. Do not use for planning-only, diagnosis-only, review-only, test-scope-only, documentation-only, or mechanical edits.
 ---
 
 # Arborist
@@ -65,7 +65,11 @@ Keep evidence roles separate:
 - **Runtime evidence** says what happened in an observed execution.
 
 Code and existing tests are not expected authority merely because they agree.
-Use them to characterize current behavior and reachability. If an unresolved
+Use them to characterize current behavior and reachability. A design document
+mixes both roles: what it prescribes is expected authority, but what it claims
+about today's behavior is implementation evidence someone else gathered, often
+against a codebase that has since moved — re-verify those claims before you
+build on them. If an unresolved
 authority conflict can change the architecture or externally observable
 result, stop with `NEEDS-DECISION` instead of choosing the current code by
 default. When expected authority prescribes an architecture and implementation
@@ -140,6 +144,27 @@ Before production code, map each Intended Change, Conserved Set item, and
 Impact Ledger row to independent evidence. Existing implementation-derived
 tests may characterize behavior; they do not supply their own business oracle.
 
+Name the **oracle** for every proof and check it is something other than the
+artifact under test. For alignment work — make X match Y — the oracle is Y's
+current behavior, never X's former behavior: "no longer the old wrong value"
+measures distance travelled, not arrival.
+
+The Intended Change pulls its own proof into existence: it starts **red** and
+turning it green is the work. The Conserved Set never does — nothing goes red
+when you skip it, so it is skipped by default. Write its checks first.
+
+A Conserved Set item closes only on a check that goes red when that item
+breaks. Naming it as a known gap is not a disposition: an item you cannot
+cover before implementation is `NEEDS-DECISION` for the user, not a note you
+write for yourself.
+
+Write the pre-registration into an untracked scratch file in the working
+tree (for example `.scratch/<task>/proofs.md`), kept out of the change's
+diff — one line per Intended Change, Conserved Set item, and high-risk
+Ledger row, each naming its oracle and its check. A proof plan held only in
+memory gets silently revised during implementation; the written file is
+what Step 6 closes against, item by item.
+
 Build the first slice as the shortest complete Happy Path from legitimate
 entry to committed outcome. Then cover, in risk order, alternate valid routes,
 business boundaries, rejection and failure semantics, rollback or
@@ -156,8 +181,11 @@ Choose evidence at the lowest surface that can prove the obligation:
 - architecture checks for dependency and cycle rules;
 - focused runtime probes only when the environment is authorized.
 
-Completion: every proof obligation maps to a command, test, inspection, or an
-explicit unverified risk before implementation begins.
+Completion: before implementation begins, the pre-registration file exists
+and in it every proof names an oracle independent of the artifact under
+test; every Intended Change and Impact Ledger row maps to a command, test,
+inspection, or an explicit unverified risk; and every Conserved Set item
+maps to a red-capable check or a `NEEDS-DECISION`.
 
 ## 5. Prune or Graft in Coherent Slices
 
@@ -182,7 +210,8 @@ and no new propagation edge remains outside the Impact Ledger.
 
 ## 6. Inspect the Whole Tree
 
-Run the pre-registered proofs, then falsify the implementation:
+Reopen the Step 4 pre-registration file, run its proofs, then falsify the
+implementation:
 
 - vary state, order, timing, retries, and failure points;
 - exercise affected flows that should remain unchanged;
@@ -192,8 +221,10 @@ Run the pre-registered proofs, then falsify the implementation:
 
 Do not claim the change safe because compilation, a focused unit test, or the
 current implementation agrees with itself. Completion requires evidence for
-every high-risk Impact Ledger row. Keep unexecuted checks and environmental
-limits visible as residual risk.
+every high-risk Impact Ledger row, a red-capable check actually executed for
+every Conserved Set item, and every line of the pre-registration file carrying
+a closing disposition. Residual risk covers the checks the environment blocked
+from running, not the checks you chose not to write.
 
 ## Handoff
 

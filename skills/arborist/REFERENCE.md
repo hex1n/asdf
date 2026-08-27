@@ -1,26 +1,9 @@
 # Arborist Reference
 
-Read this reference for complex systems in any language or whenever the change
-depth, blast radius, architecture, or verification surface remains ambiguous
-after the core workflow. Derive runtime wiring, build boundaries, and proof
-commands from the repository rather than assuming an ecosystem.
-
-## Change Depth
-
-Choose the highest matching depth. Depth controls evidence, not the amount of
-prose in the handoff.
-
-| Depth | Signal | Minimum assurance |
-| --- | --- | --- |
-| L0 — local | One private implementation detail; direct consumers bounded; no observable contract, shared state/data meaning, async, compatibility, security, or operational effect | Direct edit, focused proof, final locality/diff check |
-| L1 — Module | One Module's behavior or Interface changes; consumers are bounded | Intended Change, Conserved Set, caller trace, Interface tests |
-| L2 — system | Shared state, multiple Modules, API/event/schema, async work, migration, or compatibility | Full Impact Ledger, architecture alternatives, contract/integration/regression evidence |
-| L3 — critical | Money, inventory, authorization, irreversible data, concurrent state machine, or externally committed side effects | L2 plus explicit invariants, failure-state model, rollback/compensation, independent falsification or named residual risk |
-
-Do not lower depth because the diff is short. A one-line enum, query, routing,
-or configuration change can be L2 or L3 when many flows consume its meaning.
-L0 takes the fast path in `SKILL.md` and stops there. L1 through L3 continue
-the full workflow; any unknown locality condition means promotion.
+Read this reference before editing on any promoted change, and again whenever
+blast radius, architecture, or verification surface remains ambiguous. Derive
+runtime wiring, build boundaries, and proof commands from the repository
+rather than assuming an ecosystem.
 
 ## Runtime and Data-flow Impact Tracing
 
@@ -126,22 +109,16 @@ neighboring toolchain is not evidence that it builds the changed path. In a
 multi-language repository, verify each affected component with its own native
 tooling, then verify the contracts that connect them.
 
+A scoped gate — one driven by an explicit file list, package filter, or opt-in
+manifest — reports only what its scope contains, and new files sit outside
+every such scope by default, so enrolling them is part of the change. Report
+such a gate as its verdict together with its coverage set, never the verdict
+alone: "N files clean, and these new files are outside the list" is the honest
+form of a number that would otherwise read as full coverage.
+
 Run the narrowest relevant target first, but distinguish syntax or type
 checking, compilation, test compilation, test discovery, and actual test
 execution. Inspect configuration for skipped suites, profiles or build tags,
 filters, integration phases, generated sources, cached results, and required
 services before claiming evidence. A green command that did not execute the
 relevant proof leaves the obligation open.
-
-## Final Conservation Check
-
-Before handoff, reconcile four sets:
-
-1. Intended Change items implemented and observed.
-2. Conserved Set items exercised or justified unaffected with evidence.
-3. Impact Ledger rows closed with a permitted disposition.
-4. Diff artifacts mapped back to one of the first three sets.
-
-An artifact with no mapping is scope drift. An item with no evidence is a
-residual risk. A high-risk item with neither evidence nor an accepted risk
-keeps the task incomplete.

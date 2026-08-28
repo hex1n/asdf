@@ -35,7 +35,7 @@
 | `assayer` | 波普尔证伪：由独立 reviewer 攻击方案，第二模型作为对同模型盲区更强的证伪者；失效关闭的精确门禁，不存在近似通过；严重度只由后果决定，不由评审成本决定；full depth 时让一名 reviewer 以"值班运维"视角走读——Perspective-Based Reading（Basili）经 A/B 实验收窄到唯一值回成本的那个视角；Decision Envelope 把技术判定与价值决策分开。 |
 | `deep-research` | 证据层级（一手与非一手来源）、多条独立证据通道的三角验证、强推断（Platt；Chamberlin 的多重工作假设）：让竞争解释并存，直到区分性检查把它们分开。 |
 | `arborist` | 把 Intended Change 写成前后契约，并列出不允许改变的 Conserved Set 不变量；追踪爆炸半径到每条受影响流程；深 Module（Ousterhout）；用特征化测试守住 Seam 与 Adapter（Feathers）；每条守恒属性都对应最可能证伪它的证据。 |
-| `e2e-test-planner` | 基于模型的测试设计：对输入空间（Base-Choice、Pairwise）、状态图、决策逻辑三个模型施加覆盖准则（Ammann & Offutt）；预言机独立于实现，期望结果权威与实现证据分离；变更爆炸半径。 |
+| `e2e-test-planner` | 基于模型的测试设计：对输入空间（Base-Choice、Pairwise）、状态图、决策逻辑三个模型施加覆盖准则，复合规则的每个独立条件各欠一条义务（Ammann & Offutt；判定条件思想取自 MC/DC）；预言机独立于实现，期望结果权威与实现证据分离；变更爆炸半径。 |
 | `e2e-test-executor` | RIPR 模型——可达与感染对应可控性，传播与揭示对应可观测性；按易失性顺序采集证据（数字取证）；PROV 式溯源，使计划、运行、产物仅凭产物即可重建；显式的 SUT 边界，声明每个真实依赖与替身。 |
 | `generating-api-docs` | 契约式设计与信息隐藏（Parnas）：只写调用方契约，不写实现；写目标契约，不写当前缺陷。 |
 | `generating-test-scope` | 基于依赖追踪的变更影响分析、基于风险的测试优先级、每条建议都映射到证据。 |

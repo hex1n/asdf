@@ -73,6 +73,7 @@ Common decisions:
 - Nested objects: expand fully / reference type only
 - Enum source: caller-supplied code / lookup interface
 - Field-level change markers: include / omit
+- Compatibility verdicts: whether the caller inventory is known well enough to say `compatible` rather than `not-assessed`
 - ID type: code-declared type / normalized string
 
 ### 4. Parse Each Interface From Code
@@ -90,6 +91,7 @@ Common decisions:
 ### 6. Self-Check
 - Every Markdown anchor target exists.
 - Table of contents and interface sections match.
+- Every changed or deleted interface carries a Compatibility verdict, and every changed field row carries one; no changed row is left blank.
 - The document contains caller contract only: no business-rule section, private enum, private event, or implementation details.
 - Known defects are not written as the target contract. Mention at most a short note pointing to the issue or test.
 
@@ -105,6 +107,32 @@ Common decisions:
 - For modified fields, write `old->new` in the note, such as `required Y->N`, `Long->String`, or `enum +ENUM_VALUE`.
 - Deleted fields stay visible. Read their old type and description from `git show {base}:file`, mark them deleted, and note the former contract.
 - A fully added interface can mark the section as added without marking every field.
+
+**Compatibility**: every changed or deleted interface carries exactly one
+verdict — `compatible`, `breaking`, or `not-assessed` — telling a caller
+whether their existing integration survives. Silence is not a verdict: a reader
+cannot tell an unbroken contract from an unchecked one, so `not-assessed` is
+written out whenever the callers or their usage could not be established.
+
+Direction decides the verdict, and the same edit flips between the two:
+
+| Edit | In the request | In the response |
+| --- | --- | --- |
+| field added | compatible | compatible |
+| field deleted | compatible (server ignores it) | **breaking** |
+| required `N->Y` | **breaking** | compatible |
+| required `Y->N` | compatible | **breaking** — callers dereference it |
+| type changed | **breaking** | **breaking** |
+| `enum +VALUE` | compatible | **breaking** — exhaustive branches miss it |
+| `enum -VALUE` | **breaking** | compatible |
+| validation tightened | **breaking** | — |
+| validation relaxed | compatible | — |
+
+An operation identifier, route, or interface that is renamed or deleted is
+`breaking` regardless of its fields. When one interface carries edits of both
+verdicts, the interface is `breaking`. Name the breaking edit and the caller's
+migration in the change summary; for a deleted interface, name its replacement
+or say there is none.
 
 **Protocol-specific facts** such as auth, requiredness, address, request envelope, response wrapper, parameter position, and ID type live in adapters and the project profile. Do not duplicate those rules in this spine.
 

@@ -18,9 +18,14 @@ Fill this section from the project profile at `docs/api-doc-profile.md`.
 
 ## Table Of Contents
 
-| # | Interface | Class / Service | Type | Summary |
-| --- | --- | --- | --- | --- |
-| 1 | [{name}](#{name}) | {className} | added / modified / reused | {summary} |
+| # | Interface | Class / Service | Type | Compatibility | Summary |
+| --- | --- | --- | --- | --- | --- |
+| 1 | [{name}](#{name}) | {className} | added / modified / deleted / reused | compatible / breaking / not-assessed | {summary} |
+
+Compatibility answers whether an existing caller survives, so a reader can see
+which rows force integration work. Added and reused interfaces are
+`compatible`; leave the cell blank only when the document describes no change
+at all.
 
 If enum values come from a lookup interface, point to that interface instead of hard-coding the values here.
 
@@ -35,16 +40,21 @@ If enum values come from a lookup interface, point to that interface instead of 
 
 ### Request Parameters ({RequestClass})
 
-| Field | Description | Type | Position | Required | Change | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| {field} | {description} | {type} | {path/query/header/body} | Y/N | added / modified / unchanged | {value/length/format; condition for conditional requiredness} |
-| {obj}.{sub} | {nested field} | {Type} | body | N | unchanged |  |
-| {list}[].{sub} | {list element field} | {Type} | body | N | unchanged |  |
-| {deletedField} | {old description} | {old type} | {old position} | - | deleted | Removed from the current contract; old contract was ... |
+| Field | Description | Type | Position | Required | Change | Compatibility | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| {field} | {description} | {type} | {path/query/header/body} | Y/N | added / modified / unchanged | compatible / breaking / not-assessed | {value/length/format; condition for conditional requiredness} |
+| {obj}.{sub} | {nested field} | {Type} | body | N | unchanged | - |  |
+| {list}[].{sub} | {list element field} | {Type} | body | N | unchanged | - |  |
+| {deletedField} | {old description} | {old type} | {old position} | - | deleted | compatible | Removed from the current contract; old contract was ... |
 
 For RPC, omit the Position column unless the project profile defines a transport envelope that needs it.
 For modified rows, write old->new in Notes, such as `required Y->N` or `Long->String`.
 For deleted fields, read the old type and description from `git show {base}:file`.
+Compatibility carries a verdict only on changed rows; unchanged rows use `-`.
+The same edit differs by direction — a request table and a response table give
+opposite verdicts for the same `required Y->N`, so read the verdict off the
+table this row sits in. Omit both columns entirely when the document describes
+no change.
 
 ### Request Example
 
@@ -54,10 +64,10 @@ For deleted fields, read the old type and description from `git show {base}:file
 
 ### Response Result ({ResponseClass})
 
-| Field | Description | Type | Change | Notes |
-| --- | --- | --- | --- | --- |
-| data.field | {description} | {Type} | added / modified / unchanged |  |
-| data.list[].sub | {description} | {Type} | unchanged |  |
+| Field | Description | Type | Change | Compatibility | Notes |
+| --- | --- | --- | --- | --- | --- |
+| data.field | {description} | {Type} | added / modified / unchanged | compatible / breaking / not-assessed |  |
+| data.list[].sub | {description} | {Type} | unchanged | - |  |
 
 If the project uses a response wrapper, document the wrapper in Interface Convention and expand the business payload here.
 

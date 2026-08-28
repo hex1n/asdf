@@ -2,8 +2,8 @@
 
 > English | [简体中文](README.zh-CN.md)
 
-Portable agent skills for planning, research, documentation, implementation,
-and verification across Codex, Claude Code, and compatible agent runtimes.
+Portable agent skills and user-level tools for Codex, Claude Code, and
+compatible agent runtimes.
 
 Each directory under [`skills/`](skills/) is a self-contained source skill with
 task-facing instructions and optional references, scripts, or templates.
@@ -25,6 +25,7 @@ for the distribution vocabulary.
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
 | [`skill-ab-trial`](skills/skill-ab-trial/) | verify | Run a controlled A/B trial to measure whether a candidate instruction changes what agents deliver. |
+| [`rationale-records`](skills/rationale-records/) | navigate | Maintain and query Git-ignored personal current-code rationale, with strict source anchors and worktree handoff. |
 
 ## Lifecycle placement
 
@@ -52,6 +53,8 @@ and an external second model or fresh Agent subagent in Claude Code.
 
 ```
 skills/      # source skills and non-invocable support directories
+tools/       # portable user-level agent tools
+scripts/     # installers and contract checks
 docs/        # design notes, plans, research
 AGENTS.md    # skill-authoring and maintenance conventions
 CONTEXT.md   # canonical domain terms for skill distribution
@@ -61,6 +64,22 @@ CLAUDE.md    # runtime guidance for Claude Code
 Each skill directory contains a task-facing `SKILL.md` (with `name` / `description`
 routing frontmatter), optional `REFERENCE.md` and other detail files loaded on
 demand, and optional `scripts/` and `tests/`.
+
+## Agent tools
+
+The [portable Java formatter](tools/java-formatter/) and the scripts inside the
+[rationale-records skill](skills/rationale-records/) share one Stop hook for Codex and
+Claude Code. Business repositories may carry Git-ignored personal records under
+`docs/rationale`, but never formatter/checker executables, runtime hooks, or rationale state.
+
+    node scripts/install-agent-tools.mjs
+    node scripts/install-agent-tools.mjs --apply
+    node scripts/check-java-formatter.mjs
+    node scripts/check-rationale-records.mjs
+
+The installer links the formatter into `~/.agents/tools`, the complete rationale
+skill into `~/.agents/skills`, and merges global runtime settings without
+replacing unrelated hooks or settings.
 
 ## Testing
 

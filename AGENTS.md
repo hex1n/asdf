@@ -1,11 +1,31 @@
 # AGENTS.md for asdf-skills
 
-This repository owns portable **domain skills**. Each is independently
-distributable and depends on no orchestration runtime.
+This repository owns portable **domain skills** and user-level **agent tools**.
+Each skill is independently distributable and depends on no orchestration
+runtime. Tools may integrate specific runtimes at their configuration boundary.
 
 This file governs the **skill asset family**: authoring, evolution, and
 distribution discipline for `skills/`. Canonical domain terms live in
 [CONTEXT.md](CONTEXT.md).
+
+## Agent Tools
+
+Portable executables and shared runtime integrations live under `tools/`;
+their installers and contract checks live under `scripts/`. Keep their source
+in this repository, install by link, merge runtime configuration without
+discarding unrelated user settings, and keep business repositories free of
+tool implementation and runtime hook configuration. Each tool documents its
+external requirements and exact contract command in its own README.
+
+When changing `tools/java-formatter/` or its installer, read
+[tools/java-formatter/README.md](tools/java-formatter/README.md) and run
+`node scripts/check-java-formatter.mjs`. A portability claim names the
+platforms actually executed; source-level path tests do not count as a runtime
+execution on that platform.
+
+When changing `skills/rationale-records/`, read
+[skills/rationale-records/README.md](skills/rationale-records/README.md) and run
+`node scripts/check-rationale-records.mjs`.
 
 ## Skill Evolution
 

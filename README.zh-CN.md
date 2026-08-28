@@ -2,8 +2,7 @@
 
 > [English](README.md) | 简体中文
 
-面向 Codex、Claude Code 及兼容 agent runtime 的可移植 skills，覆盖规划、调研、
-文档、实现与验证等领域任务。
+面向 Codex、Claude Code 及兼容 agent runtime 的可移植 skills 与用户级工具。
 
 [`skills/`](skills/) 下的每个目录都是独立的源 skill，包含面向任务的指令，以及可选的
 参考资料、脚本或模板。
@@ -24,6 +23,7 @@
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
 | [`skill-ab-trial`](skills/skill-ab-trial/) | 验证 | 用对照实验实测一条候选指令是否真的改变 agent 的交付物。 |
+| [`rationale-records`](skills/rationale-records/) | 导航 | 维护和反查 Git 忽略的个人当前代码理由，并提供严格源码锚点与 worktree 交接。 |
 
 ## 生命周期定位
 
@@ -49,6 +49,8 @@ reviewer 始终只读。
 
 ```
 skills/      # 源技能与不可触发支持目录
+tools/       # 可移植的用户级 agent 工具
+scripts/     # 安装器与契约检查
 docs/        # 设计笔记、计划与调研
 AGENTS.md    # 技能编写与维护约定
 CONTEXT.md   # 技能分发的领域术语
@@ -57,6 +59,20 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 每个技能目录包含面向任务的 `SKILL.md`（含 `name` / `description` 路由 frontmatter）、
 按需加载的 `REFERENCE.md` 等细节文件，以及可选的 `scripts/` 与 `tests/`。
+
+## Agent 工具
+
+[可移植 Java formatter](tools/java-formatter/) 与
+[rationale-records skill](skills/rationale-records/) 内的脚本为 Codex 和 Claude Code 共用一个 Stop Hook。
+业务仓库可以在 `docs/rationale` 下保存 Git 忽略的个人记录，但不保存 formatter/checker 执行器、运行时 Hook 或 rationale 状态。
+
+    node scripts/install-agent-tools.mjs
+    node scripts/install-agent-tools.mjs --apply
+    node scripts/check-java-formatter.mjs
+    node scripts/check-rationale-records.mjs
+
+安装器把 formatter 链接到 `~/.agents/tools`、完整 rationale skill 链接到
+`~/.agents/skills`，合并全局运行时配置时保留已有 Hook 和其他设置。
 
 ## 测试
 

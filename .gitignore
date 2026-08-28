@@ -8,6 +8,7 @@ __pycache__/
 .taskloop/
 .tmp/
 tmp/
+tools/java-formatter/target/
 # Local eval run artifacts can carry real-project identifiers; keep them out of the repo.
 evals/
 # Test suites (top-level tests/ and per-component */tests/) are kept local-only, never published.

@@ -3,6 +3,11 @@
 // Repo-wide verification entry. Local test suites (top-level tests/ and
 // per-skill */tests/) are gitignored and never reach CI, so nothing else
 // catches a semantic change that skips them — this script is that guard.
+//
+// It deliberately stops at what runs on any machine with Node alone. Contract
+// checks that drive an external toolchain (JDK, Maven) stay out, so "the
+// repo-wide gate passed" must not be read as "the tools were exercised": the
+// run names them instead of leaving the boundary implicit.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -54,5 +59,16 @@ for (const step of steps) {
 }
 if (suites.length === 0) {
   process.stdout.write("note: no local test suites found on this machine (they are local-only, never published); only the installed-copy check ran\n");
+}
+// Discovered rather than listed: a contract check added later must not have to
+// remember to announce itself here.
+const covered = new Set(["check-all.mjs", "check-installed-copies.mjs"]);
+const external = fs.readdirSync(path.join(ROOT, "scripts"))
+  .filter((name) => name.startsWith("check-") && name.endsWith(".mjs")
+    && !name.endsWith(".test.mjs") && !covered.has(name))
+  .sort();
+if (external.length > 0) {
+  process.stdout.write(`note: not in this gate (external toolchain) — run directly: ${
+    external.map((name) => `node scripts/${name}`).join(", ")}\n`);
 }
 process.exitCode = failed ? 1 : 0;

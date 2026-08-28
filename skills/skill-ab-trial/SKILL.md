@@ -8,7 +8,7 @@ description: >
   A/B 实验、对照实验、消融实验 (ablation), 盲评对比两种提示词或流程), or to
   rerun this trial on a new candidate instruction. Do not use to choose between design options
   without running agent arms (first-principles-planner), to review one
-  completed plan (plan-review), or for questions answerable from existing
+  completed plan (assayer), or for questions answerable from existing
   evidence without controlled runs (deep-research).
 ---
 
@@ -30,7 +30,11 @@ Freeze before building anything:
   on the deliverable, not the process; a bar that prescribes process in
   either arm measures the bar, not the candidate.
 - **Bench shape**: tasks (at least two, different rule domains),
-  replications per arm per task (at least two), and the runner model.
+  replications per arm per task (at least two), the runner model, and the
+  **bench genre** — authored, or real material the arms must interrogate.
+  Name what settles the condition the candidate keys on: a fixture you wrote
+  states that condition and inflates the effect
+  ([REFERENCE.md](REFERENCE.md#the-authored-bench-amplifier)).
 - **Metrics**: objective correctness, blinded ranking dimensions, cost
   (tokens, tool calls, wall time), adherence.
 
@@ -60,7 +64,9 @@ Completion: oracle green on reference; specs frozen.
 ## 3. Run the arms
 
 - One isolated working directory per run, initialized with only the spec;
-  runs reach neither each other, nor the oracle, nor the reference.
+  runs reach neither each other, nor the oracle, nor the reference. When a run
+  reads real material, name the excluded answer paths in the prompt, require
+  the run to log every skipped hit, and audit those logs before scoring.
 - Same model, same budget posture, same deliverable bar; prompts are
   identical except the candidate block — and, when the candidate itself
   names a deliverable, the control arm's outcome-equivalent bar

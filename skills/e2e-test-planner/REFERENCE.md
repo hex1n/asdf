@@ -228,7 +228,7 @@ Decision logic:
 |---|---|
 | State graph | Every trunk edge, every affected flow, and the producer flow reached by the Primary Happy Path. |
 | Input space | Base-Choice over each success-path input model as the floor: first separate accepted blocks that reach the same committed outcome from rejection-only blocks, then use a feasible Primary Happy Path as the base and vary each accepted non-base block once while every other distinct characteristic stays at a compatible base block, keeping the oracle on the affected committed observable. Treat source or blast-radius evidence that an outcome depends jointly on characteristics as an identified interaction; add All-Combinations for up to three distinct characteristics and Pairwise for larger identified interaction sets. Name every applied criterion in the ledger. |
-| Decision logic | Every rule and error code with at least one direct assertion; judgment order asserted where rules overlap. |
+| Decision logic | Every rule and error code with at least one direct assertion; judgment order asserted where rules overlap. When one rule fires on any of several independent conditions, each condition carries its own obligation: a single assertion on the rule executes one condition and leaves the rest unproven, so the ledger would read `covered` while a condition that never fires is indistinguishable from one that is not implemented. Split the condition column into those conditions before expanding. |
 
 ## Tree Construction Rules
 

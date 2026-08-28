@@ -40,6 +40,15 @@ Completion criterion: the plan names one testable outcome, its expected-result a
 
 Build all three before inventing scenarios. Each row of each model carries separate expected-result authority and implementation evidence, or an explicit unresolved disposition.
 
+Take the **single-flow path** — state graph only, no input-space or decision-logic model, no criteria table, no requirement ledger — when inspection proves every condition:
+
+- the change reaches one business flow, and the blast radius trace finds no other affected flow;
+- no state transition, asynchronous continuation, compatibility window, permission, or stored-data meaning changes;
+- the decision logic under test is a single rule with no independent conditions;
+- one committed observable carries the verdict.
+
+Say in the Overview that the plan took this path, name the condition that made it eligible, and carry the residual risk. Scenario size is not eligibility evidence: a short plan for a change that touches two flows is an omission, not a fast path. An unknown condition means the full three models. If drafting reveals a second affected flow, a second rule, or a state transition, leave the path and build the models before continuing.
+
 ### State graph
 
 Reconstruct the normal business flow:
@@ -70,13 +79,13 @@ Completion criterion: the trunk begins at a legitimate entry (reachability) and 
 
 ## 3. Choose Coverage Criteria
 
-Name one criterion per model, starting from the [defaults](REFERENCE.md#coverage-criteria-defaults). Weaken a default only with a stated reason and the residual risk.
+Name one criterion per model, starting from the [defaults](REFERENCE.md#coverage-criteria-defaults). Weaken a default only with a stated reason and the residual risk. On the single-flow path, name the state-graph criterion alone.
 
-Completion criterion: each model has a named criterion, and every weakening is written down.
+Completion criterion: each model built has a named criterion, and every weakening is written down.
 
 ## 4. Derive Test Requirements
 
-Expand each criterion over its model into a numbered test-requirement ledger. Each requirement names its model, criterion, criterion-generated coverage obligation, and committed observable. For input space, enumerate one base tuple plus one tuple per non-base block under Base-Choice, every feasible cross-characteristic block pair under Pairwise, and every feasible complete tuple under All-Combinations. A requirement closes only through a leaf that instantiates its blocks and whose Observes covers its observable; a rejection leaf cannot close an accepted block's committed outcome. Mark an infeasible requirement with the reason instead of deleting it. Merge compatible requirements one leaf can satisfy and record the merge.
+Expand each criterion over its model into a numbered test-requirement ledger. Each requirement names its model, criterion, criterion-generated coverage obligation, and committed observable. For input space, enumerate one base tuple plus one tuple per non-base block under Base-Choice, every feasible cross-characteristic block pair under Pairwise, and every feasible complete tuple under All-Combinations. For decision logic, enumerate one obligation per rule and error code, and one per independent condition of a rule that fires on any of several. A requirement closes only through a leaf that instantiates its blocks and whose Observes covers its observable; a rejection leaf cannot close an accepted block's committed outcome. Mark an infeasible requirement with the reason instead of deleting it. Merge compatible requirements one leaf can satisfy and record the merge.
 
 Completion criterion: the ledger is the mechanical expansion of the criteria; every generated obligation appears as a requirement or an infeasibility note.
 
@@ -127,5 +136,7 @@ Use this top-level order:
 2. Sources and Models
 3. Business Scenario Tree
 4. Coverage and Gaps
+
+Keep these four headings on the single-flow path too; a plan that renames `Sources and Models` to drop what it did not build hides the choice instead of declaring it.
 
 Save the canonical Markdown under docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md unless the user gives another path. Unless the user explicitly requests Markdown-only or the Reader View is withheld under its contract, also create the same-stem `.html` **Reader View** defined in [REFERENCE.md](REFERENCE.md#reader-view-contract): an answer-first, two-layer human projection with a first-time-reader visual opening index and the complete plan below it, never a second fact source. Its primary scenario table is `Scenario | Expected Input | Expected Result`; secondary planning and traceability fields stay in row details. The opening uses one large relationship picture and few plain-language words; the complete layer retains every technical fact. It must not omit plan facts or send a browser user to raw Markdown/JSON/SQL/text for required detail. Link the Reader View first; name the canonical Markdown path as plain code unless an HTML companion is available. Do not execute tests or write test code unless the user asks.

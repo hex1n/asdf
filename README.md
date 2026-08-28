@@ -17,7 +17,7 @@ for the distribution vocabulary.
 | Skill | Focus | Purpose |
 | --- | --- | --- |
 | [`first-principles-planner`](skills/first-principles-planner/) | plan | Reframe the root problem and compare mechanisms before implementation. |
-| [`plan-review`](skills/plan-review/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
+| [`assayer`](skills/assayer/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`arborist`](skills/arborist/) | implement | Implement complex system changes through intended contracts, deep modules, traced blast radius, and regression evidence. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
@@ -27,10 +27,29 @@ for the distribution vocabulary.
 | [`skill-ab-trial`](skills/skill-ab-trial/) | verify | Run a controlled A/B trial to measure whether a candidate instruction changes what agents deliver. |
 | [`rationale-records`](skills/rationale-records/) | navigate | Maintain and query Git-ignored personal current-code rationale, with strict source anchors and worktree handoff. |
 
+## Methods behind the skills
+
+Each skill encodes a small number of established methods rather than a house
+style. Knowing which ones explains why a skill insists on a step, and where to
+look when extending it.
+
+| Skill | Methods |
+|---|---|
+| `first-principles-planner` | First-principles reasoning: root reframe (Five Whys for solution-shaped asks), splitting true constraints from conventions and unverified assumptions; option tournament with an inversion test; a Value Gate deciding worth-building before design; a pre-registered Bestness Check with an enforceable stop point. |
+| `assayer` | Popperian falsification by independent reviewers, with a second model as a stronger falsifier for same-model blind spots; a fail-closed exact gate with no approximate pass; severity fixed by consequence, never by review cost; an operator-on-call walk for one full-depth reviewer — perspective-based reading (Basili) narrowed to the single perspective an A/B trial found worth its cost; a Decision Envelope separating the technical verdict from the value decision. |
+| `deep-research` | Evidence hierarchy (primary versus non-primary sources), triangulation through independent evidence lanes, and strong inference (Platt; Chamberlin's multiple working hypotheses): rival explanations kept alive until a distinguishing check separates them. |
+| `arborist` | Intended Change as a before-to-after contract plus a Conserved Set of invariants; blast-radius tracing to every affected flow; deep modules (Ousterhout); seams and adapters with characterization tests (Feathers); each conserved property mapped to the evidence most likely to falsify it. |
+| `e2e-test-planner` | Model-based test design: coverage criteria over the input space (Base-Choice, Pairwise), state graph, and decision logic (Ammann & Offutt); an oracle independent of the implementation, with expected-result authority separated from implementation evidence; change blast radius. |
+| `e2e-test-executor` | The RIPR model — reachability and infection as controllability, propagation and revealability as observability; evidence captured in order of volatility (digital forensics); PROV-style provenance so plan, run, and artifacts reconstruct from the artifacts alone; an explicit SUT boundary declaring every real dependency and double. |
+| `generating-api-docs` | Design by contract and information hiding (Parnas): document the caller contract, never the implementation; the target contract, never a current defect. |
+| `generating-test-scope` | Change-impact analysis by dependency tracing, risk-based test prioritization, and evidence-mapped recommendations. |
+| `skill-ab-trial` | Randomized controlled trial design: pre-registration, treatment and control arms, a held-out oracle, blinded ranking, replication, and isolated runs; ablation of one instruction at a time. |
+| `rationale-records` | Chesterton's fence — record why the code has its exact shape before a natural-looking rewrite removes it; one invariant, one current owner; anchored reverse index from source to reason. |
+
 ## Lifecycle placement
 
 ```
-plan         first-principles-planner → plan-review   ← decide the plan, then falsify it
+plan         first-principles-planner → assayer       ← decide the plan, then falsify it
 implement    arborist                                 ← trace the roots, then shape the smallest safe change
 verify       e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
 investigate  deep-research                            ← answer questions from evidence
@@ -45,7 +64,7 @@ and lives outside this repository.
 
 These skills are independent of any orchestration runtime, and each is
 independently distributable.
-`plan-review` binds the same portable workflow to each host's read-only reviewer:
+`assayer` binds the same portable workflow to each host's read-only reviewer:
 a configured second-model connector or fresh collaboration subagent in Codex,
 and an external second model or fresh Agent subagent in Claude Code.
 

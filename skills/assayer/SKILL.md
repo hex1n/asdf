@@ -1,5 +1,5 @@
 ---
-name: plan-review
+name: assayer
 description: >
   Review one completed design or plan through independent falsification until
   the exact final revision passes. Enter only on an explicit review ask against
@@ -71,7 +71,8 @@ independence-limited in its closing report. Freeze:
 - the exact candidate and content hash;
 - the Decision Envelope and review scope resolved by the Entry Gate;
 - author identity; required reviewers, their frozen classes, explicit
-  second-model selections, depth, and second-model availability with its basis;
+  second-model selections, which reviewer holds the operator-on-call walk at
+  full depth, depth, and second-model availability with its basis;
 - rubric, authority evidence, constraints, and the resolved budget;
 - a ledger for rounds, findings, parent validations, and dispositions.
 
@@ -110,6 +111,13 @@ a source record it transcribes, completeness against an upstream inventory it
 compiles — and freeze them with the rest; a claim no rubric dimension names is a
 claim no reviewer is asked to attack. Existing-system claims require an authority
 source or become verification gaps.
+
+At full depth, one required reviewer reads as the **operator on call** — the
+change shipped this evening, they own it through the night and execute the
+rollback if it goes wrong — walking the candidate from that scenario before,
+never instead of, the full-rubric pass. The walk decides where that reviewer
+looks first; it never narrows what any reviewer must report, and the other
+reviewers read with the full rubric alone.
 
 Severity is fixed by consequence, never by review cost: `blocker` — could make
 the result unsafe, wrong, unexecutable, or unverifiable; `should-fix` —

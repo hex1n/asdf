@@ -1,4 +1,4 @@
 interface:
   display_name: "Plan Review"
   short_description: "Independently falsify one completed design or plan revision"
-  default_prompt: "Use $plan-review to review this completed design or plan through independent falsification."
+  default_prompt: "Use $assayer to review this completed design or plan through independent falsification."

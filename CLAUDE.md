@@ -25,7 +25,7 @@ canonical domain language lives in **[CONTEXT.md](CONTEXT.md)**.
 - `skills/` — source skills, one directory each. The full set:
   `deep-research`, `e2e-test-executor`, `e2e-test-planner`,
   `first-principles-planner`, `generating-api-docs`, `generating-test-scope`,
-  `plan-review`, `skill-ab-trial`, `rationale-records`.
+  `assayer`, `skill-ab-trial`, `rationale-records`.
   - `SKILL.md` — task-facing instructions plus routing frontmatter (`name`, `description`, and optional `disable-model-invocation`).
   - `REFERENCE.md` / extra `.md` — progressive-disclosure detail loaded on demand.
   - `scripts/` — stdlib-only helper scripts.

@@ -14,7 +14,7 @@ description: >
   (上面的是最佳方案/改进吗). Do not use for pure fact-finding research, live
   bug diagnosis, implementation, quick naming or wording polish, code review,
   reviewing or falsifying one existing plan (计划评审, 方案评审 — use
-  plan-review), durable ADR/CONTEXT capture, or skill-writing audits unless
+  assayer), durable ADR/CONTEXT capture, or skill-writing audits unless
   the user explicitly asks to re-plan from first principles.
 ---
 

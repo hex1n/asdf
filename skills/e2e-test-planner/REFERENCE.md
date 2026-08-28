@@ -116,22 +116,55 @@ The heading hierarchy is the tree. Scenario IDs may be referenced by the ledger 
 
 ## Reader View Contract
 
-The same-stem `.html` file is the human entry point; the Markdown plan is the canonical agent handoff and sole fact source. Build the HTML only after the Markdown is final. It is a projection: a visible fact, scenario, requirement, priority, risk, gap, disposition, or slice item must already exist in Markdown and link back to its heading or row.
+The same-stem `.html` file is the human entry point; the Markdown plan is the canonical agent handoff and sole fact source. Build the HTML only after the Markdown is final. The HTML is a **complete projection**, not a teaser: every source/model row, business-flow step, changed contract, scenario leaf and field, test requirement, gap/disposition, and first-slice item remains available in the HTML. Collapsing secondary detail with `<details>` is allowed; omitting it or requiring a jump to Markdown is not.
 
-Use a picture-first opening screen with large shapes and short labels:
+### Information architecture: answer first, complete below
+
+Build two deliberate layers:
+
+1. **Opening visual index** — a compact answer-first screen that lets a reader understand what is being proved, how the business flow reaches its committed result, what can invalidate the verdict, and what runs first.
+2. **Complete plan view** — semantic HTML for Overview, Sources and Models, the full Business Scenario Tree, and Coverage and Gaps. Give each section, business step, scenario ID, requirement ID, and gap a stable fragment id so the opening index and tables can link into this page without leaving HTML.
+
+The opening visual index contains four groups, all visible on a standard desktop opening screen:
 
 - **Outcome** — one short plain-language sentence naming what the plan proves; keep scope and risk detail out of this card.
-- **Business path** — ordered boxes and arrows from legitimate entry to committed observable. Preserve the Business Flow order and give every adjacent pair a visible connector. Prefer one unbroken row when it remains readable; otherwise use a vertical stepper or snake whose wrap connector visibly joins the last box of one row to the first box of the next. A trailing arrow into whitespace is invalid. Never arrange independent rows so they imply a false transition.
-- **Risks and decisions** — the highest-risk branches and every unresolved item that changes whether the plan can give a verdict, each with its disposition text/icon as well as color.
-- **First Test Slice** — the exact ordered scenario IDs from Markdown, with one-line purposes.
+- **Business path** — ordered boxes and arrows from legitimate entry to committed observable. Preserve Business Flow order and give every adjacent pair a visible connector. Prefer one unbroken row when readable; otherwise use a vertical stepper or a connected snake. A trailing arrow into whitespace is invalid. Never arrange independent rows so they imply a false transition.
+- **Risks and decisions** — the highest-risk branches and every unresolved item that changes whether the plan can give a verdict, each with disposition text/icon as well as color.
+- **First Test Slice** — the exact ordered scenario IDs from Markdown, each linked to its full HTML leaf and labeled with a one-line purpose.
 
-On a standard desktop opening screen, all four groups are visible together. Compress labels and put explanations below the fold rather than letting one large outcome card, a long flow, or expanded risk prose push another group out of view.
+### Visual grammar and plain-language reading
 
-Below the opening screen, render the complete scenario tree as compact business-branch groups. Include every scenario ID and priority, but link to the canonical leaf for actions, expected results, authority, implementation evidence, and other detail instead of copying those paragraphs. Use `<details>` for secondary branches when useful.
+Apply a first-time-reader rule to the opening layer: assume the reader knows nothing about this requirement. Explain the business consequence before internal names, use one large relationship picture and few words, and keep each card or node to one claim. Replace acronym-only or implementation-only labels with a plain-language label; preserve the exact technical token next to it only when it helps the reader connect the explanation to evidence. This is progressive disclosure, not simplification by deletion: all domain precision remains in the complete plan layer.
 
-The Reader View follows the canonical plan's language for headings, buttons, cards, and explanatory text; do not add bilingual UI labels unless the canonical plan is bilingual or the user asks. Preserve identifiers and source text as-is. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, responsive HTML and inline CSS that works offline. Communicate meaning with labels/icons in addition to color. Use no external fonts, scripts, CDNs, or automatic browser opening.
+Use the smallest visual that makes the relationship easier to understand:
 
-Before handoff, reconcile the projection against Markdown: every scenario and First Test Slice ID resolves; every displayed priority, risk, gap, and disposition agrees; the canonical relative link resolves; no HTML-only fact exists. Then render and inspect the opening screen at desktop width, checking ordered flow, readable contrast, overflow, and whether the four questions above are answerable without scrolling into detail. This pass is required: structural rules alone do not catch a flow that renders into a false transition. Without a render capability, hand off the canonical Markdown alone and say the Reader View was withheld for lack of a render pass; never hand off an unrendered view.
+- Sequence or state change: flow/stepper with explicit connectors.
+- Exact mappings, coverage reconciliation, or comparisons: table.
+- Business branches and scenario ownership: shallow tree or grouped cards.
+- One fact or one action: prose; do not manufacture a diagram.
+
+Place each visual next to the short text it supports. Use real business labels and actual IDs, not generic placeholders. Avoid oversized hero cards, decorative empty space, dense walls of equal-looking cards, tiny type, gradients that reduce contrast, and diagrams that merely restate a list. Set a readable content width, consistent spacing, strong hierarchy, visible focus states, and responsive desktop/mobile layouts.
+
+The Reader View renders the Business Scenario Tree as the plan contract table, one row per scenario, with exactly these primary columns (localized with the plan language): **Scenario**, **Expected Input**, and **Expected Result**. Expected Input combines the leaf's Preconditions with the business operation and concrete parameters in Actions. Expected Result comes only from Expected Results and its approved authority; it is never inferred from implementation evidence or a later execution. Keep the owning business branch, Priority, Purpose, Business Path, Covers, Requirements, Observes, Oracle, Expected Authority, and Implementation Evidence in the same row through a compact `details` disclosure. Do not reproduce the Markdown field list below the table.
+
+On narrow screens the semantic table may stack each row as a card, but the three field labels and row identity remain visible. The Markdown heading tree remains canonical; only its browser presentation changes. Plain language simplifies navigation; it never deletes domain precision.
+
+### Browser-only navigation
+
+- Every user-clickable local `href` ends in `.html` (optionally with a fragment) or is a same-page `#fragment`. Never link `.md`, `.json`, `.jsonl`, `.sql`, `.txt`, or `.log` directly from a browser-facing page.
+- Keep canonical/raw artifacts unchanged. When the Reader View exposes one, generate a UTF-8 HTML companion: semantic rendering for Markdown, escaped `<pre>` plus title/provenance for JSON/SQL/log/text. Companions work offline and link onward only to HTML or fragments.
+- Show canonical/raw paths as non-clickable `<code>` when provenance matters. HTML remains a projection; it does not replace the Markdown authority.
+
+### Rendering and completeness gates
+
+The Reader View follows the canonical plan's language for headings, controls, and explanatory text; do not add bilingual UI unless the plan is bilingual or the user asks. Preserve identifiers and source text as-is. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, offline HTML with inline CSS; no external fonts, scripts, CDNs, or automatic browser opening. Communicate meaning with labels/icons in addition to color.
+
+Before handoff, run both audits:
+
+1. **Projection completeness** — compare Markdown and HTML inventories: top-level sections; source/model/business-flow/blast-radius/input/decision/coverage row counts; every B*/HP-*/scenario/TR-* ID; every scenario field; every gap and disposition; every First Test Slice ID and order. Any missing item fails the audit. No HTML-only fact may appear.
+2. **Navigation and visual QA** — crawl every local `href` from the Reader View and companion pages; every target must be `.html`/`#fragment`, exist, declare UTF-8, and decode without replacement characters. Render at desktop and mobile widths. Inspect the opening screen, every first-level link, flow continuity, contrast, focus, wrapping, horizontal overflow, and expanded scenario detail. A false transition, clipped content, unreadable table, dead link, raw-file browser link, or detail available only in Markdown fails the audit.
+
+Without render capability, hand off canonical Markdown alone and say the Reader View was withheld for lack of a render pass; never hand off an unrendered or knowingly incomplete view.
 
 ## Scenario Leaf Contract
 

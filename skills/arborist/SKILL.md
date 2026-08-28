@@ -173,6 +173,19 @@ artifact under test. For alignment work — make X match Y — the oracle is Y's
 current behavior, never X's former behavior: "no longer the old wrong value"
 measures distance travelled, not arrival.
 
+An oracle is **specified** — a concrete expected value and the authority it
+comes from — or **derived**: a differential run, a replay, an invariant, or a
+metamorphic relation that fixes the output's relationship to another run
+without stating the value. Reach for a derived oracle when no authority states
+the value, which is the ordinary case for a Conserved Set item: the pre-change
+build is independent of the artifact under test and is a legitimate oracle for
+behavior that must not move — the same characterization evidence
+[REFACTORING.md](REFACTORING.md) relies on. It is not an oracle for an Intended
+Change, where the old behavior is the thing being replaced. Name which kind
+each proof uses; a derived oracle also names what it is compared against.
+`NEEDS-DECISION` is for an item neither kind can cover, not for one whose value
+no document happens to state.
+
 The Intended Change pulls its own proof into existence: it starts **red** and
 turning it green is the work. The Conserved Set never does — nothing goes red
 when you skip it, so it is skipped by default. Write its checks first.
@@ -214,11 +227,11 @@ Proof Matrix in [REFERENCE.md](REFERENCE.md) maps each property to the
 evidence most likely to falsify it.
 
 Completion: before implementation begins, the pre-registration file exists
-and in it every proof names an oracle independent of the artifact under
-test; every Intended Change and Impact Ledger row maps to a command, test,
-inspection, or an explicit unverified risk; and every Conserved Set item
-maps to a red-capable check or a `NEEDS-DECISION`; and every case of a
-removed or shrunk check is named on a disposition line.
+and in it every proof names its oracle kind and an oracle independent of the
+artifact under test; every Intended Change and Impact Ledger row maps to a
+command, test, inspection, or an explicit unverified risk; and every
+Conserved Set item maps to a red-capable check or a `NEEDS-DECISION`; and
+every case of a removed or shrunk check is named on a disposition line.
 
 ## 5. Implement in Coherent Slices
 

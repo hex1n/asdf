@@ -90,7 +90,7 @@ capabilities already present; adding a library is a separate design decision.
 
 | Property | Strong evidence |
 | --- | --- |
-| Pure calculation or invariant | Example plus property/boundary tests with an independent oracle |
+| Pure calculation or invariant | Example plus property/boundary tests with an independent oracle; where no authority states the value, a metamorphic relation over paired runs |
 | State transition | Transition table tests, illegal-transition probes, committed-state assertions |
 | Persistence or transaction | Real-store integration test, constraint/rollback probe, migration rehearsal |
 | API or RPC compatibility | Producer/consumer contract test and old/new payload fixtures |

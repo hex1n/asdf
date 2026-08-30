@@ -117,6 +117,19 @@ When Decision Logic is `built`, include:
 |---|---|---|---|---|---|---|
 | TR-001 | ... | ... | {edge, rule, base tuple, block pair, or complete tuple} | {committed observable} | ... | covered, infeasible, NEEDS-DECISION, ASSUMED, BLOCKED, or OUT-OF-SCOPE |
 
+### Ledger Reconciliation
+
+Four mechanical checks over the finished plan. Each names the state it must find, so a reader can run it by eye or by script:
+
+| Check | Passes when |
+|---|---|
+| Numbering contiguous | The `TR-*` sequence has no hole. A requirement that stops applying keeps its row carrying an `infeasible` or disposition value; it does not vanish and leave a gap. |
+| Ledger → tree | Every row whose disposition is `covered` names leaf IDs, and each named leaf lists that `TR` in its `Requirements`. |
+| Tree → ledger | Every `TR` named in a leaf's `Requirements` has a row in the ledger. |
+| Referenced IDs resolve | Every scenario ID named in the ledger, Gaps and Decisions, or First Test Slice is defined by a leaf in the tree, or is marked as a scenario this plan does not define. |
+
+A `covered` row that fails Ledger → tree is the reconciliation defect this section exists to catch: it is one edit away from closed, and reads closed until the pair is checked.
+
 ### Gaps and Decisions
 
 | Item | Disposition | Effect on plan |
@@ -174,6 +187,16 @@ On narrow screens the semantic table may stack each row as a card, but the three
 
 The Reader View follows the canonical plan's language for headings, controls, and explanatory text; do not add bilingual UI unless the plan is bilingual or the user asks. Preserve identifiers and source text as-is. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, offline HTML with inline CSS; no external fonts, scripts, CDNs, or automatic browser opening. Communicate meaning with labels/icons in addition to color.
 
+Do not hand-build a renderer. The companion skill ships one at
+`<skills-dir>/e2e-test-executor/tools/reader-view.mjs`; it takes a JSON data file and emits the Reader View plus the audits below:
+
+```bash
+node <skills-dir>/e2e-test-executor/tools/reader-view.mjs render <feature-dir>/reader-view.json
+node <skills-dir>/e2e-test-executor/tools/reader-view.mjs audit  <feature-dir>/reader-view.json
+```
+
+Set `"mode": "plan"` and describe only what changes per plan — title, subtitle, the four opening groups, one row per scenario leaf with its resolved anchors and planning fields, and the audit's expected sections, ID patterns, and leaf list. Use `cellAnchors` to make table-cell IDs (`B1`, `TR-001`, `G-01`) linkable from the opening index. The renderer owns the markdown→HTML engine, the visual grammar, and every audit rule, so a fix there reaches every future plan. When that skill is not installed, or the tool fails, fall back to the withheld-Reader-View rule at the end of this section rather than writing a replacement.
+
 Before handoff, run both audits:
 
 1. **Projection completeness** — compare Markdown and HTML inventories: top-level sections; source/model/business-flow/blast-radius/input/decision/coverage row counts; every B*/HP-*/scenario/TR-* ID; every effective scenario field after parent inheritance, including Preconditions, Actions, and State Footprint plus their parent/override lineage; every gap and disposition; every First Test Slice ID and order. Any missing item fails the audit. No HTML-only fact may appear.
@@ -207,7 +230,7 @@ Shared scenario facts may live on the nearest parent branch. Resolve every inher
 
 | Anchor | Plan-owned fact |
 |---|---|
-| Preconditions | Concrete starting-state and input values, or a deterministic construction or entity-selection rule. A fixture or variable ID is concrete only when its values or production rule are present in the plan. Name any source- or safety-required predecessor leaf or gate by stable ID; otherwise each leaf arranges its own starting state. |
+| Preconditions | Concrete starting-state and input values, or a deterministic construction or entity-selection rule. A fixture or variable ID is concrete only when its values or production rule are present in the plan. Name any source- or safety-required predecessor leaf by stable ID; otherwise each leaf arranges its own starting state. |
 | Actions | Ordered business actions. Every trigger names the project-declared adapter or entry surface, its stable locator or operation, and concrete inputs or a deterministic construction rule. |
 | Observes | The committed observable — the store, event, or external effect at the end of propagation, never the entry response — and the predicate that proves propagation settled. An asynchronous action names an observable state transition, never a fixed sleep. Record an approved product time threshold when one exists; record `business threshold: none specified` when timing is not part of the contract; use `NEEDS-DECISION` only when correctness depends on a threshold the authority has not defined. Execution-safety bounds belong to the executor. |
 | State Footprint | Business resources read, resources written, and external effects; for every writable or external target, name its provenance or ownership class and allowed terminal lifecycle: `retain`, `restore`, or `delete`. Write `none` for an empty class and expose unresolved resources, provenance, or lifecycle authorization instead of implying an empty footprint. |

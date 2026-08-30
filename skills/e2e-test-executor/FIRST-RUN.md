@@ -4,7 +4,7 @@ Read this file only for the first execution of a plan, named scenario, or conver
 
 ## Establish the upstream artifact
 
-Create this run's immutable directory before materializing any snapshot: use the user's output path when provided; otherwise create `e2e-run-<plan-name>-<timestamp>/` beside the plan under its `docs/e2e-test/<feature>/` folder, or a stated working path when no plan location exists. Directory creation is already a write: before it, canonicalize the existing parent and the user-authorized workspace or output boundary, prove the parent is inside that boundary and is not reached through a symlink or traversal, then create one unique direct child. Stop before `mkdir` when that proof fails. This intake gate does not wait for `EXECUTION.md`. The new directory is unique to the run and is never reused by a later rerun. Record its full canonical path immediately. Every file written into it before delivery is an entry of the artifact allowlist in [REPORTING.md](REPORTING.md#fill-the-run-directory).
+Create this run's immutable directory before materializing any snapshot: use the user's output path when provided; otherwise create `e2e-run-<plan-name>-<timestamp>/` beside the plan under its `docs/e2e-test/<feature>/` folder, or a stated working path when no plan location exists. Creating it is a write: satisfy [Path Containment Proof](REFERENCE.md#path-containment-proof) before `mkdir`. This intake gate does not wait for `EXECUTION.md`. The new directory is unique to the run and is never reused by a later rerun. Record its full canonical path immediately. Every file written into it before delivery is an entry of the artifact allowlist in [REPORTING.md](REPORTING.md#fill-the-run-directory).
 
 Read the plan before touching the system. A plan whose header declares `Contract: e2e-plan/v2` keeps its facts in canonical records:
 
@@ -36,12 +36,15 @@ Re-read the user's latest constraints. Record an `Execution Contract Override` w
 The selection set is, in order:
 
 1. scenarios the user explicitly named;
-2. otherwise a marked `execution-anchors/v1` plan's First Test Slice;
+2. otherwise the plan's First Test Slice, marked or not;
 3. otherwise a legacy plan's explicitly declared default scenario set or named default slice;
-4. otherwise an unmarked plan's First Test Slice;
-5. otherwise every ready scenario in priority order P0 through P2.
+4. otherwise every ready scenario in priority order P0 through P2.
+
+A First Test Slice always outranks a separately declared default scenario set. When a plan carries both and they differ, take the slice and record the ignored default set as an explicit selection note.
 
 Write the selection set down before execution. Map every selected scenario to plan IDs, edge IDs, expected variables, required capabilities, waits, cleanup, and blockers. Record missing or conflicting facts before triggering anything. `Upstream plan` must resolve to a readable path, using the materialized snapshot when the source was conversational.
+
+Pin the upstream artifact by **content hash**, not path alone, and record that hash in `plan-snapshot.md` at intake. A path names a file; a run consumes a revision. The report copies the plan's expected values, so an upstream edit after the run silently desynchronizes those copies, and a hash reconstructed afterwards is a guess. Where the plan carries no version history — an untracked or gitignored directory — the hash is the only anchor available. On delivery, re-hash the upstream artifact: an unchanged hash certifies the copied expectations; a changed one means the report states which revision it ran against and reconciles or explicitly retains each copied field.
 
 Scenario selection changes which scenario nodes execute; it does not waive shared entry gates, preconditions, safety checks, or their evidence. Supersede a shared gate only when the user explicitly changes that gate, not merely because the user selected one scenario.
 
@@ -50,7 +53,7 @@ Scenario selection changes which scenario nodes execute; it does not waive share
 Do not proceed until:
 
 - the selection set and rationale are explicit;
-- the upstream plan or snapshot is readable;
+- the upstream plan or snapshot is readable, and its content hash is recorded;
 - each selected scenario has a trigger, wait, committed-state probe, oracle, dependencies, side effects, isolation key, and cleanup decision, or an exact blocker;
 - current user overrides are recorded;
 - the report language and target environment are fixed.

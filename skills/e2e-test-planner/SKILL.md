@@ -127,7 +127,9 @@ Use `ASSUMED` only for a temporary premise explicitly accepted by the user or re
 
 The ledger is a reconciliation aid, not a second scenario catalog. It contains IDs and dispositions only; scenario meaning remains in the tree.
 
-Completion criterion: every test requirement, approved rule, trunk step, changed contract, and affected flow maps to at least one leaf; every uncovered item has an explicit disposition; no new scenario is introduced outside the tree.
+Reconcile the ledger against the tree in **both** directions before closing, because a one-directional read passes while half the pair is missing: a `covered` row whose leaf column names a leaf that never cites it reads as closed and is not. Run the [Ledger Reconciliation](REFERENCE.md#ledger-reconciliation) checks.
+
+Completion criterion: the ledger reconciles in both directions and its numbering is contiguous; every test requirement, approved rule, trunk step, changed contract, and affected flow maps to at least one leaf; every uncovered item has an explicit disposition; no new scenario is introduced outside the tree.
 
 ## Deliverable
 

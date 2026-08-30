@@ -6,7 +6,7 @@ description: >
 
 # E2E Test Executor
 
-Execute an existing E2E plan: a real run, a report, and a local issues queue when bugs exist. Write or modify tests only when the user explicitly asks, or when the plan explicitly names authoring test code as the execution method; a scenario's `Automation` level classifies coverage and is never that authorization.
+Execute an existing E2E plan: a real run, a report, and a local issues queue when bugs exist. Write or modify tests only when the user explicitly asks, or when the plan explicitly names authoring test code as the execution method; a plan's coverage or automation classification of a scenario is never that authorization.
 
 Supported environments: local and test only. If the target is preprod, staging with production-like restrictions, or production, stop and ask for a narrower read-only task or explicit safety instructions.
 
@@ -21,13 +21,13 @@ The only product of a run is a **verdict**, and a verdict is trustworthy only wh
 - **I3 Evidence integrity** — proof is captured in order of volatility before anything can destroy it, and a pass is proven the same way as a failure.
 - **I4 Provenance** — plan → run → artifacts → follow-ups is reconstructible from the artifacts alone.
 
-An `implicit` oracle such as “no crash” cannot prove a correct value, so its verdict is at most `unverified`. A `passed` verdict always retains the exact probe, raw unsummarized output, created-entity identifiers, and an independently runnable re-query. A missing probe is `blocked`; missing retained or reproducible proof is `unverified`; an unexecuted case is never `unverified`.
+An `implicit` oracle such as “no crash” cannot prove a correct value, so its verdict is at most `unverified`. A `passed` verdict retains the four proof items defined in [EXECUTION.md](EXECUTION.md#observe-the-committed-outcome), captured and re-queried before any cleanup that removes the claimed state. A missing probe is `blocked`; missing retained or reproducible proof is `unverified`; an unexecuted case is never `unverified`.
 
 On any failure, suspected product defect, or unknown mismatch, preserve the scene before cleanup: request/response, committed state, queue or job state, logs/traces/metrics, effective config, identifiers, and the exact rerun command or recorded invocation sequence. Redact secrets without removing reproduction identifiers.
 
 ## Progressive runbook
 
-Load only the stage and branch that the current run has reached. Do not pre-read every linked file or all of [REFERENCE.md](REFERENCE.md).
+Load each stage when the run reaches it, and only the branch that applies.
 
 1. **Select and establish lineage.**
    - For a first execution from a plan, named scenario, or conversational handoff, read [FIRST-RUN.md](FIRST-RUN.md).

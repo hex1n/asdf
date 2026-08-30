@@ -4,7 +4,7 @@ Read this file only when verifying fixes, resuming a prior run, or executing sce
 
 ## Preserve prior history
 
-Read the prior run's `execution-report.md` before touching the system. Never edit that report or any attachment in place. Before creating a continuation, canonicalize its existing parent and the user-authorized workspace or output boundary; prove the parent is inside that boundary and is not reached through a symlink or traversal. Validate the proposed absent target lexically as one direct child with the required prefix and no traversal; only then create it, canonicalize the result, and re-prove the direct-child relation. Creating the directory itself is a write, so a create-then-check sequence fails this gate. Use one unique `e2e-run-<plan-name>-<timestamp>/` beside the prior run unless the user supplies another validated output path. Record the prior report as `Upstream run` and back-link both the original plan and prior run. Every generated rerun command or script must target a fresh continuation directory, never the current historical directory. Every file written into the continuation before delivery is an entry of the artifact allowlist in [REPORTING.md](REPORTING.md#fill-the-run-directory).
+Read the prior run's `execution-report.md` before touching the system. Never edit that report or any attachment in place. Creating a continuation is a write: satisfy [Path Containment Proof](REFERENCE.md#path-containment-proof) before `mkdir`. Use one unique `e2e-run-<plan-name>-<timestamp>/` beside the prior run unless the user supplies another validated output path. Record the prior report as `Upstream run` and back-link both the original plan and prior run. Every generated rerun command or script must target a fresh continuation directory, never the current historical directory. Every file written into the continuation before delivery is an entry of the artifact allowlist in [REPORTING.md](REPORTING.md#fill-the-run-directory).
 
 Carry forward:
 
@@ -21,6 +21,8 @@ Re-read the user's latest constraints and record any changed exclusions, retenti
 Select the prior run's `failed`, `blocked`, and `unverified` scenarios plus every DAG dependent that consumed the fixed behavior. Do not rerun only the named failed scenario, because that misses fix-induced downstream regressions; do not rerun the entire plan unless the dependency graph or the user requires it.
 
 Map the continuation set to the same plan IDs, edge IDs, variables, required capabilities, waits, isolation, side effects, and cleanup rules used by the prior run. Re-derive only mechanics invalidated by the fix, environment change, or new evidence, and record each change in the new `plan-snapshot.md` or lineage section.
+
+A dependent the prior run never executed carries no derived mechanics to reuse. Resolve its anchors and derive its mechanics under the derivation rules in [FIRST-RUN.md](FIRST-RUN.md#establish-the-upstream-artifact) — the atomic-field reducer, the six derivation targets, and the `derived` or `legacy-derived` lineage mark — and record them in the new `plan-snapshot.md` before it enters the continuation set.
 
 Before revalidation, prove the fixed build is loaded. The deployment fingerprint must differ in the way the fix predicts — version, commit, build, start time, or a discriminating behavioral fingerprint. Reachability alone is never proof; a stale process means the fixed behavior was not reached.
 

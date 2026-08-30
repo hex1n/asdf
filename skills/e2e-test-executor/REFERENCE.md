@@ -39,8 +39,61 @@ A delegated executor's report is machine-checkable. A valid `execution-report.md
 - Include scenario-keyed proof chains in `Evidence & Failure Scenes`: probe, expected, actual, raw evidence summary or attachment paths, retained scene, cleanup safety, and rerun cue.
 - Link every `OPEN` actionable root cause in `Failures / Defects / Plan Gaps` to a local `issues/ISSUE-*.md` document on the same item, and link the same issue from every affected `Scenario Results` row.
 - Give `Re-run Instructions` at least one executable command — or, for a replay surface without executable bytes, the recorded adapter invocation sequence — not prose alone.
+- Reconcile IDs in **both** directions, because a one-directional read passes while half the pair is missing: every scenario in the recorded selection set has a `Scenario Results` row; every `issues/ISSUE-*.md` is linked from at least one row; every scenario, issue, or root-cause ID cited anywhere in the report resolves to something this report defines, or is marked as belonging to the upstream plan rather than this run. Take the selection set from the set recorded at intake, not from the IDs the report happens to mention — a scenario named only as a neighbouring precondition is a reference, not a selection.
 
-Completion criterion: a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using `execution-report.md` plus any referenced attachments; `OPEN` actionable root causes have local issue documents; optional files are added only when a named consumer needs them.
+Completion criterion: the report's IDs reconcile in both directions; a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using `execution-report.md` plus any referenced attachments; `OPEN` actionable root causes have local issue documents; optional files are added only when a named consumer needs them.
+
+## Path Containment Proof
+
+Creating a directory or file target is itself a write, so a create-then-check sequence has already failed this gate. Every run directory, continuation directory, fixture, and helper-created target satisfies this proof **before** the create call:
+
+1. Canonicalize the existing parent and the user-authorized workspace or output boundary.
+2. Prove the parent resolves inside that boundary and is not reached through a symlink or traversal component.
+3. Validate the proposed absent target lexically as one direct child — the required prefix where one applies, and no traversal component.
+4. Create it, then canonicalize the result and re-prove the direct-child relation.
+
+Record the validated parent and proposed target in the `Environment State Ledger` before writing. A relative path, system temporary directory, or tool default carries its own authorization only when the user established that boundary. When any step fails, stop before the create call and either choose an in-boundary target or mark that path blocked.
+
+Recursive deletion satisfies the same proof plus an ownership check: canonicalize both the run directory and the target, require the target to be a direct non-symlink child of the canonical run directory, and require the owner marker's recorded run or entity identity to match the requested cleanup. Reject a lexical match that contains traversal, resolves elsewhere, or carries a mismatched owner.
+
+## Replay Entry Point Contract
+
+Open this section only when the run generates a rerun entry point. Generated replay helpers are evidence-bearing interfaces, not disposable conveniences. A rerun entry point is either an **executable helper** — a script, CLI wrapper, or test task whose bytes and exit status the run controls — or, when the replay surface is an adapter without executable bytes (a browser connector, an MCP tool, a queue or job console), the **recorded adapter invocation sequence** the agent replays step by step, named as such in `Re-run Instructions`. The first group binds every replay surface; the second binds executable helpers only.
+
+### Every replay surface
+
+- Expose rerun as one orchestration entry point — the executable helper, or the recorded adapter invocation sequence the agent replays step by step. It creates a fresh continuation directory, invokes any lower-level seed/verify/cleanup helpers there, and never writes mutable state into the current historical run or overwrites its report, attachments, metadata, or fixture-path records. `Re-run Instructions` invoke this entry point, not a loose sequence whose later commands can run after an earlier failure.
+- Phase-gate the trigger, wait, probe, verification, and cleanup flow inside that entry point. A failed trigger, wait, probe, or oracle — a nonzero status or an adapter's returned error — stops later business phases and denies cleanup even when report verification succeeds; capture and retain the scene instead. Latch that first failure through every later recovery action: neither a later success nor a generic fallback status can mask it.
+- Treat every continuation, including a forced-failure probe, as a run: create its canonical `execution-report.md` (and `plan-snapshot.md` when intake facts are needed), back-link the original plan and historical run, assign terminal scenario status/oracle/diagnosis, and keep all phase receipts there. Do not invent `execution-attempt.md`, a probe-only log, or another report name.
+- After any trigger or mutation, capture the best available committed state, events/jobs/queues, logs, identifiers, exact probe commands or adapter invocations and their outputs, phase receipts, historical hash receipts, and exact rerun command or recorded invocation sequence before cleanup even when wait, probe, oracle evaluation, or report generation failed. Count ownership scaffolding such as a created state directory or owner marker as mutation even when no business row or file appeared; the report and ledger must describe its actual terminal state.
+- Materialize the canonical report with the captured pre-cleanup scene and the literal terminal field `cleanup: pending`, then read/hash-verify the bytes at that exact path before cleanup; `retained` describes a later denied-cleanup terminal state and is not a synonym at this gate. This applies after any mutation, including continuation-directory or owner-marker scaffolding followed by a pre-trigger block. Persist the verification receipt and canonical-report hash before cleanup. A report-write or verification failure skips cleanup and retains the owned scene with owner, TTL, cleanup command, and risk in that continuation's canonical report. After safe cleanup, run an exact separately named absence oracle, retain its command and output, and update the canonical report through a write-read-hash-verify-and-replace sequence; if the update cannot be verified, keep the already verified pending report intact rather than truncating or overwriting it.
+- If capture is incomplete or retained state is still needed to diagnose the failure, skip cleanup and record owner, TTL, cleanup command, and risk. Otherwise cleanup may run, but its status is reported separately. Successful cleanup removes business state, ownership scaffolding, and the empty state directory unless the report names a retained-state reason. Parse the terminal report semantically: `cleanup: completed` requires the observed cleanup status and output and a passing absence oracle, with no stale `not executed`, `pending`, or retained-state claim; substring presence alone cannot pass this gate.
+- Before recursive deletion, satisfy the deletion clause of [Path Containment Proof](#path-containment-proof).
+- Apply the same ownership, containment, proof, and first-failure gates to a retained-state cleanup entry point. On success it removes owned business state, the owner marker, and the empty state directory, then updates `execution-report.md` with the observed cleanup status, stdout, stderr (or the adapter's returned output), and exact absence-oracle receipt through the verified replacement sequence above. Build that terminal update from the observed receipt after cleanup; never install a prebuilt final report that still says `not executed`, `pending`, or `retained`. It creates no unlisted root-level result file and leaves the canonical report truthful if its update fails.
+
+### Executable helpers only
+
+- Preserve the first nonzero status through every later exception handler: a catch/finally path reports later tooling errors separately but exits with the earlier nonzero when one already exists. A parent orchestration entry point latches a child's nonzero status before forwarding the child's stdout/stderr or performing any other fallible handoff; forwarding errors are separate tooling receipts and cannot replace the latched child status.
+- Bind evidence to executable bytes: hash every generated helper before the first mutation, record those hashes in the canonical report or snapshot, and re-hash them at delivery. A changed helper invalidates the run and requires a fresh execution; never advertise or validate helper bytes edited after the recorded attempt.
+- Satisfy [Path Containment Proof](#path-containment-proof) inside generated helpers, not only in the agent's own steps.
+- Audit every mutable path against the fresh continuation before advertising the entry point as runnable.
+
+### Contract probes before advertising an executable helper
+
+Run these three safe probes, then the two checks below them:
+
+1. **Pre-trigger block** — force a nonzero after continuation and ownership scaffolding exist but before the business trigger.
+2. **Business-phase failure** — mutate a dedicated fixture and force a real wait, probe, or oracle failure while report verification still succeeds.
+3. **Report-write failure** — mutate a dedicated fixture, then simulate failure of the first canonical-report write or verification. This probe must prove cleanup was skipped while the scene remained, then write a recovery canonical report.
+
+Each probe must preserve the first nonzero status, produce a canonical continuation report, retain the failure scene before any cleanup, truthfully report and clean or intentionally retain all scaffolding, name owner, TTL, exact cleanup command, and risk whenever state remains, report cleanup or retention separately, and store before/after historical-report and attachments hashes as probe-interval receipts in that continuation report.
+
+Then also:
+
+- Exercise the retained-state cleanup entry point and prove its owner check, allowlist, absence oracle, and canonical-report update.
+- Inject a parent-side output-forwarding failure after a child nonzero and prove the advertised parent still exits with the child's first nonzero.
+
+If any branch cannot be proven, mark the helper unverified and do not present it as the rerun command.
 
 ## Reader View Contract
 
@@ -69,6 +122,15 @@ Keep bulky raw evidence in its canonical artifact, expose it through an HTML com
 Apply the same visual grammar as a focused explanatory artifact: sequence/state change uses a connected flow or timeline; mappings and comparisons use tables; hierarchy uses grouped cards or a shallow tree; single facts stay prose. Put visuals beside the short text they clarify, use real labels/IDs, and avoid oversized hero blocks, decorative whitespace, dense undifferentiated cards, and diagrams that only restate lists. Scenario detail answers in plain language: why it ran, how it was triggered, where the committed result was observed, and how the oracle decided the verdict; exact identifiers and evidence remain intact.
 
 The Reader View follows the resolved audience language from `SKILL.md` for headings, buttons, cards, and explanatory text — this can differ from a legacy report's language when the upstream plan or user establishes the audience. Do not add bilingual UI labels unless the resolved audience artifact is bilingual or the user asks. Translate generic field and section labels; preserve identifiers, commands, logs, enum tokens, and quoted evidence as-is, showing preserved machine tokens as code/badges rather than appending them to translated labels. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, responsive HTML and inline CSS that works offline. Communicate status with labels/icons in addition to color. Use no external fonts, scripts, CDNs, or automatic browser opening.
+
+Do not hand-build a renderer. This skill ships one at [`tools/reader-view.mjs`](tools/reader-view.mjs); it takes a JSON data file and emits the Reader View, its HTML companions, and the audits below:
+
+```bash
+node <skill>/tools/reader-view.mjs render <run-dir>/reader-view.json
+node <skill>/tools/reader-view.mjs audit  <run-dir>/reader-view.json
+```
+
+Set `"mode": "run"` and describe only what changes per run — title, subtitle, opening groups, scenario rows, companions, and the audit's expected sections, ID patterns, selection set, and stale tokens. The renderer owns the markdown→HTML engine, the visual grammar, companion generation, and every audit rule, so a fix there reaches every future run. Hand-copying a previous run's renderer is what produced stale headlines, stale first-screen footnotes, and companion links to files that no longer existed; a data file has nowhere for that staleness to hide. When the tool is absent or fails, fall back to the withheld-Reader-View rule at the end of this section rather than writing a replacement.
 
 Before handoff, run both audits. **Projection completeness:** compare Markdown and HTML inventories for every required report section, scenario/status/oracle/diagnosis, proof chain, defect/disposition/issue, rerun ID, next action, environment/fingerprint fact, created-data key, cleanup state, and nonzero/zero verdict count; any missing item fails. **Navigation and visual QA:** crawl every local `href` in `execution-report.html` and all reachable companion pages; fail if a target is not `.html`/`#fragment`, is missing, escapes the intended report suite, lacks UTF-8 metadata, or contains decode replacement characters. Inspect serialized visible text for a bare backtick or table-pipe residue outside `<code>`/`<pre>`. Render desktop and mobile widths; open every first-level link and inspect flow continuity, contrast, focus, wrapping, horizontal overflow, tables, and expanded detail. The opening index must expose every root cause and exact rerun set; the complete layer must expose every fact required to audit the verdict. Without render capability, hand off canonical Markdown alone and say the Reader View was withheld; never hand off an unrendered or incomplete view.
 

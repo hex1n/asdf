@@ -10,7 +10,9 @@
 - Primary Happy Path: HP-001, or No source-backed Happy Path with the reason.
 - Scope: ...
 - Change set and blast-radius summary: ...
-- Coverage criteria: {state graph}, {input space}, {decision logic}
+- Execution handoff: execution-anchors/v1
+- Model applicability: {state graph: built; input space: built/not applicable; decision logic: built/not applicable}
+- Coverage criteria: {one per built model}
 - Highest-risk branches: ...
 - Unresolved decisions: ...
 
@@ -21,6 +23,14 @@
 | Source | Evidence role | Authority status | Proven fact |
 |---|---|---|---|
 | {locator} | {expected authority, implementation evidence, or runtime evidence} | {approved by whom, or not established} | {intended rule or current behavior} |
+
+### Model Applicability
+
+| Model | Status | Basis and residual risk |
+|---|---|---|
+| State graph | built | Mandatory E2E propagation model. |
+| Input space | built or not applicable | {characteristics and feasible blocks found, or positive evidence that none applies; residual risk} |
+| Decision logic | built or not applicable | {rules, conditions, error codes, or judgment order found, or positive evidence that none applies; residual risk} |
 
 ### Business Flow
 
@@ -34,11 +44,15 @@
 |---|---|---|---|---|---|---|
 | ... | ... | ... | ... | ... | ... | ... |
 
+When Input Space is `built`, include:
+
 ### Input Space
 
 | Characteristic | Observable affected | Blocks | Expected authority | Implementation evidence |
 |---|---|---|---|---|
 | {operation, target state, direction, field, bound, subject class, mode} | {committed observable from the Business Flow table} | {block 1; block 2; ...} | ... | ... |
+
+When Decision Logic is `built`, include:
 
 ### Decision Logic
 
@@ -51,8 +65,7 @@
 | Model | Criterion | Reason and residual risk |
 |---|---|---|
 | State graph | ... | ... |
-| Input space | ... | ... |
-| Decision logic | ... | ... |
+| {each optional model whose applicability is `built`} | ... | ... |
 
 ## Business Scenario Tree
 
@@ -67,6 +80,7 @@
 - Covers: B1 through Bn
 - Requirements: TR-001, ...
 - Observes: {committed observable of Bn}
+- State Footprint: reads {{resource class}}; writes {{resource class}: ownership/provenance {...}, lifecycle {retain|restore|delete}}; external effects {none | {effect target}: ownership/provenance {...}, lifecycle {retain|restore|delete}}
 - Oracle: specified, {authority}
 - Purpose: ...
 - Preconditions: ...
@@ -85,6 +99,7 @@
 - Covers: ...
 - Requirements: ...
 - Observes: ...
+- State Footprint: reads {{resource class}}; writes {{resource class}: ownership/provenance {...}, lifecycle {retain|restore|delete}}; external effects {none | {effect target}: ownership/provenance {...}, lifecycle {retain|restore|delete}}
 - Oracle: ...
 - Purpose: ...
 - Preconditions: ...
@@ -145,7 +160,7 @@ Use the smallest visual that makes the relationship easier to understand:
 
 Place each visual next to the short text it supports. Use real business labels and actual IDs, not generic placeholders. Avoid oversized hero cards, decorative empty space, dense walls of equal-looking cards, tiny type, gradients that reduce contrast, and diagrams that merely restate a list. Set a readable content width, consistent spacing, strong hierarchy, visible focus states, and responsive desktop/mobile layouts.
 
-The Reader View renders the Business Scenario Tree as the plan contract table, one row per scenario, with exactly these primary columns (localized with the plan language): **Scenario**, **Expected Input**, and **Expected Result**. Expected Input combines the leaf's Preconditions with the business operation and concrete parameters in Actions. Expected Result comes only from Expected Results and its approved authority; it is never inferred from implementation evidence or a later execution. Keep the owning business branch, Priority, Purpose, Business Path, Covers, Requirements, Observes, Oracle, Expected Authority, and Implementation Evidence in the same row through a compact `details` disclosure. Do not reproduce the Markdown field list below the table.
+The Reader View renders the Business Scenario Tree as the plan contract table, one row per scenario, with exactly these primary columns (localized with the plan language): **Scenario**, **Expected Input**, and **Expected Result**. Expected Input resolves inherited Preconditions and Actions before combining their starting state, business operation, and concrete parameters; row details identify the parent facts and leaf overrides that produced the effective anchors. Expected Result comes only from Expected Results and its approved authority; it is never inferred from implementation evidence or a later execution. Keep the owning business branch, Priority, Purpose, Business Path, Covers, Requirements, Observes, State Footprint, Oracle, Expected Authority, and Implementation Evidence in the same row through a compact `details` disclosure. Do not reproduce the Markdown field list below the table.
 
 On narrow screens the semantic table may stack each row as a card, but the three field labels and row identity remain visible. The Markdown heading tree remains canonical; only its browser presentation changes. Plain language simplifies navigation; it never deletes domain precision.
 
@@ -161,7 +176,7 @@ The Reader View follows the canonical plan's language for headings, controls, an
 
 Before handoff, run both audits:
 
-1. **Projection completeness** — compare Markdown and HTML inventories: top-level sections; source/model/business-flow/blast-radius/input/decision/coverage row counts; every B*/HP-*/scenario/TR-* ID; every scenario field; every gap and disposition; every First Test Slice ID and order. Any missing item fails the audit. No HTML-only fact may appear.
+1. **Projection completeness** — compare Markdown and HTML inventories: top-level sections; source/model/business-flow/blast-radius/input/decision/coverage row counts; every B*/HP-*/scenario/TR-* ID; every effective scenario field after parent inheritance, including Preconditions, Actions, and State Footprint plus their parent/override lineage; every gap and disposition; every First Test Slice ID and order. Any missing item fails the audit. No HTML-only fact may appear.
 2. **Navigation and visual QA** — crawl every local `href` from the Reader View and companion pages; every target must be `.html`/`#fragment`, exist, declare UTF-8, and decode without replacement characters. Render at desktop and mobile widths. Inspect the opening screen, every first-level link, flow continuity, contrast, focus, wrapping, horizontal overflow, and expanded scenario detail. A false transition, clipped content, unreadable table, dead link, raw-file browser link, or detail available only in Markdown fails the audit.
 
 Without render capability, hand off canonical Markdown alone and say the Reader View was withheld for lack of a render pass; never hand off an unrendered or knowingly incomplete view.
@@ -174,23 +189,39 @@ Without render capability, hand off canonical Markdown alone and say the Reader 
 | Business Path | Outcome to business branch to leaf. |
 | Covers | Stable business-step IDs exercised by the leaf. |
 | Requirements | Test-requirement IDs the leaf instantiates. |
-| Observes | The committed observable, from the Business Flow table, where the leaf's probe reads the outcome — the store, event, or external effect at the end of propagation, never the entry response. |
+| Observes | The committed observable and settlement predicate required by [Execution Anchors](#execution-anchors). |
+| State Footprint | The reads, writes, and external effects required by [Execution Anchors](#execution-anchors). |
 | Oracle | `specified` (the concrete expected value and its authority) or `derived` (a differential run, replay, invariant, or metamorphic relation, with what it is computed from). A plan never emits `implicit`. |
 | Purpose | The rule, risk, or variation this leaf proves. |
-| Preconditions | Only the starting state and input facts needed to understand the scenario. |
-| Actions | Business actions in order; preserve important inputs and decisions. |
+| Preconditions | The concrete starting state and input construction or selection facts required by [Execution Anchors](#execution-anchors). |
+| Actions | The ordered business actions and entry anchors required by [Execution Anchors](#execution-anchors). |
 | Expected Results | Observable pass conditions at the relevant user, API, state, data, event, or external-effect level. If authority is missing, state the unresolved decision instead of asserting a verdict. |
 | Expected Authority | Exact approved requirement, design, decision, policy, external contract, or explicit user direction that defines each intended result; otherwise `NEEDS-DECISION` and the missing decision owner. |
-| Implementation Evidence | Exact code, configuration, schema, existing-test, or runtime locators that show current behavior, reachability, or risk. This field does not establish correctness by itself. |
+| Implementation Evidence | Exact code, configuration, schema, existing-test, or runtime locators that back the Execution Anchors and show current behavior, reachability, or risk. This field does not establish correctness by itself. |
 
-Shared preconditions may live on the parent branch. A leaf then states only its overrides, but it still owns its actions, expected results, expected authority, and implementation evidence.
+Shared scenario facts may live on the nearest parent branch. Resolve every inheritable field from root to leaf with one atomic-field rule: an omitted child field inherits the nearest ancestor's complete value unchanged; a child that defines the field replaces that complete value and must restate every effective fact in it. Never partially merge, append, or delete inside an inherited field. Reader View and executor use this same reducer, so the effective contract deterministically resolves Preconditions, Actions, Observes, State Footprint, Expected Results, Expected Authority, and Implementation Evidence.
+
+## Execution Anchors
+
+`execution-anchors/v1` is the scenario-tree planner → executor interface. It carries stable, source-backed facts the executor needs to resolve a run while keeping live environment mechanics behind the executor seam. The Overview declares `Execution handoff: execution-anchors/v1`: the `Execution handoff` label follows the plan language, while `execution-anchors/v1` — like `business threshold: none specified` below — is a machine token written verbatim in every plan language, because the executor detects the contract by the token. After inherited parent facts are applied, every leaf resolves these four anchors:
+
+| Anchor | Plan-owned fact |
+|---|---|
+| Preconditions | Concrete starting-state and input values, or a deterministic construction or entity-selection rule. A fixture or variable ID is concrete only when its values or production rule are present in the plan. Name any source- or safety-required predecessor leaf or gate by stable ID; otherwise each leaf arranges its own starting state. |
+| Actions | Ordered business actions. Every trigger names the project-declared adapter or entry surface, its stable locator or operation, and concrete inputs or a deterministic construction rule. |
+| Observes | The committed observable — the store, event, or external effect at the end of propagation, never the entry response — and the predicate that proves propagation settled. An asynchronous action names an observable state transition, never a fixed sleep. Record an approved product time threshold when one exists; record `business threshold: none specified` when timing is not part of the contract; use `NEEDS-DECISION` only when correctness depends on a threshold the authority has not defined. Execution-safety bounds belong to the executor. |
+| State Footprint | Business resources read, resources written, and external effects; for every writable or external target, name its provenance or ownership class and allowed terminal lifecycle: `retain`, `restore`, or `delete`. Write `none` for an empty class and expose unresolved resources, provenance, or lifecycle authorization instead of implying an empty footprint. |
+
+Co-locate shared anchors at the nearest parent branch and apply the atomic-field reducer above; a leaf either inherits an anchor unchanged or replaces it with its complete effective value. The effective leaf is execution-ready only when all four anchors are concrete. A missing business value is `NEEDS-DECISION`; an implementation anchor that source inspection cannot resolve is `BLOCKED` with the missing evidence or capability. Keep such a leaf in the tree and Gaps and Decisions, but do not describe it as runnable.
+
+The planner does not resolve live base URLs, credentials, environment-specific commands, selectors, safety wait bounds, run-specific owner-marker values, or cleanup implementations. The executor derives those mechanics from the anchors, implementation evidence, and live environment while obeying the footprint's ownership and lifecycle authorization. A plan may preserve an exact project-declared command when it is already the stable adapter interface, but it does not invent one merely to fill the handoff.
 
 ## Expected-Result Rules
 
 - Authority status identifies the accountable authority: an approving person or dated decision, a governing policy or versioned external contract, or explicit user direction. An implementation artifact such as a class or enum with no designation as the contract reads `not established` and backs no verdict.
 - Assert outcomes, not implementation activity (propagation). State each data outcome as a concrete value computed from the authority (revealability).
 - Cover all committed effects that define the business result. If data, events, external calls, or user-visible state must agree, state each one.
-- Include time bounds only when an approved authority supplies a threshold. Otherwise mark the threshold `NEEDS-DECISION`.
+- For time bounds, record an approved threshold when timing is contractual; use `NEEDS-DECISION` when correctness depends on an undefined threshold; otherwise record `business threshold: none specified` and leave the execution-safety bound to the executor.
 - Never derive the intended result solely from the current implementation or from tests that merely encode it. Use those sources to describe current behavior and locate risk.
 - Split known and unknown semantics. Known parts remain pass or fail assertions. An unknown part is an Observation with disposition `NEEDS-DECISION`, names the evidence to inspect, and cannot pass.
 - A source contradiction is not resolved by wording or execution. Observation can establish what the implementation does; only an approved decision can establish what it should do.
@@ -205,6 +236,20 @@ Shared preconditions may live on the parent branch. A leaf then states only its 
 
 Do not use `ASSUMED` merely because a document is published, a test passes, or the current implementation is internally consistent.
 
+## Model Applicability
+
+Record applicability before deriving scenarios or criteria. This table is the single source of truth for which model sections, criteria rows, and test requirements exist.
+
+| Model | Build when | `not applicable` when | Unknown evidence |
+|---|---|---|---|
+| State graph | Always. Every E2E plan needs a legitimate entry, propagation path, and committed outcome. | Never. | Resolve the missing path facts as `NEEDS-DECISION`; the model remains built. |
+| Input space | Source or change evidence identifies a characteristic with multiple feasible blocks and the contract either permits different reachability, state transitions, settlement timing, or committed observables across those blocks, or requires an invariant across them. | Positive source and blast-radius evidence shows no such characteristic exists in scope. | Build it and expose the uncertain characteristic or blocks as `NEEDS-DECISION`. |
+| Decision logic | The system selects among outcomes or error codes, a rule has independent conditions, or overlapping rules have a judgment order. | Positive source and blast-radius evidence shows the path has no such choice, condition, error outcome, or ordering rule. | Build it and expose the uncertain rule or condition as `NEEDS-DECISION`. |
+
+A built optional model owns a model section, one coverage criterion, and the requirements generated by that criterion. A `not applicable` model owns none of those; its reason and residual risk live only in `Model Applicability`. If later evidence changes a decision, update the table before adding or removing its downstream records.
+
+An asynchronous continuation, stored-data change, permission, compatibility window, or second affected flow always belongs in the state graph and blast-radius trace. It does not by itself prove that Input Space or Decision Logic is applicable; use each model's own gate.
+
 ## Model Rules
 
 State graph:
@@ -213,6 +258,7 @@ State graph:
 
 Input space:
 
+- Model every applicable characteristic with multiple feasible blocks, whether the contract permits an observable difference across those blocks or requires an invariant across them.
 - Blocks are partitioned relative to an observable: two inputs that reach the same decision but a different committed observable are different blocks for that observable, so a characteristic that affects several observables has one row per observable. Several observable-specific partitions of the same input are alternative views, not distinct characteristics to cross-combine.
 - A bound on an input partitions into a boundary block and an interior block.
 - When a step's outcome or settlement timing differs by subject class (product type, account tier, region), each class with a distinct outcome is its own block, the class named in the leaf title.
@@ -223,6 +269,8 @@ Decision logic:
 - Each error code is a rule with its own row; when several rules can fire at once, record the judgment order as a rule.
 
 ## Coverage Criteria Defaults
+
+Apply a default only to a built model. A `not applicable` model has no criterion and produces no test requirement.
 
 | Model | Default criterion |
 |---|---|
@@ -245,7 +293,9 @@ For Chinese output, use:
 | English | Chinese |
 |---|---|
 | Overview | 概览 |
+| Execution handoff | 执行交接 |
 | Sources and Models | 来源与模型 |
+| Model Applicability | 模型适用性 |
 | Business Flow | 业务流程 |
 | Change Blast Radius | 变更爆炸半径 |
 | Affected Flows | 受影响流程 |
@@ -264,6 +314,7 @@ For Chinese output, use:
 | Covers | 覆盖步骤 |
 | Requirements | 测试需求 |
 | Observes | 观察点 |
+| State Footprint | 状态足迹 |
 | Oracle | 判定器 |
 | Committed observable | 提交后可观察结果 |
 | Purpose | 目的 |

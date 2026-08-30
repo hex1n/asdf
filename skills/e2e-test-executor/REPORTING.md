@@ -1,0 +1,106 @@
+# Evidence, artifacts, and provenance
+
+Read this file after the execution shape is known and before cleanup or artifact generation. Volatile failure scenes must already have been captured under `SKILL.md` and `EXECUTION.md`.
+
+## Preserve before cleanup
+
+Retain created data, queues, locks, cache entries, temporary config, raw request/response, committed rows or state, job or event state, logs/traces/metrics, stub or external state, effective flags, entity/correlation IDs, relevant screenshots, and the exact rerun command or recorded invocation sequence when they are needed for diagnosis. If cleanup would destroy evidence, quarantine or retain self-owned data and record its owner, TTL, cleanup command, and risk. Redact secrets while preserving reproduction identifiers.
+
+## Fill the run directory
+
+The run directory was created at intake by [FIRST-RUN.md](FIRST-RUN.md) or [RERUN.md](RERUN.md); write every artifact into it and name its full path in the final response.
+
+Produce only artifacts whose condition applies:
+
+```text
+e2e-run-<plan-name>-<timestamp>/
+  execution-report.md        # always: canonical handoff and inline proof
+  execution-report.html      # unless Markdown-only or render inspection is unavailable
+  plan-snapshot.md           # intake/execution stage: derived, ad-hoc, or legacy-derived mechanics plus pre-report execution facts
+  scripts/                   # when the run created or mutated scriptable data
+  state/                     # only while owned mutable state is retained for diagnosis
+  issues/                    # when OPEN actionable root causes exist
+    index.md
+    ISSUE-001-<short-slug>.md
+  attachments/               # only for non-textual or readability-breaking raw evidence
+  run-metadata.json          # only for a named machine consumer
+  scenario-results.jsonl     # only for rerun/comparison tooling
+```
+
+Treat this tree as an allowlist. `state/` is a temporary or retained-data branch, not an audit-artifact branch: after successful cleanup remove its owner marker and empty directory; retain it only when its self-owned mutable contents are still needed, with owner, TTL, cleanup command, and risk in the report. `plan-snapshot.md` is the only intake/execution-stage Markdown companion; fold boundary, preflight, environment, capability, ledger, schedule, run-log, and planned-command facts into it, then into the matching canonical report sections at delivery. Do not emit `run-log.md`, `preflight.md`, or another standalone evidence ledger unless a named consumer requires it. Preserve attempt-specific failure evidence inline; use `attachments/` only under the overflow rule below.
+
+Open [Run Artifact Contract](REFERENCE.md#run-artifact-contract) for the canonical report sections and structural rules; open [Scenario Results & Evidence Legibility](REFERENCE.md#scenario-results--evidence-legibility), [Run Lineage & Emergent Scenarios](REFERENCE.md#run-lineage--emergent-scenarios), and [Environment State Ledger](REFERENCE.md#environment-state-ledger) only while constructing those respective sections.
+
+## Keep one canonical proof path
+
+`execution-report.md` is the source of truth. Put every executed scenario's four proof items inline under `Evidence & Failure Scenes`, one chain per scenario, so verdict and proof share one reading path. Spill to `attachments/` only for non-textual material or raw content large enough to obscure probe → expected → actual; leave a summary, attachment path, and re-query command inline. When one batch probe covers several scenarios, retain it once and point each scenario to its slice.
+
+Each `Scenario Results` row carries status, oracle type, one-line expected and actual, diagnosis, issue link, and evidence link. Use the closed diagnosis token only when a mismatch or verdict deficit exists; use `—` for a clean `passed` or `skipped` row. Record a root cause once in `Failures / Defects / Plan Gaps`; link every affected scenario to it. The ledger carries the deployment/freshness proof. Record every emergent out-of-plan finding in the lineage table, never only in prose.
+
+When data was created or mutated through a scriptable surface, emit paired runnable seed and cleanup scripts under `scripts/`, idempotent where possible, and link them from `Data Created & Cleanup` and the ledger. Markdown-only delivery applies to reports, not executable helpers: use the surface's normal executable extension and make the invocation explicit. A prose-only cleanup command is insufficient in this branch. For a genuinely read-only run, record the absence of created data and do not fabricate scripts.
+
+Generated replay helpers are evidence-bearing interfaces, not disposable conveniences. A rerun entry point is either an **executable helper** — a script, CLI wrapper, or test task whose bytes and exit status the run controls — or, when the replay surface is an adapter without executable bytes (a browser connector, an MCP tool, a queue or job console), the **recorded adapter invocation sequence** the agent replays step by step, named as such in `Re-run Instructions`. The first group of rules binds every replay surface; the second binds executable helpers only.
+
+**Every replay surface:**
+
+- Expose rerun as one orchestration entry point — the executable helper, or the recorded adapter invocation sequence the agent replays step by step. It creates a fresh continuation directory, invokes any lower-level seed/verify/cleanup helpers there, and never writes mutable state into the current historical run or overwrites its report, attachments, metadata, or fixture-path records. `Re-run Instructions` invoke this entry point, not a loose sequence whose later commands can run after an earlier failure.
+- Phase-gate the trigger, wait, probe, verification, and cleanup flow inside that entry point. A failed trigger, wait, probe, or oracle — a nonzero status or an adapter's returned error — stops later business phases and denies cleanup even when report verification succeeds; capture and retain the scene instead. Latch that first failure through every later recovery action: neither a later success nor a generic fallback status can mask it.
+- Treat every continuation, including a forced-failure probe, as a run: create its canonical `execution-report.md` (and `plan-snapshot.md` when intake facts are needed), back-link the original plan and historical run, assign terminal scenario status/oracle/diagnosis, and keep all phase receipts there. Do not invent `execution-attempt.md`, a probe-only log, or another report name.
+- After any trigger or mutation, capture the best available committed state, events/jobs/queues, logs, identifiers, exact probe commands or adapter invocations and their outputs, phase receipts, historical hash receipts, and exact rerun command or recorded invocation sequence before cleanup even when wait, probe, oracle evaluation, or report generation failed. Count ownership scaffolding such as a created state directory or owner marker as mutation even when no business row or file appeared; the report and ledger must describe its actual terminal state.
+- Materialize the canonical report with the captured pre-cleanup scene and the literal terminal field `cleanup: pending`, then read/hash-verify the bytes at that exact path before cleanup; `retained` describes a later denied-cleanup terminal state and is not a synonym at this gate. This applies after any mutation, including continuation-directory or owner-marker scaffolding followed by a pre-trigger block. Persist the verification receipt and canonical-report hash before cleanup. A report-write or verification failure skips cleanup and retains the owned scene with owner, TTL, cleanup command, and risk in that continuation's canonical report. After safe cleanup, run an exact separately named absence oracle, retain its command and output, and update the canonical report through a write-read-hash-verify-and-replace sequence; if the update cannot be verified, keep the already verified pending report intact rather than truncating or overwriting it.
+- If capture is incomplete or retained state is still needed to diagnose the failure, skip cleanup and record owner, TTL, cleanup command, and risk. Otherwise cleanup may run, but its status is reported separately. Successful cleanup removes business state, ownership scaffolding, and the empty state directory unless the report names a retained-state reason. Parse the terminal report semantically: `cleanup: completed` requires the observed cleanup status and output and a passing absence oracle, with no stale `not executed`, `pending`, or retained-state claim; substring presence alone cannot pass this gate.
+- Before recursive deletion, canonicalize both the run directory and target; require the target to be a direct, non-symlink child of the canonical run directory and require the owner marker's recorded run/entity identity to match the requested cleanup. Reject lexical matches containing traversal, resolving elsewhere, or carrying a mismatched owner.
+- Apply the same ownership, containment, proof, and first-failure gates to a retained-state cleanup entry point. On success it removes owned business state, the owner marker, and the empty state directory, then updates `execution-report.md` with the observed cleanup status, stdout, stderr (or the adapter's returned output), and exact absence-oracle receipt through the verified replacement sequence above. Build that terminal update from the observed receipt after cleanup; never install a prebuilt final report that still says `not executed`, `pending`, or `retained`. It creates no unlisted root-level result file and leaves the canonical report truthful if its update fails.
+
+**Executable helpers only:**
+
+- Preserve the first nonzero status through every later exception handler: a catch/finally path reports later tooling errors separately but exits with the earlier nonzero when one already exists. A parent orchestration entry point latches a child's nonzero status before forwarding the child's stdout/stderr or performing any other fallible handoff; forwarding errors are separate tooling receipts and cannot replace the latched child status.
+- Bind evidence to executable bytes: hash every generated helper before the first mutation, record those hashes in the canonical report or snapshot, and re-hash them at delivery. A changed helper invalidates the run and requires a fresh execution; never advertise or validate helper bytes edited after the recorded attempt.
+- Apply the proof-before-create sequence from `RERUN.md` and `EXECUTION.md` inside generated helpers: validate the existing canonical parent and absent direct-child target before `mkdir`, then revalidate the created result. Post-create containment checks alone are insufficient.
+- Before advertising the entry point as runnable, audit every mutable path against the fresh continuation and run three safe contract probes: one forces a nonzero after continuation/ownership scaffolding is created but before the business trigger; one mutates a dedicated fixture and forces a real wait/probe/oracle failure while report verification succeeds; and one mutates a dedicated fixture then simulates failure of the first canonical-report write or verification. Each must preserve the first nonzero status, produce a canonical continuation report, retain the failure scene before any cleanup, truthfully report and clean or intentionally retain all scaffolding, name owner, TTL, exact cleanup command, and risk whenever state remains, report cleanup or retention separately, and store before/after historical-report and attachments hashes as probe-interval receipts in that continuation report. The report-failure probe must prove cleanup was skipped while the scene remained, then write a recovery canonical report. Also exercise the retained-state cleanup entry point and prove its owner check, allowlist, absence oracle, and canonical-report update. Inject a parent-side output-forwarding failure after a child nonzero and prove the advertised parent still exits with the child's first nonzero. If any branch cannot be proven, mark the helper unverified and do not present it as the rerun command.
+
+## Dispositions and local issues
+
+Every failure, defect, and gap needs a disposition. Open [Gap & Defect Disposition](REFERENCE.md#gap--defect-disposition) when assigning it.
+
+- Every `OPEN` actionable root cause gets one `issues/ISSUE-*.md`, linked from its failure entry and affected scenario rows.
+- `Next Actions for Agent` lists only `OPEN` executable work.
+- `CONDITIONAL`, `BLOCKED-BY-TOOLING`, and `BLOCKED-BY-ENVIRONMENT` remain in the failure section with their precondition or missing capability/dependency/fixture.
+- Remote tracker creation remains out of scope unless explicitly requested.
+
+Each issue document includes `Issue ID`, `Type`, `Severity`, `Disposition`, `Affected scenarios / edges`, `Expected`, `Actual`, `Evidence / scene`, `Suspected code area`, `Reproduction steps`, `Fix constraints`, `Verification command or scenario`, `Post-fix E2E rerun`, `Closure rule`, and `Cleanup / data impact`.
+
+## Reader View branch
+
+Unless the user requests Markdown-only, create `execution-report.html` only when it can be rendered and visually inspected. Open [Reader View Contract](REFERENCE.md#reader-view-contract) for its projection and link-audit rules.
+
+The Reader View is an answer-first visual index with the complete human report below it, never a second evidence source. Its primary table is `Scenario | Expected Input | Expected Result | Actual Result`; expected columns come from the plan and actual values only from this run, while status and proof remain in row details. Every projection preserves statuses, dispositions, blockers, skipped/unverified items, proof chains, and retention policy.
+
+A delivered Reader View exposes only HTML navigation. For each clickable Markdown, JSON, JSONL, SQL, or text report-suite artifact, generate a UTF-8 HTML companion and link the companion while retaining the canonical/raw source. Audit every internal link and confirm no projection contradicts or omits a canonical Markdown fact needed to understand or audit the verdict. Withhold the Reader View, and state why, when render-and-inspect or link auditing cannot be completed.
+
+## Provenance and rerun handoff
+
+Record a PROV triple in `Run Lineage & Emergent Scenarios`:
+
+- **entities** — upstream plan, upstream run when any, this run's artifacts, downstream work;
+- **activity** — this run's selection set, overrides, start, and end;
+- **agents** — executing runtime and triggering instruction.
+
+The terminal `Environment State Ledger` is the activity snapshot. Every rerun or investigation back-links the original plan and prior run.
+
+When the user authorizes an iterate-until-green loop, keep the report and issues queue unchanged as this iteration's immutable handoff. The final response additionally names all `OPEN` actionable issues, the next continuation set defined by `RERUN.md`, and the stop condition: no open actionable root causes, a blocker only the user can resolve, the user's cap, or the default eight full rerun cycles.
+
+## Delivery gate
+
+Before final response, verify:
+
+- `execution-report.md` contains every scenario's proof chain, status, oracle, diagnosis, and lineage;
+- the ledger records terminal state, fingerprint, retained items, cleanup, and risks;
+- every open actionable root cause has an issue with post-fix rerun and closure rule;
+- seed/cleanup scripts exist exactly when the write-path condition requires them;
+- the advertised rerun is one phase-gated entry point — an executable helper whose pre-trigger and post-trigger forced-failure probes prove it keeps absent targets safe before creation and preserves the first nonzero status, canonical failure reports, and probe-interval historical hashes, or a recorded adapter invocation sequence held to the every-surface rules — and no instruction chains independent verification and cleanup commands;
+- Reader View projection, render inspection, HTML companion links, and link audit pass, or the report records why it was withheld;
+- optional machine or overflow artifacts exist only for a real consumer or payload need.
+- no unlisted run log, preflight, environment, capability, intake, or evidence-ledger companion was emitted.
+
+In the final response, link Reader View first when delivered, use HTML companions for other user-clickable report-suite links, name canonical/raw paths as code when useful, summarize every nonzero status count, identify blockers and open issues, and state whether cleanup completed or what remains preserved.

@@ -38,7 +38,7 @@ A delegated executor's report is machine-checkable. A valid `execution-report.md
 - Link any `failed` scenario row directly to an evidence/scene anchor in the same report or to an `attachments/` artifact; a failure with no evidence/scene link is a contract breach, not a pass.
 - Include scenario-keyed proof chains in `Evidence & Failure Scenes`: probe, expected, actual, raw evidence summary or attachment paths, retained scene, cleanup safety, and rerun cue.
 - Link every `OPEN` actionable root cause in `Failures / Defects / Plan Gaps` to a local `issues/ISSUE-*.md` document on the same item, and link the same issue from every affected `Scenario Results` row.
-- Give `Re-run Instructions` at least one executable command, not prose alone.
+- Give `Re-run Instructions` at least one executable command — or, for a replay surface without executable bytes, the recorded adapter invocation sequence — not prose alone.
 
 Completion criterion: a follow-up agent can rerun a scenario, inspect every failure scene, compare expected versus actual probes, and decide cleanup safety from the run directory alone using `execution-report.md` plus any referenced attachments; `OPEN` actionable root causes have local issue documents; optional files are added only when a named consumer needs them.
 
@@ -85,7 +85,7 @@ A delegated report is read scenario-first. The recurring failure it prevents: a 
 - `Oracle` is the [oracle type](#oracle-types) token; an `implicit` row cannot show `passed`.
 
 - `Expected`/`Actual` are one-line deltas, not full prose - depth lives in the evidence/scene block the row links to. Keep cells terse so the table stays scannable when scenarios are many.
-- `Diagnosis` is the section 3 classification token only (`product`/`plan`/`environment`/`tooling`/`unknown`) - a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
+- `Diagnosis` is the `SKILL.md` mismatch class written as its short token only (`product`/`plan`/`environment`/`tooling`/`unknown` — `product defect` is written `product`) - a closed-set enum, never a sentence. The full reason and disposition stay single-sourced in `Failures / Defects / Plan Gaps`.
 - `Issue` is a local `issues/ISSUE-*.md` link for each affected `OPEN` actionable root cause. Use a dash when the row has no actionable issue. A row affected by an `OPEN` actionable root cause must not omit the issue link.
 - `Evidence / scene` links to a same-report anchor by default; use `attachments/` only for bulky raw data. Do not create `evidence/`, `preserved-scenes/`, or per-scenario directories by default.
 - This is healthy denormalization: a status or enum token restated on the index row is near-zero drift; a paragraph restated is not. Never copy the failure-reason prose onto the row.
@@ -144,7 +144,7 @@ Completion criterion: an agent reading only the ledger knows whether the environ
 
 ## Environment Contract preflight
 
-The §2 completion criterion blocks the first real trigger until three contract facts hold *resolved* values. This is the preflight subset of the [Environment State Ledger](#environment-state-ledger) — the same facts, enforced before the run rather than reported after it. The recurring failure it prevents is starting execution on an *assumed* environment: trusting a profile name, an inherited PATH, or a reachable process instead of the resolved fact.
+The environment contract in `EXECUTION.md` blocks the first real trigger until three contract facts hold *resolved* values. This is the preflight subset of the [Environment State Ledger](#environment-state-ledger) — the same facts, enforced before the run rather than reported after it. The recurring failure it prevents is starting execution on an *assumed* environment: trusting a profile name, an inherited PATH, or a reachable process instead of the resolved fact.
 
 Scope the contract to what the selected scenarios actually reach — the datasource, toolchain, and process the run will exercise. An in-scope target that cannot be resolved is a blocker; a remote dependency that is merely unreachable follows the [SUT Boundary](#sut-boundary) rule (switch to the declared double, or mark the dependent scenario `blocked`), not a whole-run halt.
 
@@ -173,7 +173,7 @@ One row per override:
 | Source | Where the constraint came from — the user turn or instruction. |
 | Affected | Scenarios, gates, or report sections this override changes. |
 
-A superseded plan requirement is marked `superseded` wherever it appears (gates, exit criteria, scenario results) — never `failed`, `incomplete`, or left looking unmet. A data-retention override additionally triggers the §2 re-risk of every `destructive-delete`, `soft-delete`, `scope-mutation`, `config-change`, or `external-effect` scenario.
+A superseded plan requirement is marked `superseded` wherever it appears (gates, exit criteria, scenario results) — never `failed`, `incomplete`, or left looking unmet. A data-retention override additionally triggers the re-risk in `EXECUTION.md`'s write-path branch of every `destructive-delete`, `soft-delete`, `scope-mutation`, `config-change`, or `external-effect` scenario.
 
 Completion criterion: every constraint the user changed after planning appears as an override row; no plan default an override replaced is reported as an unmet requirement.
 
@@ -209,7 +209,7 @@ Each row is one way scenarios interfere with each other — the flaky-test root 
 |---|---|---|
 | Order dependency | `Depends on`, `Consumes`, `Produces` | Topological order; produced variables passed explicitly. |
 | Shared mutable state | Overlap in `Target locator`, closed edge `Effects` / `Readers/receivers`, `External target/stub` — a common route, table, queue, job, flag, cache, or external endpoint | Serialize; differing isolation keys alone never prove safety. Unstated overlap serializes, with the reason. |
-| Asynchronous wait | The scenario's `Wait` condition | Wait on the stated condition. Use an approved business threshold when one exists; otherwise record an execution-safety bound as `NEEDS-DECISION`, never as a product oracle. A missing condition or unavailable wait/probe capability is `blocked`. When a valid trigger and reachable dependencies/probe are established, exceeding an approved threshold is `failed`; exceeding only the execution-safety bound is `blocked` as incomplete observation, while evidence that localizes the delay to environment or tooling keeps the scenario blocked under that diagnosis. |
+| Asynchronous wait | The scenario's settlement predicate | Wait on the stated observable condition. Use an approved business threshold when one exists. When the plan records the verbatim token `business threshold: none specified` (the same token in every plan language), the executor chooses and records a finite execution-safety bound from the live environment and available tooling; that bound is not `NEEDS-DECISION` and is never a product oracle. Use `NEEDS-DECISION` only when correctness depends on a business threshold the authority has not defined. A missing settlement condition or unavailable wait/probe capability is `blocked`. When a valid trigger and reachable dependencies/probe are established, exceeding an approved business threshold is `failed`; exceeding only the execution-safety bound is `blocked` as incomplete observation, while evidence that localizes the delay to environment or tooling keeps the scenario blocked under that diagnosis. |
 | Resource leak | Cleanup dependencies between scenarios | Cleanup is a DAG edge; a scenario that reuses another's namespace runs after its cleanup or is isolated. |
 | Time or randomness | The scenario reads a clock, sequence, or random source | Inject a fixed value through a declared double, or record the observed value and recompute expectations from it. |
 | Disruptive load | Concurrency, recovery, compensation, callback-race, or load scenario | Run in isolation, after the chains it could disturb; final consistency and cleanup checks follow. |

@@ -49,6 +49,7 @@ const steps = [];
 if (suites.length > 0) {
   steps.push({ name: `test suites (${suites.length} files)`, args: ["--test", ...suites] });
 }
+steps.push({ name: "skill links", args: [path.join(ROOT, "scripts", "check-skill-links.mjs")] });
 steps.push({ name: "installed copies", args: [path.join(ROOT, "scripts", "check-installed-copies.mjs")] });
 
 let failed = false;
@@ -62,7 +63,15 @@ if (suites.length === 0) {
 }
 // Discovered rather than listed: a contract check added later must not have to
 // remember to announce itself here.
-const covered = new Set(["check-all.mjs", "check-installed-copies.mjs"]);
+// Derived from the steps actually run above, so adding a step here is the only
+// edit needed: a hand-maintained list drifted the moment a step was added and
+// announced a gated check as "not in this gate".
+const covered = new Set(["check-all.mjs"]);
+for (const step of steps) {
+  for (const arg of step.args) {
+    if (typeof arg === "string" && arg.endsWith(".mjs")) covered.add(path.basename(arg));
+  }
+}
 const external = fs.readdirSync(path.join(ROOT, "scripts"))
   .filter((name) => name.startsWith("check-") && name.endsWith(".mjs")
     && !name.endsWith(".test.mjs") && !covered.has(name))

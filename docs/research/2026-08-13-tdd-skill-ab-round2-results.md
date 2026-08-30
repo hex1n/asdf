@@ -1,5 +1,9 @@
 # TDD skill A/B 实验 Round 2 结果(2026-08-13)
 
+> **修正**:后续 Round 3 换到真实业务 repo 的存量变更,并新增回归 oracle 与变异仲裁,
+> 未能复现本文「对照臂产出质量更高」这一条 —— 盲评看到的差距没有被变异反查确认。
+> 该轮记录引用了业务代码,未随本仓库发布。
+
 > 预注册:[round2-protocol](2026-08-13-tdd-skill-ab-round2-protocol.md)。
 > Round 1:[协议](2026-08-13-tdd-skill-ab-protocol.md) /
 > [结果](2026-08-13-tdd-skill-ab-results.md)。按 `skill-ab-trial` skill 执行,

@@ -25,3 +25,11 @@ docs/research/2026-07-02-loop-engineering-multiview-review.md
 docs/research/2026-07-06-codex-loop-usage.md
 docs/research/loop-health.txt
 docs/research/loop-health-history.jsonl
+# A/B rounds and rule probes run against the real business repo (salesfundmp):
+# they quote its service names, change sets, and local paths — never publish.
+docs/research/2026-08-29-tdd-skill-ab-round3-protocol.md
+docs/research/2026-08-29-tdd-skill-ab-round3-results.md
+docs/research/2026-08-30-arborist-inert-mutation-rule-probe.md
+docs/research/2026-08-30-arborist-stored-data-invariant-archive-probe.md
+docs/research/2026-08-30-e2e-executor-hardening-harvest-basis.md
+docs/research/2026-08-30-e2e-executor-pointer-ab-intake.md

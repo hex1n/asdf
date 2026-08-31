@@ -27,6 +27,13 @@ When changing `skills/rationale-records/`, read
 [skills/rationale-records/README.md](skills/rationale-records/README.md) and run
 `node scripts/check-rationale-records.mjs`.
 
+Some in-skill tools ship as byte-identical copies in more than one skill so
+each skill installs standalone (`skills/e2e-test-executor/tools/reader-view.mjs`
+is the authoritative copy; `skills/e2e-test-planner/tools/reader-view.mjs` is
+its replica). Edit only the authoritative copy, re-copy over the replica, and
+rely on `scripts/check-shared-tool-copies.mjs` (part of `check-all`) to fail
+the gate on any divergence — never patch both copies by hand.
+
 ## Skill Evolution
 
 When adding or changing skill rules, apply the Rule Harvest Gate:

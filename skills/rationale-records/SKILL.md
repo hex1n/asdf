@@ -42,7 +42,9 @@ one current owner.
    Codex and Claude Stop hooks use the incremental check.
 
 The checker proves only mechanics: ordered files, exact schema, unique W-IDs,
-existing source paths, and file-unique snippets. It cannot decide what prose
+existing source paths, and file-unique token snippets. Shape matching ignores
+whitespace, indentation, and line breaks but preserves strings, comments, and
+token boundaries. It cannot decide what prose
 means. Do not replace the semantic boundary with a keyword blacklist. Before
 handoff, read every explanation changed in the task and keep only sentences
 needed to teach the anchored code's current mechanism; how it was discovered,

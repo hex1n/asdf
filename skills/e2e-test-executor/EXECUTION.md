@@ -12,7 +12,7 @@ If a required real dependency is unreachable, use its already-declared double. W
 
 ## Pin the trigger channel
 
-Build an `Execution Capability Map` for the selected scenarios. Include applicable API/RPC/SDK/CLI/UI controls; DB, MQ, cache, job, and callback access; logs, metrics, and traces; auth, base URLs, test accounts, feature flags, service commands, stubs, toolchains, dependency caches, and cleanup mechanisms.
+Build the `Environment & Capability Map` (the report section of the same name) for the selected scenarios. Include applicable API/RPC/SDK/CLI/UI controls; DB, MQ, cache, job, and callback access; logs, metrics, and traces; auth, base URLs, test accounts, feature flags, service commands, stubs, toolchains, dependency caches, and cleanup mechanisms.
 
 Name `Trigger Channel Gates` explicitly: tool permission, invoke/service/API allowlists, network path, target or routing overrides, direct-URL fallback, credentials, and the runtime configuration that enables them. Before a trigger, be able to localize a block to the exact layer rather than reporting a generic connection failure. A missing tool, adapter, UI selector, or access right is `tooling defect` with `BLOCKED-BY-TOOLING`, naming the missing capability.
 

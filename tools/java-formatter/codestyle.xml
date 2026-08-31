@@ -464,7 +464,7 @@
         <!--org.eclipse.jdt.core.formatter.indentation.size=Java:IndentOptions:INDENT_SIZE-->
         <setting id="org.eclipse.jdt.core.formatter.indentation.size" value="4"/>
         <!--org.eclipse.jdt.core.formatter.continuation_indentation=Java:IndentOptions:<Programmatic>-->
-        <setting id="org.eclipse.jdt.core.formatter.continuation_indentation" value="1"/>
+        <setting id="org.eclipse.jdt.core.formatter.continuation_indentation" value="2"/>
         <!--org.eclipse.jdt.core.formatter.indent_body_declarations_compare_to_type_header=Java:<Programmatic>-->
         <setting id="org.eclipse.jdt.core.formatter.indent_body_declarations_compare_to_type_header" value="true"/>
         <!--org.eclipse.jdt.core.formatter.use_tabs_only_for_leading_indentations=Java:IndentOptions:SMART_TABS-->
@@ -497,7 +497,7 @@
         <!--Java:<Programmatic>-->
         <setting id="org.eclipse.jdt.core.formatter.alignment_for_arguments_in_method_invocation" value="16"/>
         <setting id="org.eclipse.jdt.core.formatter.alignment_for_selector_in_method_invocation" value="80"/>
-        <setting id="org.eclipse.jdt.core.formatter.alignment_for_assignment" value="16"/>
+        <setting id="org.eclipse.jdt.core.formatter.alignment_for_assignment" value="0"/>
         <setting id="org.eclipse.jdt.core.formatter.alignment_for_superinterfaces_in_type_declaration" value="16"/>
         <setting id="org.eclipse.jdt.core.formatter.alignment_for_binary_expression" value="16"/>
         <setting id="org.eclipse.jdt.core.formatter.alignment_for_throws_clause_in_method_declaration" value="16"/>

@@ -280,20 +280,88 @@ function loadCorpus(repo, options, indexSources = false) {
   return { recordsRoot, rationaleFiles, entries, sourceIndex, fileErrors, fileHashes };
 }
 
-function countOccurrences(text, needle) {
-  if (!needle) return 0;
-  let count = 0;
-  let offset = 0;
-  while ((offset = text.indexOf(needle, offset)) !== -1) {
-    count += 1;
-    offset += Math.max(needle.length, 1);
+const ANCHOR_OPERATORS = [
+  ">>>=", "===", "!==", "...", "<<=", ">>=", "&&", "||", "++", "--", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "==", "!=", "<=", ">=", "<<", ">>", "::", "->", "?.", "??", "=>", "**", "??=",
+].sort((left, right) => right.length - left.length);
+
+function isAnchorWordPart(character) {
+  return Boolean(character) && (/[A-Za-z0-9_$]/.test(character) || character.charCodeAt(0) > 127);
+}
+
+function readQuotedToken(text, start, quote) {
+  let index = start + 1;
+  while (index < text.length) {
+    if (text[index] === "\\") {
+      index += 2;
+      continue;
+    }
+    if (text[index] === quote) return index + 1;
+    index += 1;
   }
-  return count;
+  return index;
+}
+
+function anchorTokens(text) {
+  const tokens = [];
+  let index = 0;
+  while (index < text.length) {
+    const start = index;
+    const character = text[index];
+    if (/\s/.test(character)) {
+      index += 1;
+      continue;
+    }
+    if (character === "/" && text[index + 1] === "/") {
+      index += 2;
+      while (index < text.length && text[index] !== "\n") index += 1;
+      tokens.push({ value: text.slice(start, index), start });
+      continue;
+    }
+    if (character === "/" && text[index + 1] === "*") {
+      index += 2;
+      while (index < text.length && !(text[index] === "*" && text[index + 1] === "/")) index += 1;
+      index = Math.min(index + 2, text.length);
+      tokens.push({ value: text.slice(start, index), start });
+      continue;
+    }
+    if (character === "\"" || character === "'") {
+      index = readQuotedToken(text, index, character);
+      tokens.push({ value: text.slice(start, index), start });
+      continue;
+    }
+    if (isAnchorWordPart(character)) {
+      index += 1;
+      while (index < text.length && isAnchorWordPart(text[index])) index += 1;
+      tokens.push({ value: text.slice(start, index), start });
+      continue;
+    }
+    const operator = ANCHOR_OPERATORS.find((candidate) => text.startsWith(candidate, index));
+    index += operator ? operator.length : 1;
+    tokens.push({ value: text.slice(start, index), start });
+  }
+  return tokens;
+}
+
+function findAnchorMatches(text, needle) {
+  const expected = anchorTokens(needle);
+  if (expected.length === 0) return [];
+  const actual = anchorTokens(text);
+  const matches = [];
+  for (let index = 0; index <= actual.length - expected.length; index += 1) {
+    if (expected.every((token, offset) => token.value === actual[index + offset].value)) {
+      matches.push(actual[index].start);
+      index += expected.length - 1;
+    }
+  }
+  return matches;
+}
+
+function lineOfOffset(text, offset) {
+  return offset === null || offset === undefined ? null : text.slice(0, offset).split("\n").length;
 }
 
 function lineOf(text, needle) {
-  const offset = text.indexOf(needle);
-  return offset === -1 ? null : text.slice(0, offset).split("\n").length;
+  return lineOfOffset(text, text.indexOf(needle));
 }
 
 function validateEntries(repo, entries, selectedIds = null, fileErrors = []) {
@@ -329,7 +397,8 @@ function validateEntries(repo, entries, selectedIds = null, fileErrors = []) {
         continue;
       }
       const sourceText = fs.readFileSync(target, "utf8");
-      const occurrences = countOccurrences(sourceText, anchor.shape);
+      const matches = findAnchorMatches(sourceText, anchor.shape);
+      const occurrences = matches.length;
       if (occurrences !== 1) {
         anchorFailures += 1;
         failures.push({ id: entry.id, title: entry.title, detail: `shape occurs ${occurrences} times in ${anchor.source}; expected exactly 1` });
@@ -337,7 +406,7 @@ function validateEntries(repo, entries, selectedIds = null, fileErrors = []) {
       }
       resolved.set(`${entry.id}\0${anchor.source}\0${anchor.shape}`, {
         source: anchor.source,
-        line: lineOf(sourceText, anchor.shape),
+        line: lineOfOffset(sourceText, matches[0]),
       });
     }
   }
@@ -500,9 +569,9 @@ function resolveAnchor(repo, anchor) {
   const file = path.resolve(repo.root, anchor.source);
   if (!fs.existsSync(file)) return { error: `missing ${anchor.source}`, source: anchor.source, line: null };
   const text = fs.readFileSync(file, "utf8");
-  const count = countOccurrences(text, anchor.shape);
-  return count === 1 ? { source: anchor.source, line: lineOf(text, anchor.shape) }
-    : { error: `shape occurrences=${count}`, source: anchor.source, line: null };
+  const matches = findAnchorMatches(text, anchor.shape);
+  return matches.length === 1 ? { source: anchor.source, line: lineOfOffset(text, matches[0]) }
+    : { error: `shape occurrences=${matches.length}`, source: anchor.source, line: null };
 }
 
 function sourceTarget(repo, corpus, query) {

@@ -121,6 +121,30 @@ try {
   assert.ok(stateFile, "incremental check must create user-local state");
   stage("incremental state");
 
+  fs.writeFileSync(alpha, [
+    "class Alpha {",
+    "    void preserveOrder() {",
+    "        apply(",
+    "            first,",
+    "            second",
+    "        );",
+    "    }",
+    "}",
+    "",
+  ].join("\n"), "utf8");
+  const whitespaceOnly = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "whitespace-only source change"));
+  assert.equal(whitespaceOnly.failures.length, 0, "line wrapping must not invalidate a code anchor");
+  assert.match(expect(run(["find", "W-001"], repo, stateRoot), 0, "find formatted anchor"), /Alpha\.java:3/);
+  stage("whitespace-insensitive anchor");
+
+  fs.writeFileSync(alpha, "class Alpha { void preserveOrder() { apply(firstsecond); } }\n", "utf8");
+  const tokenBoundaryFailure = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 1, "token boundary mutation"));
+  assert.match(JSON.stringify(tokenBoundaryFailure.failures), /shape occurs 0/,
+    "different tokens must not match merely because whitespace is ignored");
+  fs.writeFileSync(alpha, "class Alpha { void preserveOrder() { apply(first, second); } }\n", "utf8");
+  expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "token boundary repair");
+  stage("token boundary preservation");
+
   fs.writeFileSync(rationale, activeRecord("apply(second, first);"), "utf8");
   const ignoredEdit = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 1, "ignored rationale edit"));
   assert.equal(ignoredEdit.failures.length > 0, true, "ignored rationale edits must still be checked");

@@ -187,15 +187,20 @@ On narrow screens the semantic table may stack each row as a card, but the three
 
 The Reader View follows the canonical plan's language for headings, controls, and explanatory text; do not add bilingual UI unless the plan is bilingual or the user asks. Preserve identifiers and source text as-is. Render Markdown syntax as HTML — inline code uses `<code>`, with no visible backticks, table pipes, or escape residue. Use semantic, offline HTML with inline CSS; no external fonts, scripts, CDNs, or automatic browser opening. Communicate meaning with labels/icons in addition to color.
 
-Do not hand-build a renderer. The companion skill ships one at
-`<skills-dir>/e2e-test-executor/tools/reader-view.mjs`; it takes a JSON data file and emits the Reader View plus the audits below:
+Do not hand-build a renderer. This skill ships one at [`tools/reader-view.mjs`](tools/reader-view.mjs); it takes a JSON data file and emits the Reader View plus the static audits below (projection inventory, links, encoding — the render-and-inspect visual QA remains the planning agent's own duty):
 
 ```bash
-node <skills-dir>/e2e-test-executor/tools/reader-view.mjs render <feature-dir>/reader-view.json
-node <skills-dir>/e2e-test-executor/tools/reader-view.mjs audit  <feature-dir>/reader-view.json
+node <skill>/tools/reader-view.mjs render <feature-dir>/reader-view.json
+node <skill>/tools/reader-view.mjs audit  <feature-dir>/reader-view.json
 ```
 
-Set `"mode": "plan"` and describe only what changes per plan — title, subtitle, the four opening groups, one row per scenario leaf with its resolved anchors and planning fields, and the audit's expected sections, ID patterns, and leaf list. Use `cellAnchors` to make table-cell IDs (`B1`, `TR-001`, `G-01`) linkable from the opening index. The renderer owns the markdown→HTML engine, the visual grammar, and every audit rule, so a fix there reaches every future plan. When that skill is not installed, or the tool fails, fall back to the withheld-Reader-View rule at the end of this section rather than writing a replacement.
+The data file's required keys are the render contract — the tool refuses the file naming any missing one, so build them all before invoking it:
+
+- Top level: `mode` (`"plan"`), `title`, `canonical` (the Markdown plan path), `out` (the HTML file to write), `scenarios`, `opening`. Optional: `subtitle`, `kicker`, `tableNote`, `companions`, `cellAnchors`, `audit`.
+- Each scenario row: `id`, `title`, `input` (the resolved Expected Input), `expected` (the resolved Expected Result — from Expected Results only, never inferred). Optional: `branch` (owning business branch header), `priority`, and `fields` (the planning/traceability details disclosure).
+- `opening`: `outcome`, `flow`, `risks`, `decisions` (each carrying the item identifier, disposition token, and one-line text as written in Gaps and Decisions), `slice` (`{id, why}` in slice order). Optional: `sideFlows` and group labels.
+
+Beyond those keys, describe only what changes per plan. Use `cellAnchors` to make table-cell IDs (`B1`, `TR-001`) linkable from the opening index. The renderer owns the markdown→HTML engine, the visual grammar, and every static audit rule, so a fix there reaches every future plan. When the tool fails, fall back to the withheld-Reader-View rule at the end of this section rather than writing a replacement.
 
 Before handoff, run both audits:
 

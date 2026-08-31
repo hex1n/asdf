@@ -50,6 +50,7 @@ if (suites.length > 0) {
   steps.push({ name: `test suites (${suites.length} files)`, args: ["--test", ...suites] });
 }
 steps.push({ name: "skill links", args: [path.join(ROOT, "scripts", "check-skill-links.mjs")] });
+steps.push({ name: "shared tool copies", args: [path.join(ROOT, "scripts", "check-shared-tool-copies.mjs")] });
 steps.push({ name: "installed copies", args: [path.join(ROOT, "scripts", "check-installed-copies.mjs")] });
 
 let failed = false;

@@ -10,6 +10,11 @@ const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CONFIG = path.join(TOOL_ROOT, "codestyle.xml");
 const FORMATTER_POM = path.join(TOOL_ROOT, "pom.xml");
 const FORMATTER_SOURCE = path.join(TOOL_ROOT, "src", "main", "java", "dev", "asdf", "tools", "JavaFormatter.java");
+const TEST_SOURCE_PATTERNS = [
+  /(^|\/)src\/test\//,
+  /(^|\/)test\//,
+  /(^|\/)tests\//,
+];
 
 export function run(command, args, options = {}) {
   return spawnSync(command, args, {
@@ -49,13 +54,20 @@ export function changedPaths(repoRoot) {
   ])];
 }
 
-export function changedJavaFiles(repoRoot, explicitFiles = []) {
+function isTestSource(repoRoot, file) {
+  const relative = path.relative(repoRoot, file).replaceAll("\\", "/");
+  return TEST_SOURCE_PATTERNS.some((pattern) => pattern.test(relative));
+}
+
+export function changedJavaFiles(repoRoot, explicitFiles = [], options = {}) {
   const candidates = explicitFiles.length > 0 ? explicitFiles : changedPaths(repoRoot);
+  const includeTests = options.includeTests === true;
 
   return [...new Set(candidates)]
     .filter((file) => file.toLowerCase().endsWith(".java"))
     .map((file) => path.resolve(repoRoot, file))
-    .filter((file) => inside(repoRoot, file) && fs.existsSync(file) && fs.statSync(file).isFile());
+    .filter((file) => inside(repoRoot, file) && fs.existsSync(file) && fs.statSync(file).isFile())
+    .filter((file) => includeTests || !isTestSource(repoRoot, file));
 }
 
 function javaMajorVersion(repoRoot) {
@@ -114,7 +126,7 @@ export function formatChangedJava(options = {}) {
   if (!repoRoot) return [];
   const explicitFiles = options.explicitFiles || [];
   const configPath = options.configPath || process.env.ASDF_JAVA_FORMAT_CONFIG || DEFAULT_CONFIG;
-  const files = changedJavaFiles(repoRoot, explicitFiles);
+  const files = changedJavaFiles(repoRoot, explicitFiles, { includeTests: options.includeTests === true });
   if (files.length === 0) return [];
 
   const formatter = formatterCommand(repoRoot, configPath);
@@ -171,7 +183,13 @@ export function formatChangedJava(options = {}) {
 
 function parseExplicitFiles(args) {
   const marker = args.indexOf("--files");
-  return marker === -1 ? [] : args.slice(marker + 1);
+  if (marker === -1) return [];
+  const files = [];
+  for (const arg of args.slice(marker + 1)) {
+    if (arg.startsWith("--")) break;
+    files.push(arg);
+  }
+  return files;
 }
 
 function selfTest() {
@@ -188,55 +206,13 @@ function selfTest() {
   process.stdout.write("Java formatter wrapper self-test OK\n");
 }
 
-function shapeProbe(configPath) {
-  const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), "asdf-java-shapes-"));
-  try {
-    const file = path.join(temporaryDir, "ShapeProbe.java");
-    const source = [
-      "class ShapeProbe {",
-      "    public MaintenanceAcceptance acceptDelete(FundTradeDeleteRequest request, MaintenanceAcceptanceSnapshot snapshot, MaintenanceOverlayCommand command) { return null; }",
-      "    void assignment() { List<SalesTradeCommandBO> commands = salesTradeCommandService.fetchFullHistoryByMpCodeAndFundCode(mpCode, fundCode); }",
-      "    void chain() { effective.add(EffectiveTrade.builder().transactionNo(command.getTransactionNo()).applyDate(command.getApplyDate()).tradeType(command.getTradeType()).tradeValue(command.getTradeValue()).feeRules(command.getFeeRules()).sameDaySequence(sequence).maintained(true).build()); }",
-      "}",
-      "",
-    ].join("\n");
-    fs.writeFileSync(file, source, "utf8");
-    formatChangedJava({ repoRoot: temporaryDir, explicitFiles: [file], configPath });
-    const formatted = fs.readFileSync(file, "utf8");
-    const lines = formatted.split(/\r?\n/);
-    const declaration = lines.findIndex((line) => line.includes("acceptDelete("));
-    const continuation = lines[declaration + 1];
-    const firstParameterColumn = lines[declaration].indexOf("FundTradeDeleteRequest");
-    if (!continuation || continuation.indexOf("MaintenanceOverlayCommand") !== firstParameterColumn) {
-      throw new Error("Method declaration continuation is not aligned under the first parameter.\n" + formatted);
-    }
-    const assignment = "        List<SalesTradeCommandBO> commands = salesTradeCommandService.fetchFullHistoryByMpCodeAndFundCode(mpCode, fundCode);";
-    if (!formatted.includes(assignment)) {
-      throw new Error("Simple assignment did not remain on one line.\n" + formatted);
-    }
-    const stages = [
-      ".transactionNo(", ".applyDate(", ".tradeType(", ".tradeValue(",
-      ".feeRules(", ".sameDaySequence(", ".maintained(", ".build()",
-    ];
-    for (const stage of stages) {
-      if (!lines.some((line) => line.trimStart().startsWith(stage))) {
-        throw new Error("Fluent stage is not vertical: " + stage + "\n" + formatted);
-      }
-    }
-    process.stdout.write("Java formatter shape probe OK\n");
-  } finally {
-    fs.rmSync(temporaryDir, { recursive: true, force: true });
-  }
-}
-
 function main(args) {
   if (args.includes("--self-test")) return selfTest();
-  if (args.includes("--self-test-shapes")) {
-    const configIndex = args.indexOf("--config");
-    const configPath = configIndex === -1 ? DEFAULT_CONFIG : path.resolve(args[configIndex + 1]);
-    return shapeProbe(configPath);
-  }
-  const changed = formatChangedJava({ cwd: process.cwd(), explicitFiles: parseExplicitFiles(args) });
+  const changed = formatChangedJava({
+    cwd: process.cwd(),
+    explicitFiles: parseExplicitFiles(args),
+    includeTests: args.includes("--include-tests"),
+  });
   if (changed.length > 0) {
     process.stdout.write("Formatted " + changed.length + " changed Java file(s); inspect the diff and stop again.\n");
     process.exitCode = 3;

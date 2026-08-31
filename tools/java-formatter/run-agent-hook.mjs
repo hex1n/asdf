@@ -130,6 +130,41 @@ export function repositoryDispatcher(repoRoot) {
   return fs.existsSync(candidate) ? candidate : null;
 }
 
+function parseStructuredOutput(output) {
+  const text = String(output || "").trim();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {}
+  for (const line of text.split(/\r?\n/).reverse()) {
+    try {
+      return JSON.parse(line);
+    } catch {}
+  }
+  return null;
+}
+
+function oneLine(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function summarizeGateFailure(label, output) {
+  const structured = parseStructuredOutput(output);
+  if (structured && Array.isArray(structured.failures)) {
+    const failures = structured.failures;
+    const lines = failures.slice(0, 8).map((failure) => {
+      const id = oneLine(failure.id) || "unknown";
+      const title = oneLine(failure.title);
+      const detail = oneLine(failure.detail);
+      return "- " + id + (title ? " " + title : "") + (detail ? ": " + detail : "");
+    });
+    if (failures.length > lines.length) lines.push("- ... " + (failures.length - lines.length) + " more failure(s)");
+    return label + ": " + failures.length + " failure(s)" + (lines.length > 0 ? "\n" + lines.join("\n") : ".");
+  }
+  const text = oneLine(output);
+  return label + (text ? ": " + text.slice(-1600) : ": checker exited without structured failure details.");
+}
+
 function runRepositoryDispatcher(repoRoot, dispatcher, rawInput) {
   const result = spawnSync(process.execPath, [dispatcher], {
     cwd: repoRoot,
@@ -141,7 +176,7 @@ function runRepositoryDispatcher(repoRoot, dispatcher, rawInput) {
   if (result.status !== 0) {
     const output = [result.error && result.error.message, result.stdout, result.stderr]
       .filter(Boolean).join("\n").trim();
-    throw new Error("Repository delivery gates failed" + (output ? ":\n" + output : ""));
+    throw new Error(summarizeGateFailure("Repository delivery gates failed", output));
   }
   const output = String(result.stdout || "").trim();
   if (!output || output === "{}") return null;
@@ -176,7 +211,7 @@ function runRationaleGate(repoRoot) {
   const output = [result.error && result.error.message, result.stdout, result.stderr]
     .filter(Boolean).join("\n").trim();
   if (result.status !== 0) {
-    throw new Error("Rationale records require attention" + (output ? ":\n" + output : ""));
+    throw new Error(summarizeGateFailure("Rationale records require attention", output));
   }
 }
 
@@ -228,6 +263,17 @@ function selfTest() {
   }
   if (resolveRationaleCli({}, [absent]) !== null) {
     throw new Error("An absent checker must resolve to null, not to a path that cannot run.");
+  }
+
+  const compact = summarizeGateFailure("Rationale records require attention", JSON.stringify({
+    failures: [{ id: "W-001", title: "anchor mismatch", detail: "shape occurs 0 times" }],
+    selectedPaths: ["first.java", "second.java", "third.java"],
+  }));
+  if (!compact.includes("W-001") || !compact.includes("shape occurs 0 times")) {
+    throw new Error("Structured rationale failure details were lost.");
+  }
+  if (compact.includes("selectedPaths") || compact.includes("first.java")) {
+    throw new Error("Structured rationale failure summary leaked selectedPaths.");
   }
 
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "asdf-hook-dispatch-"));

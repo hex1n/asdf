@@ -16,7 +16,10 @@ Produce only artifacts whose condition applies:
 e2e-run-<plan-name>-<timestamp>/
   execution-report.md        # always: canonical handoff and inline proof
   execution-report.html      # unless Markdown-only or render inspection is unavailable
+  reader-view.json           # with the Reader View: the data file the shipped renderer consumes
   plan-snapshot.md           # intake/execution stage: derived, ad-hoc, or legacy-derived mechanics plus pre-report execution facts
+  *.html                     # with the Reader View: one UTF-8 companion beside each user-clickable
+                             #   artifact above and below (plan-snapshot.html, issues/*.html, scripts/*.html)
   scripts/                   # when the run created or mutated scriptable data
   state/                     # only while owned mutable state is retained for diagnosis
   issues/                    # when OPEN actionable root causes exist
@@ -50,13 +53,13 @@ Every failure, defect, and gap needs a disposition. Open [Gap & Defect Dispositi
 - `CONDITIONAL`, `BLOCKED-BY-TOOLING`, and `BLOCKED-BY-ENVIRONMENT` remain in the failure section with their precondition or missing capability/dependency/fixture.
 - Remote tracker creation remains out of scope unless explicitly requested.
 
-Each issue document includes `Issue ID`, `Type`, `Severity`, `Disposition`, `Affected scenarios / edges`, `Expected`, `Actual`, `Evidence / scene`, `Suspected code area`, `Reproduction steps`, `Fix constraints`, `Verification command or scenario`, `Post-fix E2E rerun`, `Closure rule`, and `Cleanup / data impact`.
+Each issue document carries the fifteen-field schema in [Scenario Results & Evidence Legibility](REFERENCE.md#scenario-results--evidence-legibility) (**Local issue documents**); that section is the only copy of the field list.
 
 ## Reader View branch
 
 Unless the user requests Markdown-only, create `execution-report.html` only when it can be rendered and visually inspected. Open [Reader View Contract](REFERENCE.md#reader-view-contract) for its projection and link-audit rules.
 
-The Reader View is an answer-first visual index with the complete human report below it, never a second evidence source. Its primary table is `Scenario | Expected Input | Expected Result | Actual Result`; expected columns come from the plan and actual values only from this run, while status and proof remain in row details. Every projection preserves statuses, dispositions, blockers, skipped/unverified items, proof chains, and retention policy.
+The Reader View is an answer-first visual index with the complete human report below it, never a second evidence source. Its primary table columns and their provenance rules are defined once in the [Reader View Contract](REFERENCE.md#reader-view-contract). Every projection preserves statuses, dispositions, blockers, skipped/unverified items, proof chains, and retention policy.
 
 A delivered Reader View exposes only HTML navigation. For each clickable Markdown, JSON, JSONL, SQL, or text report-suite artifact, generate a UTF-8 HTML companion and link the companion while retaining the canonical/raw source. Audit every internal link and confirm no projection contradicts or omits a canonical Markdown fact needed to understand or audit the verdict. Withhold the Reader View, and state why, when render-and-inspect or link auditing cannot be completed.
 
@@ -70,7 +73,7 @@ Record a PROV triple in `Run Lineage & Emergent Scenarios`:
 
 The terminal `Environment State Ledger` is the activity snapshot. Every rerun or investigation back-links the original plan and prior run.
 
-When the user authorizes an iterate-until-green loop, keep the report and issues queue unchanged as this iteration's immutable handoff. The final response additionally names all `OPEN` actionable issues, the next continuation set defined by `RERUN.md`, and the stop condition: no open actionable root causes, a blocker only the user can resolve, the user's cap, or the default eight full rerun cycles.
+When the user authorizes an iterate-until-green loop, keep the report and issues queue unchanged as this iteration's immutable handoff. The final response additionally names all `OPEN` actionable issues, the next continuation set defined by `RERUN.md`, and the applicable stop condition: no open actionable root causes, a blocker only the user can resolve, or the loop cap from `SKILL.md`'s scope boundary.
 
 ## Delivery gate
 

@@ -41,7 +41,7 @@ function git(repo, args) {
 function runShapeContracts(temporaryDir) {
   requireStatus(run(process.execPath, [FORMATTER, "--self-test"]), 0, "formatter self-test");
   requireStatus(run(process.execPath, [HOOK, "--self-test"]), 0, "hook self-test");
-  requireStatus(run(process.execPath, [FORMATTER, "--self-test-shapes"]), 0, "shape contract");
+  runFormatterShapeContract(temporaryDir);
 
   const linkedTool = path.join(temporaryDir, "linked-java-formatter");
   fs.symlinkSync(path.dirname(FORMATTER), linkedTool, process.platform === "win32" ? "junction" : "dir");
@@ -56,8 +56,68 @@ function runShapeContracts(temporaryDir) {
     '<setting id="org.eclipse.jdt.core.formatter.lineSplit" value="140"/>',
     '<setting id="org.eclipse.jdt.core.formatter.lineSplit" value="100"/>',
   ));
-  const mutant = run(process.execPath, [FORMATTER, "--self-test-shapes", "--config", narrowed]);
-  assert.notEqual(mutant.status, 0, "lineSplit mutation must kill the accepted assignment shape");
+  assert.throws(
+    () => runFormatterShapeContract(temporaryDir, narrowed),
+    /shape|continuation|assignment|method declaration/i,
+    "lineSplit mutation must kill the accepted generic shape contract",
+  );
+}
+
+function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
+  const repo = fs.mkdtempSync(path.join(temporaryDir, "shape-contract-"));
+  git(repo, ["init", "-q"]);
+  const file = path.join(repo, "ShapeProbe.java");
+  write(file, [
+    "class ShapeProbe {",
+    "    public ResultWithAReasonablyLongName accept(RequestWithAReasonablyLongName request, SnapshotWithAReasonablyLongName snapshot, CommandWithAReasonablyLongName command) { return null; }",
+    "    void assignment() { List<GenericItemWithLongName> items = service.loadByGroupAndType(groupIdentifier, typeIdentifierWithLongName); }",
+    "    void chain() { target.add(Item.builder().first(command.getFirst()).second(command.getSecond()).third(command.getThird()).fourth(command.getFourth()).fifth(command.getFifth()).sixth(sixth).enabled(true).build()); }",
+    "    void stream() { BigDecimal total = valuesWithAReasonablyLongName.stream().map(ValueWithAReasonablyLongName::amount).reduce(BigDecimal.ZERO, BigDecimal::add); }",
+    "}",
+    "",
+  ].join("\n"));
+  const result = run(process.execPath, [FORMATTER, "--files", file], {
+    cwd: repo,
+    env: { ...process.env, ASDF_JAVA_FORMAT_CONFIG: configPath },
+  });
+  requireStatus(result, 3, "generic shape format");
+
+  const formatted = fs.readFileSync(file, "utf8");
+  const lines = formatted.split(/\r?\n/);
+  const declaration = lines.findIndex((line) => line.includes("accept("));
+  const continuation = lines[declaration + 1];
+  const firstParameterColumn = lines[declaration].indexOf("RequestWithAReasonablyLongName");
+  if (!continuation || continuation.indexOf("CommandWithAReasonablyLongName") !== firstParameterColumn) {
+    throw new Error("Method declaration continuation is not aligned under the first parameter.\n" + formatted);
+  }
+  const assignment = "        List<GenericItemWithLongName> items = service.loadByGroupAndType(groupIdentifier, typeIdentifierWithLongName);";
+  if (!formatted.includes(assignment)) {
+    throw new Error("Simple assignment did not remain on one line.\n" + formatted);
+  }
+  const streamDeclaration = lines.findIndex((line) => line.includes("BigDecimal total = valuesWithAReasonablyLongName.stream()"));
+  if (streamDeclaration === -1) {
+    throw new Error("Stream declaration was not preserved as the expected first line.\n" + formatted);
+  }
+  const streamMap = lines[streamDeclaration + 1];
+  const streamReduce = lines[streamDeclaration + 2];
+  const streamIndent = lines[streamDeclaration].indexOf("BigDecimal");
+  if (!streamMap || !streamReduce
+    || !streamMap.trimStart().startsWith(".map(ValueWithAReasonablyLongName::amount)")
+    || !streamReduce.trimStart().startsWith(".reduce(BigDecimal.ZERO, BigDecimal::add);")
+    || streamMap.indexOf(".map") !== streamIndent + 8
+    || streamReduce.indexOf(".reduce") !== streamIndent + 8) {
+    throw new Error("Stream chain is not in the expected continuation shape.\n" + formatted);
+  }
+  const stages = [
+    ".first(", ".second(", ".third(", ".fourth(",
+    ".fifth(", ".sixth(", ".enabled(", ".build()",
+  ];
+  for (const stage of stages) {
+    if (!lines.some((line) => line.trimStart().startsWith(stage))) {
+      throw new Error("Fluent stage is not vertical: " + stage + "\n" + formatted);
+    }
+  }
+  return formatted;
 }
 
 function runChangedFileContract(temporaryDir) {
@@ -113,6 +173,38 @@ function runChangedFileContract(temporaryDir) {
   requireStatus(run(process.execPath, [FORMATTER], { cwd: repo }), 1, "invalid batch");
   assert.equal(fs.readFileSync(changed, "utf8"), goodBeforeFailure,
     "a failing batch must not partially write a valid peer");
+}
+
+function runSourceScopeContract(temporaryDir) {
+  const repo = path.join(temporaryDir, "source-scope-repo");
+  fs.mkdirSync(repo, { recursive: true });
+  git(repo, ["init", "-q"]);
+  git(repo, ["config", "user.email", "formatter@example.invalid"]);
+  git(repo, ["config", "user.name", "Formatter Probe"]);
+  const production = path.join(repo, "src", "main", "java", "Production.java");
+  const unitTest = path.join(repo, "src", "test", "java", "ProductionTest.java");
+  const appTest = path.join(repo, "app", "test", "src", "Test.java");
+  write(production, "class Production { void oldName() {} }\n");
+  write(unitTest, "class ProductionTest { void oldName( ) { } }\n");
+  write(appTest, "class Test { void oldName( ) { } }\n");
+  git(repo, ["add", "."]);
+  git(repo, ["commit", "-qm", "baseline"]);
+
+  write(production, "class Production { void changed( ) { } }\n");
+  const unitTestBefore = fs.readFileSync(unitTest, "utf8");
+  const appTestBefore = fs.readFileSync(appTest, "utf8");
+  const productionRun = run(process.execPath, [FORMATTER], { cwd: repo });
+  requireStatus(productionRun, 3, "production-only format");
+  assert.match(fs.readFileSync(production, "utf8"), /void changed\(\) \{/);
+  assert.equal(fs.readFileSync(unitTest, "utf8"), unitTestBefore,
+    "src/test Java must remain unchanged by the default formatter scope");
+  assert.equal(fs.readFileSync(appTest, "utf8"), appTestBefore,
+    "app/test Java must remain unchanged by the default formatter scope");
+
+  const testRun = run(process.execPath, [FORMATTER, "--include-tests", "--files", unitTest, appTest], { cwd: repo });
+  requireStatus(testRun, 3, "explicit test format");
+  assert.match(fs.readFileSync(unitTest, "utf8"), /void oldName\(\) \{/);
+  assert.match(fs.readFileSync(appTest, "utf8"), /void oldName\(\) \{/);
 }
 
 function hookRun(repo, stateRoot, label, extraEnv = {}) {
@@ -209,12 +301,22 @@ function runRationaleToolingContract(temporaryDir) {
 
   const healthy = hookRun(repo, stateRoot, "installed checker");
   assert.deepEqual(healthy, {}, "a discoverable checker must validate an empty corpus without blocking");
+
+  const noisy = path.join(temporaryDir, "noisy-rationale.mjs");
+  write(noisy, "process.stdout.write(JSON.stringify({failures:[{id:'W-001',title:'anchor mismatch',detail:'shape occurs 0 times'}],selectedPaths:['one.java','two.java','three.java']})); process.exitCode=1;\n");
+  const compact = hookRun(repo, stateRoot, "compact rationale failure", { ASDF_RATIONALE_CLI: noisy });
+  assert.equal(compact.decision, "block", "a rationale failure must still block the handoff");
+  assert.match(compact.reason, /W-001/);
+  assert.match(compact.reason, /shape occurs 0 times/);
+  assert.doesNotMatch(compact.reason, /selectedPaths|one\.java|two\.java|three\.java/,
+    "rationale failure output must not dump selectedPaths");
 }
 
 const temporaryDir = fs.mkdtempSync(path.join(os.tmpdir(), "asdf-java-formatter-contract-"));
 try {
   runShapeContracts(temporaryDir);
   runChangedFileContract(temporaryDir);
+  runSourceScopeContract(temporaryDir);
   runHookScopeContract(temporaryDir);
   runRationaleToolingContract(temporaryDir);
   process.stdout.write("Portable Java formatter contract OK\n");

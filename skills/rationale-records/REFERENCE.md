@@ -18,14 +18,16 @@ Continue with entries in this schema:
 ## W-001 · 一句话点明这段代码在解释什么
 
 - **源码** `relative/path/File.ext`
-- **形状** `one exact source line unique inside that file`
+- **形状** `one behavior-bearing token sequence unique inside that file`
 - **解释** 先说明这段代码做什么，再沿数据或控制流解释为什么这样写，以及简化后会改变什么
 ```
 
 Repeat the `源码`/`形状` pair when one invariant depends on more than one real
 declaration or call. Use repository-relative paths. A shape must occur exactly
-once in its file. Anchor behavior-bearing code, not a comment, import, method
-signature, or movable trace.
+once in its file. Whitespace, indentation, and line breaks are ignored when
+matching; strings, comments, and token boundaries are preserved. Anchor
+behavior-bearing code, not a comment, import, method signature, or movable
+trace.
 
 W-IDs are unique across all files under `docs/rationale`. Allocate after the
 repository-wide maximum. Active records carry no obsolete entries: update a

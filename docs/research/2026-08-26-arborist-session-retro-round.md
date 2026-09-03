@@ -80,3 +80,9 @@ same rationale as `skill-ab-trial`). Two signals:
 
 Both signals absent → the file requirement is sediment; revert it. One
 present → keep, note which claim it supports.
+
+Closed 2026-09-03: both signals observed in the audit of every local arborist
+run (Codex 13/13 and Claude 5/5 wrote the file before the first production
+edit; closing dispositions were appended in about 26 of 37 archived files).
+The file requirement stays. The audit's other findings feed the 2026-09-03
+improvement round (header, reader brief, Step 0 completion).

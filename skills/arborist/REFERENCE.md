@@ -122,3 +122,48 @@ execution. Inspect configuration for skipped suites, profiles or build tags,
 filters, integration phases, generated sources, cached results, and required
 services before claiming evidence. A green command that did not execute the
 relevant proof leaves the obligation open.
+
+Time the narrowest command that builds and tests the changed path once,
+before the proofs are pre-registered; that figure and the count of separate
+runs the proofs need are what the `Runs:` header records. A build that recompiles
+components the change does not touch is narrowed to the changed component
+and the tests that exercise it. A run expected to outlast the runtime's
+foreground limit is started so that limit cannot kill it — a background job
+the runtime tracks, or a run the user launches — with its output written to
+a log file in the task directory; evidence cites the log path and line
+rather than a terminal excerpt.
+
+The change's diff, wherever these mechanics name it, is the working tree
+against the change's base revision, added files included, produced by one
+recorded command so that a later run reproduces it byte for byte.
+
+A mutation's evidence is two files in the task directory: the mutant as a
+patch against the change (`mutants/<identifier>.patch`) and the full log
+of one command sequence — apply the patch, run the checks, reverse the
+patch, run the checks again — so the red and the green sit in one file
+with the apply and the reverse between them. The log opens with the test
+command, the diff command, the `sha256` of the change's diff at that
+moment, and the `sha256` of the patch; the pre-registration line cites
+both files. Step 6 reproduces the diff with the recorded command and
+recomputes both digests: a mismatch means the run predates the final tree
+or the patch changed, and the mutation is re-run. A reader
+re-runs only in an isolated copy of the checkout — a VCS worktree or a
+plain directory copy at the change's base, with the handed-over diff
+applied and checked by producing the same diff there and comparing the
+two byte for byte; nothing built there is installed to a shared cache, a
+toolchain whose build cache is shared by default is given a cache of its
+own, and the run confirms it executes the copy's source rather than the
+original checkout's. A reader that cannot make such a copy re-runs nothing
+and reports each item it could not re-run. After a read that stopped early,
+the builder diffs the checkout against the diff it handed over: a reader's
+mutant found there is restored and the restore recorded in the
+pre-registration file before any other step; any other difference is
+reported, not restored.
+
+A wide gate run once may fail on tests that name no line of the seam.
+Classify each failure before reporting the gate: introduced by this change;
+pre-existing, shown by running that test alone — never the whole gate again
+— against the pre-change tree, a worktree at the base commit or a run log
+from before the change; or absent from the tree — a filter that tolerates a
+missing test passes silently, so name every listed test the tree does not
+hold. The gate's verdict is reported with all three lists.

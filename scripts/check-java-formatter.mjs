@@ -73,6 +73,13 @@ function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
     "    void assignment() { List<GenericItemWithLongName> items = service.loadByGroupAndType(groupIdentifier, typeIdentifierWithLongName); }",
     "    void chain() { target.add(Item.builder().first(command.getFirst()).second(command.getSecond()).third(command.getThird()).fourth(command.getFourth()).fifth(command.getFifth()).sixth(sixth).enabled(true).build()); }",
     "    void stream() { BigDecimal total = valuesWithAReasonablyLongName.stream().map(ValueWithAReasonablyLongName::amount).reduce(BigDecimal.ZERO, BigDecimal::add); }",
+    "    void shortStream() { long count = values.stream().filter(value -> !value.isEmpty()).count(); }",
+    "    void shortBuilder() { Item item = Item.builder().fieldA(fieldA).fieldB(fieldB).build(); }",
+    "    void constructorBuilder() { Item constructed = new Item().fieldA(fieldA).fieldB(fieldB).build(); }",
+    "    void parenthesizedBuilder() { Item parenthesized = (factory.create()).fieldA(fieldA).fieldB(fieldB).build(); }",
+    "    void twoLinkChain() { boolean blank = valueWithAReasonablyLongName.trim().isEmpty(); }",
+    "    void genericReceiver() { Map<String, List<GenericItemWithLongName>> grouped = itemsWithAReasonablyLongName.stream().filter(item -> item.isActive()).collect(Collectors.groupingBy(GenericItemWithLongName::group)); }",
+    "    void multilineArguments() { MultilineItem multiline = MultilineItem.builder().fieldA(firstArgumentWithAnExtremelyLongNeutralNameDesignedToExceedTheConfiguredLineWidth, secondArgumentWithAnExtremelyLongNeutralNameDesignedToExceedTheConfiguredLineWidth).build(); }",
     "}",
     "",
   ].join("\n"));
@@ -94,6 +101,34 @@ function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
   if (!formatted.includes(assignment)) {
     throw new Error("Simple assignment did not remain on one line.\n" + formatted);
   }
+  assertVerticalChain(formatted, lines, "long count = values.stream()", [
+    ".filter(value -> !value.isEmpty())",
+    ".count();",
+  ]);
+  assertVerticalChain(formatted, lines, "Item item = Item.builder()", [
+    ".fieldA(fieldA)",
+    ".fieldB(fieldB)",
+    ".build();",
+  ]);
+  assertVerticalChain(formatted, lines, "Item constructed = new Item()", [
+    ".fieldA(fieldA)",
+    ".fieldB(fieldB)",
+    ".build();",
+  ]);
+  assertVerticalChain(formatted, lines, "Item parenthesized = (factory.create())", [
+    ".fieldA(fieldA)",
+    ".fieldB(fieldB)",
+    ".build();",
+  ]);
+  assertMultilineChainArguments(formatted, lines);
+  const twoLink = "        boolean blank = valueWithAReasonablyLongName.trim().isEmpty();";
+  if (!formatted.includes(twoLink)) {
+    throw new Error("Two-link chain must stay on one line.\n" + formatted);
+  }
+  assertVerticalChain(formatted, lines, "List<GenericItemWithLongName>> grouped = itemsWithAReasonablyLongName.stream()", [
+    ".filter(item -> item.isActive())",
+    ".collect(Collectors.groupingBy(GenericItemWithLongName::group));",
+  ]);
   const streamDeclaration = lines.findIndex((line) => line.includes("BigDecimal total = valuesWithAReasonablyLongName.stream()"));
   if (streamDeclaration === -1) {
     throw new Error("Stream declaration was not preserved as the expected first line.\n" + formatted);
@@ -117,7 +152,44 @@ function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
       throw new Error("Fluent stage is not vertical: " + stage + "\n" + formatted);
     }
   }
+  const repeat = run(process.execPath, [FORMATTER, "--files", file], {
+    cwd: repo,
+    env: { ...process.env, ASDF_JAVA_FORMAT_CONFIG: configPath },
+  });
+  requireStatus(repeat, 0, "idempotent fluent-chain format");
+  assert.equal(fs.readFileSync(file, "utf8"), formatted, "fluent-chain formatting must be idempotent");
   return formatted;
+}
+
+function assertVerticalChain(formatted, lines, declarationText, selectors) {
+  const declaration = lines.findIndex((line) => line.includes(declarationText));
+  if (declaration === -1) {
+    throw new Error("Fluent chain declaration was not preserved: " + declarationText + "\n" + formatted);
+  }
+  const declarationIndent = lines[declaration].search(/\S/);
+  for (const [offset, selector] of selectors.entries()) {
+    const line = lines[declaration + offset + 1];
+    if (!line || !line.trimStart().startsWith(selector) || line.search(/\S/) !== declarationIndent + 8) {
+      throw new Error("Short fluent chain is not vertical: " + selector + "\n" + formatted);
+    }
+  }
+}
+
+function assertMultilineChainArguments(formatted, lines) {
+  const declaration = lines.findIndex((line) => line.includes("MultilineItem multiline = MultilineItem.builder()"));
+  const field = declaration + 1;
+  const secondArgument = lines.findIndex((line, index) => index > field
+    && line.includes("secondArgumentWithAnExtremelyLongNeutralNameDesignedToExceedTheConfiguredLineWidth"));
+  const build = lines.findIndex((line, index) => index > field && line.trimStart().startsWith(".build();"));
+  const declarationIndent = declaration >= 0 ? lines[declaration].search(/\S/) : -1;
+  const fieldIndent = field < lines.length ? lines[field].search(/\S/) : -1;
+  const argumentIndent = secondArgument >= 0 ? lines[secondArgument].search(/\S/) : -1;
+  if (declaration < 0 || !lines[field].trimStart().startsWith(".fieldA(")
+    || fieldIndent !== declarationIndent + 8
+    || secondArgument <= field || secondArgument >= build
+    || argumentIndent <= fieldIndent) {
+    throw new Error("Multiline fluent arguments are not aligned beneath their selector.\n" + formatted);
+  }
 }
 
 function runChangedFileContract(temporaryDir) {
@@ -162,8 +234,10 @@ function runChangedFileContract(temporaryDir) {
   assert.equal(fs.readFileSync(unchanged, "utf8"), unchangedBefore);
   assert.equal(fs.existsSync(deleted), false);
   assert.equal(fs.readFileSync(notes, "utf8"), "still not Java\n");
-  assert.ok(fs.readFileSync(legacy, "utf8").startsWith(legacyJavadoc),
-    "legacy Javadoc bytes and mixed line endings must remain unchanged");
+  const formattedLegacy = fs.readFileSync(legacy, "utf8");
+  assert.ok(formattedLegacy.startsWith(legacyJavadoc), "legacy Javadoc bytes must remain unchanged");
+  assert.doesNotMatch(formattedLegacy.slice(legacyJavadoc.length), /(^|[^\r])\n/,
+    "formatted layout around a preserved Javadoc must use the source's CRLF convention");
   requireStatus(run(process.execPath, [FORMATTER], { cwd: repo }), 0, "idempotent changed-file format");
 
   const good = fs.readFileSync(changed, "utf8").replace("void changed()", "void changed( )");

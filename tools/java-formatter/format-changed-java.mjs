@@ -202,7 +202,9 @@ function selfTest() {
     rejected = true;
   }
   if (!rejected) throw new Error("Javadoc mutation did not fail.");
-  if (!fs.existsSync(DEFAULT_CONFIG)) throw new Error("codestyle.xml is missing.");
+  for (const input of formatterInputs()) {
+    if (!fs.existsSync(input)) throw new Error("Java formatter input is missing: " + input);
+  }
   process.stdout.write("Java formatter wrapper self-test OK\n");
 }
 

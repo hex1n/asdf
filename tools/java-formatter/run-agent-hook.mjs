@@ -12,6 +12,7 @@ import {
   findGitRoot,
   formatChangedJava,
   formatterInputs,
+  run,
 } from "./format-changed-java.mjs";
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +24,11 @@ const RATIONALE_INSTALLED_CLI = path.join(os.homedir(), ".agents", "skills", "ra
 // The hook rewrites files, so its scope is what moved while it was watching this
 // worktree, not the whole HEAD diff. A repository it has never observed is
 // adopted as a baseline, and so is a file older than the last observation: work
-// the agent never touched must not be reformatted underneath it.
+// the agent never touched must not be reformatted underneath it. Bytes that git
+// itself produced are not agent work either: a file whose content equals its
+// blob in HEAD or in the merge parent (`git checkout --`, `git merge`, a stash
+// pop) is skipped, otherwise every restore of an upstream file would be
+// reformatted again on the next stop.
 const STATE_VERSION = 2;
 // Coarse filesystem timestamps must not silence a real edit, so an ambiguous
 // mtime formats (loud) rather than adopting (silent).
@@ -60,12 +65,40 @@ export function toolDigest(files = formatterInputs()) {
   return digest.digest("hex");
 }
 
+// Refs whose trees hold content git may have written into the worktree without
+// an editor: the checked-out commit and, while a merge is in progress, its
+// other parent.
+function committedContentRefs(repoRoot) {
+  const gitDir = run("git", ["rev-parse", "--git-dir"], { cwd: repoRoot });
+  const refs = ["HEAD"];
+  if (gitDir.status === 0 && fs.existsSync(path.resolve(repoRoot, gitDir.stdout.trim(), "MERGE_HEAD"))) refs.push("MERGE_HEAD");
+  return refs;
+}
+
+// `git diff --quiet` compares after the same normalisation git applies on add,
+// so a CRLF checkout of an LF blob still counts as the committed content. A path
+// absent from the ref is never a match: an untracked file is new work.
+export function matchesCommittedContent(repoRoot, relative, refs = committedContentRefs(repoRoot)) {
+  for (const ref of refs) {
+    const exists = run("git", ["cat-file", "-e", ref + ":" + relative], { cwd: repoRoot });
+    if (exists.status !== 0) continue;
+    const same = run("git", ["diff", "--quiet", ref, "--", relative], { cwd: repoRoot });
+    if (same.status === 0) return true;
+  }
+  return false;
+}
+
 export function observe(repoRoot, files) {
   const observed = new Map();
+  const refs = committedContentRefs(repoRoot);
   for (const file of files.slice().sort()) {
     const relative = path.relative(repoRoot, file).replaceAll("\\", "/");
     const stat = fs.statSync(file, { throwIfNoEntry: false });
-    observed.set(relative, { digest: fileDigest(file), mtimeMs: stat ? stat.mtimeMs : 0 });
+    observed.set(relative, {
+      digest: fileDigest(file),
+      mtimeMs: stat ? stat.mtimeMs : 0,
+      committed: fs.existsSync(file) && matchesCommittedContent(repoRoot, relative, refs),
+    });
   }
   return observed;
 }
@@ -83,6 +116,7 @@ export function selectJavaTargets(state, observed, context) {
   const since = Number(state.observedAt) || 0;
   const targets = [];
   for (const [file, current] of observed) {
+    if (current.committed) continue;
     if (!Object.prototype.hasOwnProperty.call(baseline, file)) {
       if (current.mtimeMs + MTIME_TOLERANCE_MS >= since) targets.push(file);
       continue;
@@ -248,6 +282,14 @@ function selfTest() {
   }
   if (selectJavaTargets(watched, observed, { tools: "t2" }).targets.length !== 2) {
     throw new Error("A changed formatter profile must re-apply to the whole watched scope.");
+  }
+  const checkedOut = new Map([
+    ["Known.java", { digest: "d2", mtimeMs: now + 1, committed: true }],
+    ["Merged.java", { digest: "d4", mtimeMs: now + 1, committed: true }],
+    ["Edited.java", { digest: "d5", mtimeMs: now + 1, committed: false }],
+  ]);
+  if (selectJavaTargets(watched, checkedOut, context).targets.join() !== "Edited.java") {
+    throw new Error("Content that equals a committed blob was written by git, not the agent, and must not be formatted.");
   }
 
   const present = fileURLToPath(import.meta.url);

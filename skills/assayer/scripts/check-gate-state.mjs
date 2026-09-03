@@ -526,4 +526,15 @@ async function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) await main();
+const invokedPath = process.argv[1] ?? "";
+let entryHref = "";
+try {
+  entryHref = pathToFileURL(fs.realpathSync(invokedPath)).href;
+} catch {
+  try { entryHref = pathToFileURL(invokedPath).href; } catch { entryHref = ""; }
+}
+// Case/realpath-insensitive compare (Windows drive-letter casing and MSYS path
+// translation break exact-equality guards silently: main() never ran, exit 0).
+const isEntry = entryHref !== "" && import.meta.url.toLowerCase() === entryHref.toLowerCase();
+const looksLikeCli = invokedPath.replace(/\\/g, "/").toLowerCase().endsWith("/check-gate-state.mjs");
+if (isEntry || looksLikeCli) await main();

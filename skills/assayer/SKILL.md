@@ -82,7 +82,10 @@ basis as depth, or user-authorized `unbounded`. A bounded budget is recorded
 with an observable unit and threshold — reviewer invocations, wall-clock, or
 output volume — plus its basis; a missing budget never resolves to
 `unbounded`, and `scripts/check-gate-state.mjs` fails closed without this
-record.
+record. Sanity-check a declared budget against the candidate's claim surface
+at freeze: a candidate hundreds of lines dense with existing-system claims
+runs several rounds, and an envelope declaring one round for it is challenged
+at freeze, not mid-loop.
 
 Calibrate review depth and expected rounds from irreversibility and blast radius,
 and record that basis here at freeze time. Shallow depth is eligible only when
@@ -248,6 +251,18 @@ Give every finding an owner and one disposition:
 - `defer-gap`: verification gaps outside closing scope, with owner and next check;
 - `needs-input`: a missing user decision or authority source.
 
+Two disciplines govern writing the fix. **Verify before you write**: every
+existing-system claim the revision adds or sharpens is checked against its
+source — file opened, line cited — before the revision ships; reviewers
+falsify your fixes at full invocation cost, and an unverified claim converts
+this round's finding into next round's. Write the minimal claim that closes
+the finding — asserting a property of the whole component fails where
+asserting it only of the members the finding names survives; every word of
+scope you add is surface a reviewer can falsify. **Re-derive the wound**: when a finding falsifies
+a mechanism the candidate invented, re-derive that section from the authority
+sources — the domain record often already holds the answer — rather than
+patching the invention; a patched invention is the next round's blocker.
+
 Batch compatible fixes. A focused recheck may close findings but cannot close
 the gate. Use it only for edits contained by finding-linked scope; uncertainty
 or cross-cutting change requires a complete review. See
@@ -259,12 +274,17 @@ key assumption of the frozen Decision Envelope invalidates that envelope:
 suspend the review and return the value decision to the planner rather than
 reviewing the changed economics to GO.
 
-Completion: every finding is validated, owned, and dispositioned; a new hashed
-revision exists or every rebuttal has returned to its reviewer.
+Completion: every finding is validated, owned, and dispositioned; every
+existing-system claim the revision adds carries a source verified this round;
+a new hashed revision exists or every rebuttal has returned to its reviewer.
 
 ### 5. Close Or Continue
 
-Send the complete revised candidate and ledger to every required reviewer. The
+Send the complete revised candidate and ledger to this round's reviewers:
+mid-loop, when one required reviewer has closed its lane (GO or optional-only
+findings) on consecutive revisions while another keeps returning confirmed
+defects, run only the still-falsifying lanes; the closing round still sends
+the candidate to every required reviewer, and the gate is unchanged. The
 final GO must cover the complete current revision. Record, disclose, validate,
 and disposition every new finding, then repeat. This closing review returns the
 complete set of currently known findings across all severities, grouped by root cause; it

@@ -50,7 +50,6 @@ if (suites.length > 0) {
   steps.push({ name: `test suites (${suites.length} files)`, args: ["--test", ...suites] });
 }
 steps.push({ name: "skill links", args: [path.join(ROOT, "scripts", "check-skill-links.mjs")] });
-steps.push({ name: "shared tool copies", args: [path.join(ROOT, "scripts", "check-shared-tool-copies.mjs")] });
 steps.push({ name: "installed copies", args: [path.join(ROOT, "scripts", "check-installed-copies.mjs")] });
 
 let failed = false;
@@ -60,7 +59,7 @@ for (const step of steps) {
   process.stdout.write(`${result.status === 0 ? "PASS" : "FAIL"}: ${step.name}\n`);
 }
 if (suites.length === 0) {
-  process.stdout.write("note: no local test suites found on this machine (they are local-only, never published); only the installed-copy check ran\n");
+  process.stdout.write(`note: no local test suites found on this machine (they are local-only, never published); ran ${steps.map((step) => step.name).join(", ")}\n`);
 }
 // Discovered rather than listed: a contract check added later must not have to
 // remember to announce itself here.

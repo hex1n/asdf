@@ -1,63 +1,44 @@
-# First-run intake
+# Additional intake cases
 
-Read this file only for the first execution of a plan, named scenario, or conversational handoff. A continuation from an earlier execution report uses [RERUN.md](RERUN.md) instead.
+Read only for an inherited/legacy plan shape or a conversational handoff. Selection,
+expected authority, source pinning, and run-directory rules live in `SKILL.md`.
 
-## Establish the upstream artifact
+## Scenario-tree inheritance
 
-Create this run's immutable directory before materializing any snapshot: use the user's output path when provided; otherwise create `e2e-run-<plan-name>-<timestamp>/` beside the plan under its `docs/e2e-test/<feature>/` folder, or a stated working path when no plan location exists. Creating it is a write: satisfy [Path Containment Proof](REFERENCE.md#path-containment-proof) before `mkdir`. This intake gate does not wait for `EXECUTION.md`. The new directory is unique to the run and is never reused by a later rerun. Record its full canonical path immediately. Every file written into it before delivery is an entry of the artifact allowlist in [REPORTING.md](REPORTING.md#fill-the-run-directory).
+For `execution-anchors/v1`, resolve shared fields from root to leaf: an omitted child
+field inherits the nearest complete parent value; a defined child field replaces the
+whole value. Partial append/delete inside an inherited field is invalid. Preserve
+all four anchors and the approved verdict facts. Priority, business-step IDs,
+requirement links, layer-allocation tables, and a formal ledger are optional unless
+an existing consumer explicitly requires them. Missing such annotations alone is
+not a plan defect.
 
-Read the plan before touching the system. A plan whose header declares `Contract: e2e-plan/v2` keeps its facts in canonical records:
+Derive live mechanics from the effective facts: trigger from Actions, probe and wait
+from Observes, inputs/dependencies from Preconditions, and ownership/lifecycle from
+State Footprint. Mark derived mechanics in the report; a separate `plan-snapshot.md`
+is useful only when their volume or reuse warrants it. Missing or contradictory
+marked anchors remain plan gaps instead of being silently repaired from current code.
 
-- `Scenario Contracts` supplies mechanics, capabilities, waits, side effects, isolation, and cleanup.
-- `Gates` (`GT-*`) supplies entry prerequisites, status, and blocking rules.
-- `Gaps` (`G-*`) supplies unresolved facts and dispositions.
-- `Coverage Obligations` and `Flow and Impact Edges` state what each scenario must close.
-- Derive the runtime DAG and order from `Depends on`, `Consumes`, `Produces`, `Slice`, and `Priority`. This contract has no `Execution DAG`, `Execution Order`, or handoff index; never wait for one, and treat a v2 plan that carries one as invalid.
+## Older plans
 
-A scenario-tree plan from e2e-test-planner carries business facts rather than mechanics. A plan whose Overview carries the `execution-anchors/v1` handoff token — the `Execution handoff` label may be localized; the token is verbatim in every plan language — supplies four authoritative anchors per effective leaf after parent inheritance: concrete `Preconditions`; entry-anchored `Actions`; settlement-aware `Observes`; and `State Footprint` with reads, writes, external effects, ownership/provenance, and allowed terminal lifecycle. Resolve every inherited field with the planner contract's atomic-field reducer: an omitted child field inherits the nearest ancestor unchanged; a defined child field replaces the complete inherited value and must restate every effective fact; partial merge, append, or delete is invalid. `Covers`, `Requirements`, `Oracle`, `Expected Results`, `Expected Authority`, and `Implementation Evidence` complete the business verdict and evidence chain. A marked leaf missing an anchor, using an undefined fixture or variable, or contradicting itself is a plan defect and is not runnable; preserve its explicit `NEEDS-DECISION` or `BLOCKED` disposition. For a legacy scenario-tree plan without the marker, preserve every existing scenario definition, Agent Execution Contract, DAG or safety edge, handoff index, declared default scenario set, and named slice. Derive only absent anchors and mechanics, record their lineage as `legacy-derived`, and never replace an existing safety or scheduling fact merely because it is not a produced-value dependency.
+For a tree without the handoff marker, preserve existing scenario definitions,
+Agent Execution Contracts, DAG/safety edges, gates, defaults, and slices. Derive only
+absent anchors/mechanics, mark them `legacy-derived`, and keep existing scheduling
+and safety facts even when they are not produced-value dependencies.
 
-Deriving mechanics is executor work, not a plan defect. For every selected leaf, use code, docs, config, scripts, existing tests, and safe read-only probes to derive:
+For `Contract: e2e-plan/v2`, read Scenario Contracts, Gates (`GT-*`), Gaps (`G-*`),
+Coverage Obligations, and Flow and Impact Edges as its canonical records. Resolve
+order from Depends on, Consumes, Produces, Slice, and Priority. This format has no
+separate Execution DAG/Order or handoff index; conflicting duplicates require
+reconciliation rather than ignoring either safety constraint.
 
-- the live target and exact trigger command or action from the `Actions` entry anchor;
-- the wait and committed-state probe from the `Observes` settlement predicate;
-- the oracle from `Oracle` and `Expected Results`;
-- dependencies and consumed/produced variables from concrete `Preconditions`, including named predecessor leaf or gate IDs, and produced values;
-- side-effect class, isolation key, run-specific owner marker, and cleanup operation from `State Footprint`, constrained by its ownership/provenance and allowed terminal lifecycle;
-- entry gates from environment notes and available capabilities.
+## Conversational handoff
 
-Record derived mechanics per leaf in `plan-snapshot.md` inside the run directory with lineage `derived`, while `Upstream plan` still names the original. The anchors constrain derivation; implementation evidence cannot silently replace their business values, settlement predicate, ownership, or lifecycle authorization.
+Materialize the concrete scenario contract, source instruction, and selected IDs in
+the report before execution. Keep a snapshot only when the original source would
+otherwise be lost. Source-backed intermediate steps and locators are mechanics;
+invented business inputs or expectations are not.
 
-Plan-cited implementation evidence ages: the plan was written against one revision, the run executes against the current checkout. Before asserting any oracle whose expected value, error contract, or settlement predicate rests on the plan's `Implementation Evidence` — a file:line, a branch's behavior, an error-code table — re-verify that citation against the checked-out code. Drifted evidence never silently keeps its old oracle: when the governing business authority is unchanged, re-derive the expectation from current code and record the re-derivation; otherwise cap the leaf at `unverified` and record the drift as a plan gap. The failure this prevents: a scenario asserting a live oracle down a code path whose plan-cited projection branch no longer exists. Block a mutating leaf whose effective footprint lacks target provenance/ownership or an allowed terminal lifecycle. A command, credential, live target, or probe unresolved against the environment makes that leaf `blocked` with the next safe probe named, not a plan defect. Ask the user only for facts the available sources cannot yield.
-
-When the plan exists only in conversation, materialize it before execution. If scenario design is the actual task — including a bare request to run E2E tests with no flow, change, fix, or scenario to derive — hand off once to e2e-test-planner and resume from its artifact. Otherwise write only the implied scenario set to `plan-snapshot.md`, mark lineage `ad-hoc`, and use that readable path as `Upstream plan`. Resolving locators, credentials, and necessary intermediate steps from sources is derivation, not invention.
-
-## Select the run
-
-Re-read the user's latest constraints. Record an `Execution Contract Override` when the user changes excluded scenarios, data retention, tool restrictions, or exit criteria after the plan was written. The override supersedes the matching plan default; mark the old requirement `superseded`, never failed. Open [Execution Contract Override](REFERENCE.md#execution-contract-override) only when an override exists.
-
-The selection set is, in order:
-
-1. scenarios the user explicitly named;
-2. otherwise the plan's First Test Slice, marked or not;
-3. otherwise a legacy plan's explicitly declared default scenario set or named default slice;
-4. otherwise every ready scenario in priority order P0 through P2.
-
-A First Test Slice always outranks a separately declared default scenario set. When a plan carries both and they differ, take the slice and record the ignored default set as an explicit selection note.
-
-Write the selection set down before execution. Map every selected scenario to plan IDs, edge IDs, expected variables, required capabilities, waits, cleanup, and blockers. Record missing or conflicting facts before triggering anything. `Upstream plan` must resolve to a readable path, using the materialized snapshot when the source was conversational.
-
-Pin the upstream artifact by **content hash**, not path alone, and record that hash in `plan-snapshot.md` at intake. A path names a file; a run consumes a revision. The report copies the plan's expected values, so an upstream edit after the run silently desynchronizes those copies, and a hash reconstructed afterwards is a guess. Where the plan carries no version history — an untracked or gitignored directory — the hash is the only anchor available. On delivery, re-hash the upstream artifact: an unchanged hash certifies the copied expectations; a changed one means the report states which revision it ran against and reconciles or explicitly retains each copied field.
-
-Scenario selection changes which scenario nodes execute; it does not waive shared entry gates, preconditions, safety checks, or their evidence. Supersede a shared gate only when the user explicitly changes that gate, not merely because the user selected one scenario.
-
-## Intake completion gate
-
-Do not proceed until:
-
-- the selection set and rationale are explicit;
-- the upstream plan or snapshot is readable, and its content hash is recorded;
-- each selected scenario has a trigger, wait, committed-state probe, oracle, dependencies, side effects, isolation key, and cleanup decision, or an exact blocker;
-- current user overrides are recorded;
-- the report language and target environment are fixed.
-
-Then read [EXECUTION.md](EXECUTION.md).
+If the user actually needs scenario design, complete that planning first, using
+`e2e-test-planner` when available, then resume execution from its artifact. An already
+concrete scenario does not require creating a separate full planning document.

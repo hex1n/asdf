@@ -24,7 +24,6 @@ for the distribution vocabulary.
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
-| [`skill-ab-trial`](skills/skill-ab-trial/) | verify | Run a controlled A/B trial to measure whether a candidate instruction changes what agents deliver. |
 | [`rationale-records`](skills/rationale-records/) | navigate | Maintain and query Git-ignored personal current-code rationale, with strict source anchors and worktree handoff. |
 
 ## Methods behind the skills
@@ -43,7 +42,6 @@ look when extending it.
 | `e2e-test-executor` | The RIPR model — reachability and infection as controllability, propagation and revealability as observability; evidence captured in order of volatility (digital forensics); PROV-style provenance so plan, run, and artifacts reconstruct from the artifacts alone; an explicit SUT boundary declaring every real dependency and double. |
 | `generating-api-docs` | Design by contract and information hiding (Parnas): document the caller contract, never the implementation; the target contract, never a current defect. |
 | `generating-test-scope` | Change-impact analysis by dependency tracing, risk-based test prioritization, and evidence-mapped recommendations. |
-| `skill-ab-trial` | Randomized controlled trial design: pre-registration, treatment and control arms, a held-out oracle, blinded ranking, replication, and isolated runs; ablation of one instruction at a time. |
 | `rationale-records` | Chesterton's fence — record why the code has its exact shape before a natural-looking rewrite removes it; one invariant, one current owner; anchored reverse index from source to reason. |
 
 ## Lifecycle placement
@@ -75,7 +73,7 @@ skills/      # source skills and non-invocable support directories
 tools/       # portable user-level agent tools
 scripts/     # installers and contract checks
 docs/        # design notes, plans, research
-AGENTS.md    # skill-authoring and maintenance conventions
+AGENTS.md    # shared repository contract
 CONTEXT.md   # canonical domain terms for skill distribution
 CLAUDE.md    # runtime guidance for Claude Code
 ```
@@ -102,20 +100,12 @@ replacing unrelated hooks or settings.
 
 ## Testing
 
-Run the focused checks provided by the skill being changed.
+Follow the verification requirements in [AGENTS.md](AGENTS.md#verification-and-completion).
 
 ## Contributing
 
-Read [AGENTS.md](AGENTS.md) before adding or changing a skill. Key conventions:
-
-- **Rule Harvest Gate** — promote a rule only for a repeated correction, observed
-  failure mode, or explicit user-approved invariant, at the narrowest applicable level.
-- **Keep `SKILL.md` task-facing** — maintenance guidance goes in `AGENTS.md`,
-  detail goes in `REFERENCE.md`.
-- **Stay portable** — standard Markdown and stdlib-only scripts; no runtime-specific
-  workflow scripts or external dependencies in core skills.
-- **Don't edit managed installed copies** — keep installed runtime copies
-  byte-identical with their source; customize via a local override skill.
-
-Improvements follow an evidence loop (baseline → name failure mode → narrowest
-edit → re-validate → decide with hard gates), described in `AGENTS.md`.
+Read [AGENTS.md](AGENTS.md) before repository work. It owns source ownership,
+portability, authoring, and verification requirements for skills and tools.
+Skill creation and improvement use the current runtime's official
+`skill-creator`, with `writing-for-agents` for wording and information structure.
+Repository-specific constraints remain in `AGENTS.md`.

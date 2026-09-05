@@ -22,7 +22,6 @@
 | [`e2e-test-executor`](skills/e2e-test-executor/) | 验证 | 执行端到端测试计划并产出有证据支撑的报告；驱动修复循环直至全绿。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
-| [`skill-ab-trial`](skills/skill-ab-trial/) | 验证 | 用对照实验实测一条候选指令是否真的改变 agent 的交付物。 |
 | [`rationale-records`](skills/rationale-records/) | 导航 | 维护和反查 Git 忽略的个人当前代码理由，并提供严格源码锚点与 worktree 交接。 |
 
 ## 各 skill 背后的方法
@@ -39,7 +38,6 @@
 | `e2e-test-executor` | RIPR 模型——可达与感染对应可控性，传播与揭示对应可观测性；按易失性顺序采集证据（数字取证）；PROV 式溯源，使计划、运行、产物仅凭产物即可重建；显式的 SUT 边界，声明每个真实依赖与替身。 |
 | `generating-api-docs` | 契约式设计与信息隐藏（Parnas）：只写调用方契约，不写实现；写目标契约，不写当前缺陷。 |
 | `generating-test-scope` | 基于依赖追踪的变更影响分析、基于风险的测试优先级、每条建议都映射到证据。 |
-| `skill-ab-trial` | 随机对照实验设计：预注册、处理组与对照组、留出预言机、盲评、重复、隔离运行；一次只消融一条指令。 |
 | `rationale-records` | 切斯特顿的栅栏——在看似自然的重写抹掉它之前，先记下代码为什么是这个精确形状；一条不变量只有一个当前所有者；从源码到理由的锚定反查索引。 |
 
 ## 生命周期定位
@@ -69,7 +67,7 @@ skills/      # 源技能与不可触发支持目录
 tools/       # 可移植的用户级 agent 工具
 scripts/     # 安装器与契约检查
 docs/        # 设计笔记、计划与调研
-AGENTS.md    # 技能编写与维护约定
+AGENTS.md    # 跨运行时共用仓库约定
 CONTEXT.md   # 技能分发的领域术语
 CLAUDE.md    # 面向 Claude Code 的运行时指引
 ```
@@ -93,19 +91,10 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 ## 测试
 
-修改 skill 后运行它提供的针对性检查。
+遵循 [AGENTS.md](AGENTS.md#verification-and-completion) 中的验证要求。
 
 ## 参与贡献
 
-新增或修改技能前请先阅读 [AGENTS.md](AGENTS.md)。核心约定：
-
-- **规则收割闸（Rule Harvest Gate）**——只有当某规则对应一次重复纠正、已观察到的失效
-  模式，或用户明确认可的不变式时才提升为规则，并在最窄的适用层级添加。
-- **`SKILL.md` 保持面向任务**——维护性指引放入 `AGENTS.md`，细节放入 `REFERENCE.md`。
-- **保持可移植**——标准 Markdown 与仅依赖标准库的脚本；核心技能不引入运行时专属工作流
-  脚本或外部依赖。
-- **不要修改受管安装副本**——已安装的运行时副本须与源技能逐字节一致；个性化定制请使用
-  本地覆盖技能（local override skill）。
-
-技能改进遵循证据闭环（建立基线 → 命名失效模式 → 最窄改动 → 重新验证 → 依据硬闸与判定
-规则决策），详见 `AGENTS.md`。
+仓库工作开始前阅读 [AGENTS.md](AGENTS.md)。它统一定义 skills 与工具的源码归属、
+可移植性、编写和验证要求。创建和改进 skill 使用当前运行时官方的 `skill-creator`，
+措辞与信息组织使用 `writing-for-agents`。仓库特有的约束继续由 `AGENTS.md` 定义。

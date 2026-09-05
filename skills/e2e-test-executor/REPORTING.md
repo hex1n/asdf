@@ -1,91 +1,108 @@
-# Evidence, artifacts, and provenance
+# Report and delivery
 
-Read this file after the execution shape is known and before cleanup or artifact generation. Volatile failure scenes must already have been captured under `SKILL.md` and `EXECUTION.md`.
+Keep one canonical `execution-report.md` and, unless Markdown-only is requested, one
+desktop `execution-report.html`. The report is the default home for the run's facts.
+Use the end-user language for headings and prose; only identifiers, closed status
+vocabularies, commands, and quoted evidence retain their original spelling.
 
-## Preserve before cleanup
+## Canonical report
 
-Retain created data, queues, locks, cache entries, temporary config, raw request/response, committed rows or state, job or event state, logs/traces/metrics, stub or external state, effective flags, entity/correlation IDs, relevant screenshots, and the exact rerun command or recorded invocation sequence when they are needed for diagnosis. If cleanup would destroy evidence, quarantine or retain self-owned data and record its owner, TTL, cleanup command, and risk. Redact secrets while preserving reproduction identifiers.
+Begin with the conclusion and counts. Group the following facts into a short report;
+they are required information, not twelve mandatory sections or repeated tables.
+Merge small groups and omit inapplicable details instead of filling empty schemas.
 
-## Fill the run directory
+| Information | Content |
+|---|---|
+| Run context | Selected IDs and exclusions, local/test target and actual build/source identity, relevant harness/runtime and real/double boundary, source plan path/hash or ad-hoc contract, timing, and prior run/overrides when present. |
+| Scenario results | One row per selected scenario: ID, terminal status, oracle, expected, actual, evidence link, and diagnosis when there is a deficit. Distinct assertions within a bundled case remain distinguishable. |
+| Evidence and findings | Per-scenario proof from `SKILL.md`, raw output or its attachment, and each root cause once with affected IDs, disposition, and next step. Shared command output is retained once and referenced by assertion. |
+| Continuation and state | Exact rerun command or recorded adapter sequence, next actionable work, and actual cleanup/retention state. A read-only run can state that no business data changed; writes name owner, retained IDs/TTL, recovery/cleanup invocation, and observed cleanup receipt. |
 
-The run directory was created at intake by [FIRST-RUN.md](FIRST-RUN.md) or [RERUN.md](RERUN.md); write every artifact into it and name its full path in the final response.
+A verdict row should explain the expected/actual difference without joining multiple
+documents. Link its detail directly. Source and deployment facts need one home; reuse
+that record for provenance and state resumption instead of copying it into several
+ledgers. If an existing downstream consumer requires a named schema, retain that
+schema for this handoff and name the consumer.
 
-Produce only artifacts whose condition applies:
+Before delivery, recheck the upstream hash. If it changed, keep the consumed revision
+and expectations explicit; reconcile changed source facts without rewriting the
+observed result. A conversational source is pinned by its retained scenario contract.
 
-```text
-e2e-run-<plan-name>-<timestamp>/
-  execution-report.md        # always: canonical handoff and inline proof
-  execution-report.html      # unless Markdown-only or render inspection is unavailable
-  reader-view.json           # with the Reader View: the data file the shipped renderer consumes
-  plan-snapshot.md           # intake/execution stage: derived, ad-hoc, or legacy-derived mechanics plus pre-report execution facts
-  *.html                     # with the Reader View: one UTF-8 companion beside each user-clickable
-                             #   artifact above and below (plan-snapshot.html, issues/*.html, scripts/*.html)
-  scripts/                   # when the run created or mutated scriptable data
-  state/                     # only while owned mutable state is retained for diagnosis
-  issues/                    # when OPEN actionable root causes exist
-    index.md
-    ISSUE-001-<short-slug>.md
-  attachments/               # only for non-textual or readability-breaking raw evidence
-  run-metadata.json          # only for a named machine consumer
-  scenario-results.jsonl     # only for rerun/comparison tooling
-```
+## Additional artifacts
 
-Treat this tree as an allowlist. `state/` is a temporary or retained-data branch, not an audit-artifact branch: after successful cleanup remove its owner marker and empty directory; retain it only when its self-owned mutable contents are still needed, with owner, TTL, cleanup command, and risk in the report. `plan-snapshot.md` is the only intake/execution-stage Markdown companion; fold boundary, preflight, environment, capability, ledger, schedule, run-log, and planned-command facts into it, then into the matching canonical report sections at delivery. Do not emit `run-log.md`, `preflight.md`, or another standalone evidence ledger unless a named consumer requires it. Preserve attempt-specific failure evidence inline; use `attachments/` only under the overflow rule below.
+Create only artifacts with a concrete consumer or payload need:
 
-Open [Run Artifact Contract](REFERENCE.md#run-artifact-contract) for the canonical report sections and structural rules; open [Scenario Results & Evidence Legibility](REFERENCE.md#scenario-results--evidence-legibility), [Run Lineage & Emergent Scenarios](REFERENCE.md#run-lineage--emergent-scenarios), and [Environment State Ledger](REFERENCE.md#environment-state-ledger) only while constructing those respective sections.
+- `attachments/` for large raw output, screenshots, or binary evidence that would
+  obscure the proof chain; retain an inline summary and precise pointer.
+- `plan-snapshot.md` for otherwise unavailable source facts or complex derived mechanics
+  that must be reused. Ordinary resolved commands and inputs fit in the report.
+- `scripts/` for genuinely needed replay or owned-data cleanup helpers; prefer existing
+  project commands. Read [Replay Entry Points](REFERENCE.md#replay-entry-points) when
+  generating a helper or a new orchestrated invocation sequence.
+- `issues/` when a repair workflow or named consumer needs separate actionable units.
+  Otherwise keep root causes inline. Read [Defect Handoffs](REFERENCE.md#defect-handoffs)
+  when creating a fix queue or assigning an unclear disposition.
+- Machine-readable metadata/results only for a named machine consumer; they project
+  the canonical facts, not a second independent verdict.
 
-## Keep one canonical proof path
+Use a fresh continuation directory for a rerun; existing commands remain valid rerun
+instructions when the next executor controls capture and report generation. A helper
+need not contain a report generator. State who produces the new report: the executor,
+the existing harness, or an explicitly requested unattended entry point. A manually
+recorded sequence is replayed step by step, inspecting each result before dependent
+actions or cleanup. Do not advertise it as an unattended executable.
 
-`execution-report.md` is the source of truth. Put every executed scenario's four proof items inline under `Evidence & Failure Scenes`, one chain per scenario, so verdict and proof share one reading path. Spill to `attachments/` only for non-textual material or raw content large enough to obscure probe → expected → actual; leave a summary, attachment path, and re-query command inline. When one batch probe covers several scenarios, retain it once and point each scenario to its slice.
+## Reader View
 
-Each `Scenario Results` row carries status, oracle type, one-line expected and actual, diagnosis, issue link, and evidence link. Use the closed diagnosis token only when a mismatch or verdict deficit exists; use `—` for a clean `passed` or `skipped` row. Record a root cause once in `Failures / Defects / Plan Gaps`; link every affected scenario to it. The ledger carries the deployment/freshness proof. Record every emergent out-of-plan finding in the lineage table, never only in prose.
+Author a self-contained desktop HTML page from the finalized canonical report. Start
+with the verdict distribution, tested target/revision, significant failures/blockers,
+and exact next run or required decision. Show `passed`, `failed`, `blocked`,
+`unverified`, and `skipped` counts from the same selected-scenario records. An all-pass
+headline requires a nonempty selection with every selected scenario passed. Zero
+selected scenarios and all-skipped runs never become successful runs.
 
-When data was created or mutated through a scriptable surface, emit paired runnable seed and cleanup scripts under `scripts/`, idempotent where possible, and link them from `Data Created & Cleanup` and the ledger. Markdown-only delivery applies to reports, not executable helpers: use the surface's normal executable extension and make the invocation explicit. A prose-only cleanup command is insufficient in this branch. For a genuinely read-only run, record the absence of created data and do not fabricate scripts.
+Use a comparison table with **Scenario**, **Expected Input**, **Expected Result**, and
+**Actual Result**, localized to the audience. Expected fields come from the consumed
+plan and approved overrides; actual fields come from this run. Make terminal status
+visible, with oracle, diagnosis, evidence, and full effective details expandable in
+the same scenario's row. Group shared root causes once and link affected scenarios.
 
-When this run generates a rerun entry point — an executable helper, or a recorded adapter invocation sequence — open [Replay Entry Point Contract](REFERENCE.md#replay-entry-point-contract) and satisfy it before naming that entry point in `Re-run Instructions`. A read-only run that generates none skips it.
+Keep all facts needed to understand, audit, rerun, or clean up accessible in the page.
+Embed supporting text/evidence in expandable detail or link bulky canonical/raw
+attachments directly for inspection/download. A Markdown, SQL, JSON, or log link does
+not require another HTML file. Add a companion only for a real size/navigation need.
+Preserve canonical paths and provenance, and audit any extra pages that are created.
 
-## Dispositions and local issues
+Use semantic HTML, inline CSS, native disclosures, UTF-8, localized controls, textual
+status labels, visible keyboard focus, and a desktop layout with readable tables and
+wrapping. Keep the report readable without JavaScript; optional inline interaction
+only filters/navigates existing facts. Use no external fonts, scripts, or CDNs. Escape
+raw evidence. Add a flow/timeline only when it explains real dependencies or recovery.
 
-Every failure, defect, and gap needs a disposition. Open [Gap & Defect Disposition](REFERENCE.md#gap--defect-disposition) when assigning it.
+Verify before delivering HTML:
 
-- Every `OPEN` actionable root cause gets one `issues/ISSUE-*.md`, linked from its failure entry and affected scenario rows.
-- `Next Actions for Agent` lists only `OPEN` executable work.
-- `CONDITIONAL`, `BLOCKED-BY-TOOLING`, and `BLOCKED-BY-ENVIRONMENT` remain in the failure section with their precondition or missing capability/dependency/fixture.
-- Remote tracker creation remains out of scope unless explicitly requested.
+1. Compare each scenario's actual field values, authority, oracle, diagnosis, evidence,
+   and cleanup state against Markdown and the consumed plan. Never resolve a mismatch
+   by changing the expected result to the actual result.
+2. Recompute counts/headline and reconcile selected IDs, unresolved findings,
+   exclusions, retained data, and the exact continuation set. IDs/counts alone do not
+   establish semantic agreement.
+3. Audit local links and fragments, including raw attachments, for existence within
+   the intended report/source boundary. Preserve UTF-8 and raw evidence contents.
+4. Render at a normal desktop viewport and inspect the opening, scenario/failure
+   details, tables, links, focus, wrapping, and overflow. Fix clipped content or
+   misleading status/flow presentation.
 
-Each issue document carries the fifteen-field schema in [Scenario Results & Evidence Legibility](REFERENCE.md#scenario-results--evidence-legibility) (**Local issue documents**); that section is the only copy of the field list.
+If render inspection or a necessary fidelity check is unavailable, deliver Markdown
+and explain why the HTML view was withheld. File creation alone is not a render pass.
 
-## Reader View branch
+## Final reconciliation
 
-Unless the user requests Markdown-only, create `execution-report.html` only when it can be rendered and visually inspected. Open [Reader View Contract](REFERENCE.md#reader-view-contract) for its projection and link-audit rules.
+Check selection → results and results → selection, resolving every cited scenario,
+root-cause, issue, or evidence reference. Mark references to upstream-only scenarios
+as such. Preserve attempted failures and blockers even if later attempts passed.
+Cleanup claims require their observed receipt and independent absence/restoration
+proof; unresolved evidence or lifecycle obligations remain visible.
 
-The Reader View is an answer-first visual index with the complete human report below it, never a second evidence source. Its primary table columns and their provenance rules are defined once in the [Reader View Contract](REFERENCE.md#reader-view-contract). Every projection preserves statuses, dispositions, blockers, skipped/unverified items, proof chains, and retention policy.
-
-A delivered Reader View exposes only HTML navigation. For each clickable Markdown, JSON, JSONL, SQL, or text report-suite artifact, generate a UTF-8 HTML companion and link the companion while retaining the canonical/raw source. Audit every internal link and confirm no projection contradicts or omits a canonical Markdown fact needed to understand or audit the verdict. Withhold the Reader View, and state why, when render-and-inspect or link auditing cannot be completed.
-
-## Provenance and rerun handoff
-
-Record a PROV triple in `Run Lineage & Emergent Scenarios`:
-
-- **entities** — upstream plan, upstream run when any, this run's artifacts, downstream work;
-- **activity** — this run's selection set, overrides, start, and end;
-- **agents** — executing runtime and triggering instruction.
-
-The terminal `Environment State Ledger` is the activity snapshot. Every rerun or investigation back-links the original plan and prior run.
-
-When the user authorizes an iterate-until-green loop, keep the report and issues queue unchanged as this iteration's immutable handoff. The final response additionally names all `OPEN` actionable issues, the next continuation set defined by `RERUN.md`, and the applicable stop condition: no open actionable root causes, a blocker only the user can resolve, or the loop cap from `SKILL.md`'s scope boundary.
-
-## Delivery gate
-
-Before final response, verify:
-
-- `execution-report.md` contains every scenario's proof chain, status, oracle, diagnosis, and lineage;
-- the ledger records terminal state, fingerprint, retained items, cleanup, and risks;
-- every open actionable root cause has an issue with post-fix rerun and closure rule;
-- seed/cleanup scripts exist exactly when the write-path condition requires them;
-- when a rerun entry point was generated, it satisfies [Replay Entry Point Contract](REFERENCE.md#replay-entry-point-contract), and no instruction chains independent verification and cleanup commands;
-- Reader View projection, render inspection, HTML companion links, and link audit pass, or the report records why it was withheld;
-- optional machine or overflow artifacts exist only for a real consumer or payload need.
-- no unlisted run log, preflight, environment, capability, intake, or evidence-ledger companion was emitted.
-
-In the final response, link Reader View first when delivered, use HTML companions for other user-clickable report-suite links, name canonical/raw paths as code when useful, summarize every nonzero status count, identify blockers and open issues, and state whether cleanup completed or what remains preserved.
+Link HTML first when delivered and also provide canonical/raw links when useful.
+Summarize every nonzero status count, actionable findings, blockers, and retained data.

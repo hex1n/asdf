@@ -1,97 +1,95 @@
-# Execution control and observation
+# Stateful and dependent execution
 
-Read this file after the selection set is fixed and before the first trigger. Follow only the environment and side-effect branches that apply.
+Read only the applicable sections before setup, writes, async work, shared-state
+scheduling, or cleanup. Record each fact once in the report or a linked existing
+harness receipt; a named table is unnecessary unless it clarifies the run.
 
-Keep execution-stage records on the canonical proof path: append boundary, capability, preflight, ledger, schedule, and planned-command facts to `plan-snapshot.md` until `execution-report.md` exists. Do not create a separate run log, preflight, environment, capability, intake, or evidence-ledger document; raw proof belongs inline in the final report or, only when it would break readability, under `attachments/` as defined by `REPORTING.md`.
+## Environment and dependency readiness
 
-## Pin the SUT boundary
+Use effective targets for the reached stores, queues, services, and external effects.
+Verify the schema/fields actually used, the tool paths/versions the run's shell loads,
+and the intended build in the running process. Omit irrelevant capabilities. After
+changing configuration, services, fixtures, or deployment, recheck readiness and prove
+the next response or state reflects the new setup.
 
-Declare every dependency the selected scenarios reach as **real** or a **double** (stub, fixture, record/replay), including the double's source and owner. Open [SUT Boundary](REFERENCE.md#sut-boundary) for the row schema. An undeclared dependency cannot carry a verdict.
+In local scope, repair reversible setup issues: start declared services/workers/stubs,
+resolve ports and declared dependencies, use temporary configuration, and run required
+migrations/seeds. Retain the actual commands and changes. Downloads/cache failures
+remain setup problems unless product code ran and violated an expectation. Preserve
+business logic and existing authorization/validation boundaries.
 
-If a required real dependency is unreachable, use its already-declared double. When no double exists, capture endpoint, error, timestamp, and retry evidence; mark the scenario `blocked`; classify the root cause as `environment defect` with `BLOCKED-BY-ENVIRONMENT`. It becomes a product defect only when product code ran and violated an established expectation. The only exception is a scenario whose `Purpose` and `Expected Results` explicitly cover dependency-down, timeout, or recovery behavior — a legacy `e2e-plan/v2` plan may carry that declaration in `Automation` instead: the outage is then its expected input, and it passes only when the specified fallback, retry, compensation, or error contract is observed.
+Prefer declared harnesses and adapters; use their safe describe/probe surfaces to
+resolve invocation details. Record only the selected target, operation, inputs,
+relevant options, and actual permissions. Localize blockers to credentials, tooling,
+network, routing, or dependency readiness from evidence instead of a generic failure.
 
-## Pin the trigger channel
+A required real dependency that is unreachable blocks its dependent scenarios unless
+the plan already permits a declared double. Keep real/double coverage explicit; do
+not silently replace a real integration boundary. An intentionally unavailable
+upstream is valid input only for a scenario whose authority specifies the fallback,
+timeout, or recovery result. Time and randomness are dependencies too: control them
+or observe them independently; inferring an expected clock/random value from the
+response under test is circular.
 
-Build the `Environment & Capability Map` (the report section of the same name) for the selected scenarios. Include applicable API/RPC/SDK/CLI/UI controls; DB, MQ, cache, job, and callback access; logs, metrics, and traces; auth, base URLs, test accounts, feature flags, service commands, stubs, toolchains, dependency caches, and cleanup mechanisms.
+## Business data and ownership
 
-Name `Trigger Channel Gates` explicitly: tool permission, invoke/service/API allowlists, network path, target or routing overrides, direct-URL fallback, credentials, and the runtime configuration that enables them. Before a trigger, be able to localize a block to the exact layer rather than reporting a generic connection failure. A missing tool, adapter, UI selector, or access right is `tooling defect` with `BLOCKED-BY-TOOLING`, naming the missing capability.
+Before a business mutation, resolve the footprint's target provenance, owner or
+run namespace, permitted effects, and terminal lifecycle (`retain`, `restore`, or
+`delete`). Unknown ownership or recovery/retention authority blocks that mutation.
+Create fixtures through legitimate business entries or declared test tools. Reused
+read-only data needs its source, identifier, and reproducibility limits; it needs no
+invented owner marker, TTL, or cleanup. Mutated shared data needs explicit restoration
+or retention authority. Direct database mutation is a test-environment hook only,
+with the affected records and commands retained.
 
-Prefer a project-declared test harness, adapter, CLI wrapper, browser driver, queue/job tool, or callback harness over hand-written mechanics. Open [Execution Adapter Boundary](REFERENCE.md#execution-adapter-boundary) only when choosing or validating an adapter. The executor owns selection, gates, data policy, evidence, diagnosis, cleanup, and reporting; the adapter owns surface-specific resolution, safe describe or dry-run behavior, encoding, invocation, and replay. Invoking an existing harness is allowed. Creating a new test file or method still requires the authorization stated in `SKILL.md`.
+For created/mutated data, record the owner, identifiers, original state when restoring,
+cleanup command, retention scope/TTL, and allowed lifecycle. Preserve diagnostic
+traces by default when the lifecycle permits it; honor a user's clean/retain override.
+A retention override requires reconsidering destructive, configuration, scope-changing,
+and external-effect scenarios. Use an owned fixture or an authorized read-only
+alternative when the original route would violate it. Failure injection and replay
+use dedicated fixtures, never an already-succeeded business state.
 
-## Pin the starting state
+Existing seed/cleanup commands are valid reproducible handoffs. Generate helpers only
+when existing entry points cannot provide the required replay or retained-data cleanup;
+then read [Replay Entry Points](REFERENCE.md#replay-entry-points). A scriptable write
+alone does not require a new script pair. Preserve enough inputs and exact invocations
+to reconstruct the fixture and restore/delete only the authorized targets.
 
-A scenario triggers only after its environment fingerprint, data ownership, and schedule are all pinned.
+## Order, waits, and interference
 
-### Environment contract
+Keep a short ordered list for a linear dependent run. Build a DAG when branching
+prerequisites, shared mutable state, or cleanup dependencies make that list ambiguous.
+Retain source-backed prerequisite edges and explicitly pass produced values. Parallel
+execution requires evidence of disjoint mutable targets and effects across records,
+readers/receivers, and external targets/stubs; different isolation keys alone are not
+proof. Serialize unresolved overlap. Isolate disruptive recovery or concurrency work.
 
-Resolve concrete values for the effective datasource and expected schema, the actual build/run toolchain, and the running process's deployment fingerprint. A profile name or `reachable` is not a value or fingerprint. Open [Environment Contract preflight](REFERENCE.md#environment-contract-preflight) for the field schema.
+Wait on bounded observable completion predicates, not fixed sleeps alone. Use approved
+business thresholds when present. With `business threshold: none specified`, choose
+and record a finite execution-safety bound from the environment; it is not a product
+oracle. A missing completion/probe capability is `blocked`. Exceeding a contractual
+threshold is `failed` only after valid trigger and observation are established;
+exceeding only a safety bound is `blocked` as incomplete observation, preserving any
+more specific environment/tooling cause.
 
-After changing config, profiles, flags, stubs, service state, seed data, test data, or deployment, rerun readiness and prove the next response, row, event, log, or artifact reflects the new state. Treat stale snapshots, reused fixtures, cache hits, and missing fingerprints as risks until disproved. An unresolved in-scope field blocks execution.
+Finish dependent chains with the contractual cross-store/event/external consistency
+checks. For a rejection that promises unchanged state, retain a before/after or other
+independent invariant probe, including when the error response itself is correct.
 
-#### Local branch
+## Preserve and clean up
 
-For a local run, actively fix reversible environment problems within scope: start declared services, workers, schedulers, stubs, or compose stacks; resolve ports; install declared dependencies; create temporary config; run migrations or seeds; and inspect logs until readiness passes or a blocker is proven. Resolve and record the non-interactive shell's actual tool paths and versions before build or startup. Log each command, port, profile, service, toolchain version, cache/dependency source, file, and temporary change.
+Before cleanup, persist and verify the diagnostic evidence, owned identifiers, and
+observed verdict in the canonical report or its linked durable receipts. Capture
+failure state before further actions can overwrite it. If capture fails or required
+diagnosis still needs the scene, preserve owned state under its permitted lifecycle,
+record the failure and recovery path, and report any lifecycle obligation still unmet.
+Never trade lost evidence for an apparently clean run.
 
-Cache misses, downloads, and dependency-resolution timeouts are setup defects unless product code actually ran and failed. Never alter business logic, bypass auth or validation, or edit production templates to make a scenario pass.
-
-#### Test branch
-
-For a confirmed test environment, data creation and cleanup plus job and callback triggering are permitted within the selected plan. Confirm the environment first; do not infer safety from a profile name. Use only test credentials and targets, and keep every mutation attributable and reversible or explicitly retained.
-
-### Data ownership and side-effect branch
-
-Prefer creating required business data through business entry points or existing test tools. Stable, low-side-effect preconfigured data may be reused — accounts, tenants, products, templates, switches, dictionaries, or provider configuration are examples — only after recording its ID, source, current state, why it was reused, whether the run may mutate it, and the effect on reproducibility and cleanup.
-
-Every created or reused entity needs an owner marker such as batch ID, prefix, creator, tenant, trace ID, remark, or scenario ID, plus retention decision, TTL, and cleanup command. Direct DB mutation is allowed only in test when it is the practical hook, with every write/delete logged.
-
-Choose and record one data policy before triggering:
-
-- **preserve traces** is the default for local/test E2E because repair and rerun work may need the scene;
-- **clean** applies when the user asks, the plan requires zero retained data, or created data is provably irrelevant to diagnosis and reproducibility.
-
-Record strategy, retention scope, cleanable keys, and do-not-clean items in the `Environment State Ledger`.
-
-#### Read-only branch
-
-Do not create cleanup scripts when nothing was created or mutated. Record the reused identifiers and non-mutation evidence. If existing data could be changed but cannot be restored, keep the scenario read-only or mark its mutation path blocked.
-
-#### Write-path branch
-
-When creating or mutating data, decide cleanup before the write and later emit runnable seed and cleanup scripts when the surface is scriptable. A generated helper that performs this run's mutations is hashed before its first mutation and the hash recorded, under the helper rules in [REPORTING.md](REPORTING.md#keep-one-canonical-proof-path). For an absent target, satisfy [Path Containment Proof](REFERENCE.md#path-containment-proof) before the create call and before the first mutation. Under preserve-traces policy, keep self-owned diagnostic state with owner, TTL, cleanup command, and risk.
-
-When preservation is required, re-risk scenarios involving `soft-delete`, `destructive-delete`, `scope-mutation`, `config-change`, or `external-effect`. Without explicit authorization, downgrade them to read-only verification using existing evidence or a dedicated new fixture. Failure-recovery and replay paths use a dedicated failure-injection fixture; never reuse an already-succeeded state.
-
-### Schedule by root cause
-
-Build a runtime DAG; file order is not execution order. Open [Scheduling by Root Cause](REFERENCE.md#scheduling-by-root-cause) when placing nodes. Default to serial. Parallelize a pair only when isolation keys differ **and** records prove no shared mutable target across locator, effects, readers/receivers, and external target or stub. Differing isolation keys alone do not prove independence. If overlap is unstated, serialize and explain why.
-
-Run dependent chains in DAG order and pass produced variables explicitly. Isolate disruptive nodes. Finish with final consistency and cleanup checks across committed stores, events, logs, metrics, stubs, external side effects, and created data.
-
-## Observe the committed outcome
-
-Name each oracle as `specified`, `derived`, or `implicit`. Open [Oracle Types](REFERENCE.md#oracle-types) when classification is unclear. An implicit oracle is at most `unverified`.
-
-Probe the committed outcome named by Expected Results — row, event, external effect, or user-visible state after propagation — not merely an entry response that accepted work. For asynchronous behavior, wait on a bounded, observable state transition; fixed sleeps alone cannot prove completion.
-
-A scenario passes only when expected probes, waits, invariants, side effects, and cleanup evidence hold. Retain for every executed scenario:
-
-1. exact probe commands or adapter invocations;
-2. raw unsummarized output verbatim in a fenced block;
-3. created-entity identifiers, or an explicit “none” for a read-only scenario;
-4. an exact pre-cleanup re-query command an auditor can run against the live datasource — or, on a replay surface without executable bytes, the recorded adapter invocation that re-reads the committed state — plus its retained output from this run.
-
-Execute that independent re-query and retain its output before any cleanup that intentionally removes the claimed state. If raw evidence was not retained or this pre-cleanup re-query does not reproduce the claim, the result is `unverified`. A post-cleanup absence probe is a separate cleanup oracle: name it as such, retain its exact command and output, and never present an intentionally failing post-cleanup query as the scenario's re-query. Every probe named in the report is exact and replayable — a command or a recorded adapter invocation; “the corresponding command” is neither. When one plan leaf bundles independently verifiable cases, report each separately; an unexecuted case is `blocked` with its missing fixture or capability.
-
-## Execution completion gate
-
-Before cleanup or reporting, confirm:
-
-- every dependency has a boundary row;
-- the capability map either satisfies gates or names exact blockers;
-- environment contract values and deployment freshness are concrete;
-- every entity has ownership and retention metadata;
-- schedule decisions cite their root cause;
-- every scenario has a terminal status, oracle type, proof chain or explicit deficit, and diagnosis for failures/blockers;
-- volatile failure scenes are already preserved.
-
-Then read [REPORTING.md](REPORTING.md).
+Delete or restore only the recorded owned targets under the authorized lifecycle.
+For filesystem cleanup, resolve the target inside the authorized run namespace,
+reject traversal/symlink escape, and verify the matching owner before deletion.
+After cleanup, perform an independent absence/restoration check and record its exact
+invocation and output. Distinguish not attempted, retained, pending, and verified
+completed cleanup. Remove empty ownership scaffolding only after its owned data is
+settled. Cleanup success does not convert a failed scenario into a pass.

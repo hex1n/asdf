@@ -1,42 +1,39 @@
-# Rerun intake
+# Continue a prior run
 
-Read this file only when verifying fixes, resuming a prior run, or executing scenarios selected from an existing `execution-report.md`. A first execution uses [FIRST-RUN.md](FIRST-RUN.md) instead.
+Read the previous `execution-report.md` and original plan before acting. Create a
+fresh continuation directory under `SKILL.md`'s path rules; never rewrite historical
+reports, evidence, or helpers. Back-link both sources and pin the current consumed
+source revision. Carry forward applicable user overrides and retained-state facts.
 
-## Preserve prior history
+## Choose and validate the continuation
 
-Read the prior run's `execution-report.md` before touching the system. Never edit that report or any attachment in place. Creating a continuation is a write: satisfy [Path Containment Proof](REFERENCE.md#path-containment-proof) before `mkdir`. Use one unique `e2e-run-<plan-name>-<timestamp>/` beside the prior run unless the user supplies another validated output path. Record the prior report as `Upstream run` and back-link both the original plan and prior run. Every generated rerun command or script must target a fresh continuation directory, never the current historical directory. Every file written into the continuation before delivery is an entry of the artifact allowlist in [REPORTING.md](REPORTING.md#fill-the-run-directory).
+Honor the user's explicit scenario selection. Otherwise select previous `failed`,
+`blocked`, and `unverified` scenarios plus dependents that consumed the fixed behavior.
+Explain any affected dependents excluded by the requested scope; do not silently
+claim their regressions were checked. Expand to the entire plan only when impact or
+the user requires it. A subset never waives shared prerequisites or safety gates.
 
-Carry forward:
+Re-derive only mechanics invalidated by changed code, environment, or evidence. Keep
+unchanged business expectations pinned to their approved authority, recording any
+approved expectation changes separately. Resolve never-executed dependents under
+[FIRST-RUN.md](FIRST-RUN.md); preserve existing safety edges and legacy facts.
 
-- all `failed`, `blocked`, and `unverified` scenarios;
-- every open defect and its disposition;
-- the `Environment State Ledger` as the resume snapshot, including what persists and what must not be cleaned;
-- prior execution overrides that still apply;
-- retained entities, owner markers, TTLs, cleanup commands, and failure scenes.
+Prove the fix is loaded in the actual command/process before judging it. Use the
+expected version, loaded source/build identity, or a discriminating behavioral
+fingerprint; reachability alone does not prove freshness. Reuse prior metadata only
+when it still describes the effective target.
 
-Re-read the user's latest constraints and record any changed exclusions, retention policy, tool restriction, or exit criterion as a new `Execution Contract Override`. An override supersedes the matching prior or plan default; it is never reported as a failure. Open [Execution Contract Override](REFERENCE.md#execution-contract-override) only when an override exists.
+Read retained identifiers, ownership, TTL, cleanup commands, and do-not-clean items
+before creating or reusing fixtures. Read [EXECUTION.md](EXECUTION.md) for any writes,
+async/dependent work, or retained-state cleanup. A previous failure becomes passed
+only with this run's fresh outcome and retained proof. Record the new disposition
+and evidence here while preserving the original verdict.
 
-## Select the continuation
+## Authorized repair loops
 
-Select the prior run's `failed`, `blocked`, and `unverified` scenarios plus every DAG dependent that consumed the fixed behavior. Do not rerun only the named failed scenario, because that misses fix-induced downstream regressions; do not rerun the entire plan unless the dependency graph or the user requires it.
-
-Map the continuation set to the same plan IDs, edge IDs, variables, required capabilities, waits, isolation, side effects, and cleanup rules used by the prior run. Re-derive only mechanics invalidated by the fix, environment change, or new evidence, and record each change in the new `plan-snapshot.md` or lineage section.
-
-A dependent the prior run never executed carries no derived mechanics to reuse. Resolve its anchors and derive its mechanics under the derivation rules in [FIRST-RUN.md](FIRST-RUN.md#establish-the-upstream-artifact) — the atomic-field reducer, the six derivation targets, and the `derived` or `legacy-derived` lineage mark — and record them in the new `plan-snapshot.md` before it enters the continuation set.
-
-Before revalidation, prove the fixed build is loaded. The deployment fingerprint must differ in the way the fix predicts — version, commit, build, start time, or a discriminating behavioral fingerprint. Reachability alone is never proof; a stale process means the fixed behavior was not reached.
-
-A previously failed scenario flips to `passed` only when the current run satisfies its committed-state probes and retained-proof contract. Update the copied defect status in this run and back-link the new evidence; never rewrite the historical verdict.
-
-## Rerun completion gate
-
-Do not proceed until:
-
-- the prior report and original plan are readable;
-- the continuation set includes affected dependents and explains exclusions;
-- retained state and do-not-clean items are carried into the new ledger;
-- the expected fixed-build fingerprint is named;
-- every selected scenario has current mechanics or an exact blocker;
-- current user overrides are recorded.
-
-Then read [EXECUTION.md](EXECUTION.md).
+This skill supplies execution and diagnosis; the calling agent owns separately
+authorized product fixes. For an explicit iterate-until-green request, retain each
+iteration's report as an immutable handoff. Continue from actionable defects and
+affected dependents; stop when no actionable defects remain, an external decision
+blocks progress, or the user's cap is reached (default eight full E2E rerun cycles).
+Report skipped/unverified/blocked work even when no actionable fix remains.

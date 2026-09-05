@@ -1,145 +1,118 @@
 ---
 name: e2e-test-planner
 description: >
-  E2E test plans as business scenario trees, model-driven (input space, state graph, decision logic) and source-backed, with change blast radius. Use when the user asks for an end-to-end, integration, acceptance, or regression test plan or test scenarios from requirements, designs, decisions, or codebase changes. To run an existing plan or scenario use e2e-test-executor.
+  Create source-backed E2E, integration, acceptance, or regression test plans as business scenario trees from requirements, designs, decisions, or code changes. Use for planning scenarios and coverage; executing an existing plan, report, or concrete scenario belongs to e2e-test-executor.
 ---
 
 # E2E Test Planner
 
-Write the plan as a business scenario tree. The tree is the single home for scenarios: one primary Happy Path first, then branches attached to the business step or decision they vary, each with its expected result.
+Produce an executable business scenario tree with justified expectations and visible
+coverage gaps. Scale the supporting analysis to the behavior: a short flow and
+coverage note can support a small plan; interactions and shared changes need models.
+Use the user's language, preserving identifiers, commands, and quoted evidence.
 
-Use the user's language unless explicitly asked otherwise. Preserve identifiers, paths, API names, enum values, commands, and quoted source text exactly.
+## 1. Establish the outcome and evidence
 
-Read [REFERENCE.md](REFERENCE.md) before drafting; it defines the plan shape, model tables, coverage defaults, and leaf contract.
+Name the actor, legitimate entry, completed business outcome, requested test boundary,
+and exclusions. Separate **expected-result authority** (approved requirements,
+decisions, policies, external contracts, or explicit user direction) from
+**implementation evidence** (code, configuration, schemas, tests, and logs).
 
-## Principle
+Pin intended behavior to its authority and revision. Current code and tests establish
+reachability and current behavior; they define correctness only when explicitly
+designated as the contract at a particular revision. With no established authority,
+retain useful characterization scenarios and mark the intended result
+`NEEDS-DECISION`. Agreement with the implementation does not resolve that decision.
 
-A plan applies coverage criteria to the models the behavior actually has — the **state graph**, **input space**, and **decision logic** — with an oracle independent of the implementation on every leaf. Judge every leaf by **RIPR**: it reaches the path, lets a fault infect state, propagates that state to a committed outcome, and reveals it with a concrete expected value.
+Trace the normal route from entry to completed outcome. Include a producer flow when
+it creates a prerequisite the journey must exercise. For a change, follow affected
+contracts through shared writers, readers, callers, and subscribers to other business
+outcomes. Inspect alternate entries and asynchronous or recovery paths the change
+can reach; retain unresolved impact as a gap instead of silently narrowing scope.
 
-## 1. Frame the Business Outcome
+## 2. Identify coverage and choose its layer
 
-State:
+Account for the requested rules, accepted and rejected input partitions, boundaries,
+state transitions, and affected flows. A short list mapping these to scenarios or
+gaps is sufficient when the mapping is direct.
 
-- The actor, legitimate entry, intended business outcome, and observable completion state.
-- The requested scope and explicit non-goals.
-- The source that defines the intended result and who approved it.
-- The implementation evidence that shows current behavior, reachability, and risk.
-- Any conflict or missing authority that prevents a correctness verdict.
+Read [Coverage Models](REFERENCE.md#coverage-models) when conditions interact,
+rules overlap, retries or concurrency introduce alternative transitions, a shared
+change affects multiple flows, or the user requests a matrix or formal traceability.
+Build only the models that explain those obligations. The reference also defines
+when an explicit test-requirement ledger is useful; a simple plan needs neither
+that ledger nor a table proving that unused models are inapplicable.
 
-Keep these evidence roles separate:
+Allocate each obligation to the lowest layer that exposes the fault: unit for local
+calculations and validation; integration for component contracts, persistence, and
+adapters; E2E for the requested journeys and system-level propagation. Preserve the
+user's requested boundary. Local permutations may share an E2E representative only
+with source-backed equivalence at that boundary and a stated residual risk.
 
-- **Expected-result authority** defines what should happen: explicit user direction, an approved requirement, design, decision, business policy, or published external contract.
-- **Implementation evidence** shows what currently happens: code, configuration, schemas, existing tests, and logs.
-- **Runtime evidence** shows what happened in one observed execution.
+An existing lower-layer test counts as mapped coverage only after inspecting its
+inputs and assertions. Missing tests remain explicit follow-ups. A coverage mapping
+is a plan fact, never an executed-pass claim, and never authorization to write tests.
 
-Code and existing tests do not prove business correctness merely because they agree. They may define a verdict only when the user or an approved source explicitly designates them as the contract. If only implementation evidence exists, write a current-behavior characterization, mark the intended result `NEEDS-DECISION`, and do not turn implementation agreement into a pass condition. If sources conflict, name the selected expected-result authority and its approval basis; when that choice is not established, keep the semantic unresolved.
+## 3. Write the scenario tree
 
-Completion criterion: the plan names one testable outcome, its expected-result authority, its implementation evidence, and the surfaces deliberately excluded. Every later business rule points to an approved authority or is marked `NEEDS-DECISION`.
+Keep each scenario's definition under its business branch. Put the shortest complete
+Primary Happy Path first, then attach variants at the step where they diverge. Include
+affected-flow regressions and source-backed failure or recovery branches. When the
+contract is negative-only, put its canonical verification path first and explain why
+there is no positive Happy Path.
 
-## 2. Build the Applicable Models
+Declare `Execution handoff: execution-anchors/v1` in the overview; localize the label,
+preserve the token. Each stable scenario ID has a purpose and these effective facts:
 
-Build the state graph first, then run the [Model Applicability](REFERENCE.md#model-applicability) gate before inventing scenarios. Record all three models once in the `Model Applicability` table:
+| Fact | Required content |
+|---|---|
+| Preconditions | Concrete starting state and inputs, or deterministic construction/selection rules; predecessor scenario IDs only where genuinely required. |
+| Actions | Ordered business actions through a source-backed entry or adapter, naming the stable operation and its inputs. |
+| Observes | Final contractual observation and completion predicate. Record an approved product time threshold, or `business threshold: none specified`. |
+| State Footprint | Resources read, written, and external effects; `none` for an empty class. Every writable/external target names provenance or ownership and allowed lifecycle: `retain`, `restore`, or `delete`. |
+| Expected Results | Concrete values, errors, or invariants that distinguish correct from incorrect behavior. |
+| Oracle / Expected Authority | `specified` for approved expected values, or `derived` for an independent reference/relation; name the governing source, revision, and calculation. |
+| Implementation Evidence | Locators supporting the entry, state, observation, and footprint; these establish mechanics, not business correctness. |
 
-- **State graph — always built.** Every E2E plan needs a legitimate entry, propagation path, and committed outcome. Change-scoped work also traces every affected flow through this model.
-- **Input space — built when applicable.** Build it when source or change evidence identifies a characteristic with multiple feasible blocks and the contract either permits different reachability, state transitions, settlement timing, or committed observables across those blocks, or requires an invariant across them.
-- **Decision logic — built when applicable.** Build it when the system selects among outcomes or error codes, a rule has independent conditions, or overlapping rules have a judgment order.
+The first four facts are the execution anchors. Resolve business facts here; the
+executor resolves live targets, credentials, commands, safety wait bounds, owner
+markers, and cleanup implementations. Keep a known project command when it is the
+stable entry interface. Missing business decisions stay `NEEDS-DECISION`; missing
+source anchors stay `BLOCKED`. Either can be planned, but neither is execution-ready.
 
-Mark an optional model `not applicable` only from positive source and blast-radius evidence, and record the reason and residual risk. Missing evidence is not proof of absence: build the model with the uncertainty as a `NEEDS-DECISION` row. If later drafting reveals a characteristic, rule, condition, or affected flow that changes applicability, update this table and finish the newly applicable model before deriving requirements.
+A synchronous query or calculation can finish in its complete response. Establish a
+read-only footprint from the adapter and inspected call path; that alone creates no
+extra runtime zero-write obligation. Mutations and asynchronous work require their
+contractual state, event, or external effect; acceptance alone is insufficient. A
+rejection promising unchanged state also needs that invariant observed. Add a
+non-mutation probe to a read-only path only when requested or a reachable write risk
+requires it. Execution-safety timeouts are not business failure thresholds.
 
-Each row of every built model carries separate expected-result authority and implementation evidence, or an explicit unresolved disposition.
+Co-locate shared facts on the nearest parent. An omitted child field inherits the
+complete parent value; a child replacement restates the whole effective field.
+This atomic rule also governs execution and HTML projection. Add priority, step IDs,
+and `Requirements` links when they aid selection or traceability; their absence does
+not invalidate an otherwise complete handoff.
 
-### State graph
+## 4. Close and deliver
 
-Reconstruct the normal business flow:
+Use an overview, the scenario tree, and coverage/gaps as the default shape. Place
+sources beside the facts they support; add flow diagrams and model tables where
+they explain a decision. Do not reproduce the tree as a second scenario inventory.
 
-1. Entry and eligibility; when eligibility needs state another flow produces, the trunk starts at that producer flow.
-2. Ordered business actions and decisions.
-3. State transitions and the committed observable each step leaves — the store, event, or external effect a probe can read.
-4. Async continuations, callbacks, retries, or scheduled work.
-5. The committed outcome.
+Check that every in-scope obligation has a scenario, an inspected lower-layer
+assertion, or an explicit gap; all referenced IDs resolve; inherited anchors and
+expected values are coherent. When using a ledger, reconcile both mapping directions.
+End with the smallest useful first slice: the Happy Path and highest-risk required
+branches, identified by scenario ID.
 
-Give important steps stable IDs such as B1, B2, and B3. Give affected independent flows their own stable prefixes when useful. A small Mermaid flow or ordered table is enough; model business behavior, not internal call stacks.
+Use `NEEDS-DECISION` for unresolved authority, `BLOCKED` for unavailable execution
+evidence or capability, and `OUT-OF-SCOPE` for a stated exclusion. `ASSUMED` requires
+an explicitly accepted temporary premise and the accepting owner. Keep unresolved
+items and missing lower-layer tests visible without inflating the E2E tree.
 
-Then add the change blast radius. Resolve the change set: for a bounded change it is the diff; for a broad feature it is every shared component, store, or control path the feature reuses, and each existing consumer of those is an affected flow. Translate the change set into changed contracts: business rules, state transitions, data meaning or schema, API or event payloads, permissions, ordering, idempotency, timing, and external effects. Trace propagation outward:
-
-`changed artifact -> changed contract/state/data -> writers, readers, callers, and subscribers -> affected business flows -> observable outcomes`
-
-Inspect direct callers and also alternate entry points, shared readers, scheduled or async work, callbacks, retries, recovery, administrative operations, reports, compatibility paths, and flows that compete for the same state. Treat code as reachability evidence here, not as proof that the reached behavior is correct. If a possible impact cannot be resolved, keep it as `NEEDS-DECISION`, `BLOCKED`, or `OUT-OF-SCOPE` with evidence; do not silently omit it.
-
-### Input space (when built)
-
-List every applicable characteristic, the committed observable it affects, and the feasible blocks it partitions into relative to that observable. Include both characteristics whose blocks may differ in reachability, state transition, settlement timing, or outcome and characteristics whose blocks the contract requires to preserve an invariant: operation, target state, direction of change, each mutable field, each bound with its boundary and interior blocks, each subject class with a distinct outcome or settlement timing, and each business mode an affected flow runs in.
-
-### Decision logic (when built)
-
-List every rule the system decides on: acceptance checks, error codes, judgment order, and the conditions under which each outcome fires.
-
-Completion criterion: all three models have one applicability decision; the trunk begins at a legitimate entry (reachability) and ends at an observable committed outcome; every changed contract and affected flow is in the state graph; every applicable characteristic is in the input space; every applicable rule, condition, error code, and judgment order is in the decision logic; every `not applicable` decision has positive evidence and residual risk.
-
-## 3. Choose Coverage Criteria
-
-Name one criterion per built model, starting from the [defaults](REFERENCE.md#coverage-criteria-defaults). A `not applicable` model has no criterion. Weaken a default only with a stated reason and the residual risk.
-
-Completion criterion: each model built has a named criterion, and every weakening is written down.
-
-## 4. Derive Test Requirements
-
-Expand each built model's criterion into a numbered test-requirement ledger; a `not applicable` model creates no requirements. Each requirement names its model, criterion, criterion-generated coverage obligation, and committed observable. For input space, enumerate one base tuple plus one tuple per non-base block under Base-Choice, every feasible cross-characteristic block pair under Pairwise, and every feasible complete tuple under All-Combinations. For decision logic, enumerate one obligation per rule and error code, and one per independent condition of a rule that fires on any of several. A requirement closes only through a leaf that instantiates its blocks and whose Observes covers its observable; a rejection leaf cannot close an accepted block's committed outcome. Mark an infeasible requirement with the reason instead of deleting it. Merge compatible requirements one leaf can satisfy and record the merge.
-
-Completion criterion: the ledger is the mechanical expansion of the criteria; every generated obligation appears as a requirement or an infeasibility note.
-
-## 5. Instantiate the Scenario Tree
-
-Use one Business Scenario Tree section. Represent hierarchy with nested headings from outcome to business branch to scenario leaf. Keep the scenario fields directly beneath their leaf; do not create a separate scenario inventory, group summary, or detached detailed-scenario section.
-
-Declare `Execution handoff: execution-anchors/v1` in the Overview. For every effective leaf, complete the four source-backed [Execution Anchors](REFERENCE.md#execution-anchors): concrete Preconditions, anchored Actions, settlement-aware Observes, and State Footprint. These are stable plan facts, not environment-specific commands: the executor resolves live targets, credentials, commands, probes, safety bounds, isolation, and cleanup. A missing business value is `NEEDS-DECISION`; an unavailable implementation anchor is `BLOCKED`; neither may be replaced with an invented fixture, locator, or wait.
-
-Select the shortest source-backed route that reaches the normal committed outcome as the Primary Happy Path. Its Actions execute every trunk step from the first; seeded data stands in only for state no trunk step produces. A normal positive-outcome tree has exactly one. Other successful routes are alternate branches at the decision where they diverge.
-
-If the requested contract has no meaningful successful route, such as a negative-only rule or verification-only migration, say No source-backed Happy Path and give the reason, then put the canonical verification path first. Never manufacture a positive flow.
-
-Order each normal tree as:
-
-1. Primary Happy Path, then the rest of the success matrix in the same branch: enough leaves to instantiate every generated success-side input-space requirement, with compatible requirements merged explicitly in the ledger.
-2. Blast-radius regression branches that prove other affected business flows still reach their intended outcomes.
-3. Alternate valid routes at their divergence point.
-4. Input, rule, state, permission, and subject-class branches under the earliest affected business step.
-5. Dependency failure, timeout, partial success, rollback, recovery, retry, idempotency, and concurrency branches under the step they disturb.
-6. Cross-cutting performance or operability branches only when they span several steps and have an approved acceptance threshold.
-
-The business flow supplies branch names. Labels such as boundary, concurrency, recovery, or performance classify leaves; they do not replace business stages as the tree's top-level structure.
-
-Every leaf follows the contract in [REFERENCE.md](REFERENCE.md#scenario-leaf-contract).
-
-Put each shared complete field at the nearest common branch. A leaf omits only fields it inherits unchanged; when any fact inside an inherited field differs, restate that field's complete effective value under the atomic-field rule in [REFERENCE.md](REFERENCE.md#scenario-leaf-contract). Large trees stay readable by factoring fields that remain identical upward, not by moving leaves into a flat matrix.
-
-Completion criterion: the first ordinary branch is the complete Happy Path and its success matrix; every leaf carries its four RIPR fields — Actions (reach), Requirements (infect), Observes (propagate), Oracle with Expected Authority (reveal); every effective leaf resolves all four Execution Anchors after inherited parent facts are applied or carries an explicit blocking disposition; every test requirement is instantiated by a leaf or carries an explicit disposition.
-
-## 6. Close Coverage
-
-End with:
-
-- The test-requirement ledger with its leaf column filled: every requirement maps to leaf IDs and a disposition.
-- Gaps and Decisions, with each unresolved item marked `NEEDS-DECISION`, `ASSUMED`, `BLOCKED`, or `OUT-OF-SCOPE`.
-- The smallest first test slice. For a normal positive-outcome plan, start with the Primary Happy Path, then add the highest-risk branches needed by the request.
-
-Use `ASSUMED` only for a temporary premise explicitly accepted by the user or responsible decision owner, and name that acceptance. Unknown approval status is `NEEDS-DECISION`, not `ASSUMED`.
-
-The ledger is a reconciliation aid, not a second scenario catalog. It contains IDs and dispositions only; scenario meaning remains in the tree.
-
-Reconcile the ledger against the tree in **both** directions before closing, because a one-directional read passes while half the pair is missing: a `covered` row whose leaf column names a leaf that never cites it reads as closed and is not. Run the [Ledger Reconciliation](REFERENCE.md#ledger-reconciliation) checks.
-
-Completion criterion: the ledger reconciles in both directions and its numbering is contiguous; every test requirement, approved rule, trunk step, changed contract, and affected flow maps to at least one leaf; every uncovered item has an explicit disposition; no new scenario is introduced outside the tree.
-
-## Deliverable
-
-Use this top-level order:
-
-1. Overview
-2. Sources and Models
-3. Business Scenario Tree
-4. Coverage and Gaps
-
-Keep these four headings when optional models are not applicable; the `Model Applicability` table makes the omission explicit rather than hiding it by renaming `Sources and Models`.
-
-Save the canonical Markdown under docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md unless the user gives another path. Unless the user explicitly requests Markdown-only or the Reader View is withheld under its contract, also create the same-stem `.html` **Reader View** defined in [REFERENCE.md](REFERENCE.md#reader-view-contract): an answer-first, two-layer human projection, never a second fact source; its table columns, opening groups, and completeness rules live only in that contract. Link the Reader View first; name the canonical Markdown path as plain code unless an HTML companion is available. Do not execute tests or write test code unless the user asks.
+Save Markdown under `docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md` unless
+the user specifies a path. Unless Markdown-only is requested, read the
+[Reader View Contract](REFERENCE.md#reader-view-contract) and create a desktop HTML
+companion. Link the HTML and canonical Markdown when available. Planning ends with
+the plan; execute tests or implement test code only when the task authorizes it.

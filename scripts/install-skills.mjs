@@ -126,6 +126,17 @@ export function planInstall(skills, home = os.homedir(), skillsRoot = SKILLS_ROO
 export function findStrays(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
   const strays = [];
   const wanted = new Set(skills);
+  // A runtime may read the managed root through a link rather than carrying
+  // its own copy (~/.codex/skills -> ../.agents/skills), so a directory name
+  // is not evidence of a separate installation. Resolve the target roots once:
+  // an install seen through such an alias is the managed link itself, and
+  // pruning it deletes the correct install rather than a stale duplicate.
+  const managedRoots = new Set();
+  for (const runtime of TARGET_RUNTIMES) {
+    try {
+      managedRoots.add(fs.realpathSync(path.join(home, runtime, "skills")));
+    } catch {} // that runtime is not installed on this machine
+  }
   let entries = [];
   try {
     entries = fs.readdirSync(home, { withFileTypes: true });
@@ -136,6 +147,13 @@ export function findStrays(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT
     if (!entry.isDirectory() || !entry.name.startsWith(".")) continue;
     if (TARGET_RUNTIMES.includes(entry.name)) continue;
     const skillsDir = path.join(home, entry.name, "skills");
+    let resolvedDir;
+    try {
+      resolvedDir = fs.realpathSync(skillsDir);
+    } catch {
+      continue; // no skills tree under this runtime
+    }
+    if (managedRoots.has(resolvedDir)) continue;
     let children = [];
     try {
       children = fs.readdirSync(skillsDir, { withFileTypes: true });

@@ -11,8 +11,15 @@ tmp/
 tools/java-formatter/target/
 # Local eval run artifacts can carry real-project identifiers; keep them out of the repo.
 evals/
+# Research notes and generated E2E plans are local working material.
+docs/
+docs/research/
+docs/e2e-test/
 # Test suites (top-level tests/ and per-component */tests/) are kept local-only, never published.
 tests/
+# Keep test/spec files out of Git regardless of their component directory.
+**/*.test.*
+**/*.spec.*
 # analyze-sessions.py outputs contain personal prompt corpora; only loop-health.txt aggregates are safe
 docs/research/corpus_*.txt
 docs/research/first_prompts*.txt

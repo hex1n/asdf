@@ -39,15 +39,42 @@ Interpret the result by cause:
 - **Invalid or inconclusive:** the fault or execution failed before the intended
   behavior could be observed. Correct the experiment or report the limitation.
 
-Investigate meaningful survivors rather than optimizing a score. Keep the
-property, decisive command and result, and remaining gap with the task's evidence.
+Investigate meaningful survivors rather than optimizing a score. A result
+belongs to the exact test and implementation it ran against: editing,
+renaming, or retargeting a test afterwards invalidates it, so rerun the fault
+against the final test before citing it. Keep the property, decisive command
+and result, and remaining gap with the task's evidence.
 
 ## Focused independent review
 
 Use a fresh-context agent or an appropriate human reviewer when available and
-permitted. Give the reviewer the original task and requirements, the final diff,
-and access to relevant raw source. Have them derive failure cases before seeing
-the builder's checklist, test conclusions, or suggested findings.
+permitted. The reviewer derives failure cases from the requirements and the code
+before seeing the builder's checklist, test conclusions, mutation results, or
+suggested findings.
+
+### Brief the reviewer
+
+Give the reviewer:
+
+- the original task and requirements, and the scope boundary;
+- the final diff and access to the relevant raw source;
+- the before-state when the diff hides it: uncommitted work that adds untracked
+  files or continues earlier uncommitted changes needs a snapshot, patch, or
+  explicit list of what existed before, otherwise moves, dedupes, and deletions
+  are misread;
+- the target: the changed contracts, the entry points that reach them, and the
+  paths the builder's trace left unresolved. A second full trace is the
+  builder's job; the review's budget goes to falsifying the changed contracts;
+- the repository gates that already ran and their result, so the budget goes to
+  hypotheses rather than repeating the gate;
+- the focus questions below that this change actually threatens, usually two
+  or three, with the others left out. A consolidated guard threatens the
+  obligation and coverage questions; a moved decision threatens the ownership
+  question. A reviewer handed every question sweeps wide and thin, and the
+  one finding that needed a single experiment gets diluted across a full tour;
+- the report format: findings first, each naming the violated contract or
+  structural goal, source or execution evidence with file and line, and the
+  consequence; then what was checked and found sound; then what stayed unverified.
 
 Focus the review on the changed contracts and structural targets:
 
@@ -62,17 +89,32 @@ Focus the review on the changed contracts and structural targets:
   their exit conditions?
 - Do the checks execute the relevant code and observe the behavior they claim?
 
-Require material findings to identify the violated contract or structural goal,
-supporting source or execution evidence, and consequence. Verify findings before
-changing code. Repair confirmed issues within scope and rerun affected checks.
+### Disposition of findings
 
-Start with one focused review. Revisit affected conclusions after a material
-design repair, discovery of a new path, or an unresolved material finding.
-Do not repeat full reviews solely to accumulate approvals. Review evidence must
-still apply to the final material revision.
+Verify each finding before changing code, then give it one disposition and
+report all of them, sub-items included, whether or not you acted on them:
 
-Independence depends on how the reviewer forms its judgment, not the model name.
-A review finding or approval cannot substitute for runtime evidence. If an
-independent reviewer is unavailable, label self-review accurately, use the
-strongest available checks, and disclose the limitation. Keep unresolved
+- **Confirmed, in scope:** repair and rerun the affected checks.
+- **Confirmed, pre-existing or outside the requested scope:** report it with
+  its reproduction as an open decision for the user. Tests that lock the
+  behavior show it is characterized, not that it is required, as the contract
+  section of [Arborist](../SKILL.md#establish-the-contract) states; the
+  builder alone does not settle it, and the finding keeps its confirmed label.
+- **Refuted:** state the evidence that refutes it.
+- **Unverified:** keep it open and say why.
+
+When your evidence and the reviewer's conclusion point opposite ways, the
+report carries both, side by side, with the observation each rests on. The
+user decides; the builder does not settle it by relabeling the finding.
+
+Severity is judged against this change: a defect the diff did not introduce is
+reported as pre-existing, whatever label the reviewer gave it.
+
+One focused review, revisited on the affected conclusions after a material
+design repair, a newly discovered path, or an unresolved material finding, is
+the target. Review evidence must still apply to the final material revision.
+
+A review finding or approval cannot substitute for runtime evidence. When no
+fresh-context reviewer is available, label self-review accurately, use the
+strongest available checks, disclose the limitation, and keep unresolved
 high-impact claims open.

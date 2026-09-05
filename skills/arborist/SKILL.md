@@ -34,6 +34,12 @@ or relocated. Establish which obligation each serves before changing it.
 Investigate technical unknowns directly. Ask only for missing user-owned intent
 or authority decisions, and continue work that does not depend on the answer.
 
+Before the first edit, list the assumptions the change rests on that you have
+not read for yourself: what a dependency returns, what a tool a hint points at
+can answer, what an entry point already rejects. Read each one now. An
+assumption that survives only because nothing has checked it is where the
+review will find the defect later, at a higher price.
+
 ## Trace the affected behavior
 
 Follow real entry points through decisions, state changes, and effects to the
@@ -121,17 +127,24 @@ the affected behavior, including unchanged and relocated logic. Use controlled
 interleavings or dependency failures when they expose the risk better than a
 syntactic mutation.
 
-Use one [focused independent review](references/verification.md#focused-independent-review)
-by default for material changes to:
+Brief and run one [focused independent review](references/verification.md#focused-independent-review)
+before reporting completion when the change touches:
 
 - responsibility ownership, public interfaces, or dependency direction;
 - shared state, concurrency, or authorization semantics;
 - data spanning versions or effects that are difficult to recover;
 - important shared or external guards being deleted or consolidated.
 
-Local or mechanical edits preserving these contracts usually need focused
-verification only. Follow stricter repository requirements when present.
-Review is additional evidence, not a substitute for execution.
+Independent means a fresh-context reviewer, such as a subagent, that derives
+failure cases from the requirements and code before seeing the builder's
+conclusions. A reviewer that reads the builder's reasoning, including an
+advisor call, is self-review: useful, and reported as such. Dispatch the
+review once the diff is reviewable and run the remaining gates while it works;
+code changed after dispatch means revisiting the affected conclusions.
+
+Local or mechanical edits preserving these contracts need focused verification
+only. Follow stricter repository requirements when present. Review is
+additional evidence, not a substitute for execution.
 
 Reuse evidence only while its relevant source, inputs, and environment remain
 unchanged. Rerun invalidated checks and all required repository gates.
@@ -140,6 +153,8 @@ unchanged. Rerun invalidated checks and all required repository gates.
 
 Before reporting completion, check that the requested behavior has evidence,
 affected preserved contracts hold, and requested structural gains are observable.
+When the change met a review trigger, the review ran, its evidence still applies
+to the final material revision, and every finding has a reported disposition.
 For refactoring, also close the removal target or state the remaining migration
 stage. Inspect the final diff for scope and unintended changes.
 

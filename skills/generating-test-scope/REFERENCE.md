@@ -1,5 +1,23 @@
 # generating-test-scope Reference
 
+## Comparison Modes
+
+Resolve named refs to commits before inventorying. Carry the effective baseline
+and target into every delegated task; the mode determines what is included:
+
+| Mode | Comparison |
+| --- | --- |
+| Branch | Resolve `git merge-base {base} {head}` as the effective baseline, then compare that commit to the resolved head. This is the change set represented by `{base}...{head}`. |
+| Working tree | Compare the requested baseline commit to the current tracked tree with `git diff {baseline}`. Use `git status --short`, staged/unstaged diffs as needed, and `git ls-files --others --exclude-standard` to account for relevant untracked content. Default the baseline to HEAD only when the request covers uncommitted changes alone. |
+| Release | Compare the two specified resolved snapshots directly with `git diff {old-release} {new-release}`; do not substitute their merge base. |
+
+Use `--name-status` for inventory, then inspect changed content and old/deleted
+definitions from the same effective baseline. For working-tree reports, retain
+the inspected diff and relevant untracked content or hashes when needed to bind
+the report to a snapshot. A status listing alone does not prove file content is
+unchanged. A delegated task inherits these inputs and the requested release
+boundary; a generic branch template must not replace them.
+
 ## Impact Tracing
 
 Use the smallest set of traces that explains the risk:
@@ -16,10 +34,10 @@ Stop tracing when the next edge is speculative. Put the missing edge in Unknowns
 
 | Tier | Include when | Evidence required |
 | --- | --- | --- |
-| P0 | User-visible contract, critical workflow, data write/migration, permission, runtime switch, or cross-system interaction changed | changed file plus entrypoint or state boundary |
-| P1 | A caller, dependency, compatibility path, or main error branch is plausibly affected | changed file plus traced edge |
-| P2 | Low-risk display, copy, test/tooling, docs-adjacent behavior, or broad regression around the touched area | changed file plus reason it is not P0/P1 |
-| Non-scope | File is generated, dead, test-only with no product path, or docs-only outside released surface | evidence for exclusion |
+| P0 | Release-critical failure consequence, reachable in the release | traced entry/state boundary, consequence, exposure, recovery difficulty |
+| P1 | Material behavior affected with bounded impact or feasible recovery | changed artifact and traced edge with failure consequence |
+| P2 | Localized low-impact regression | changed artifact and a reason the consequence is limited |
+| Non-scope | No affected released behavior, or covered through a named authoritative source/generator | consumer/release evidence and any remaining check |
 
 Prefer a narrow P0 with explicit follow-up Unknowns over a broad P0 that hides uncertainty.
 
@@ -46,16 +64,22 @@ Prefer a narrow P0 with explicit follow-up Unknowns over a broad P0 that hides u
 ### P0
 - [ ] Behavior:
   - Evidence:
+  - Expected outcome:
+  - Existing coverage and remaining check:
   - Risk:
 
 ### P1
 - [ ] Behavior:
   - Evidence:
+  - Expected outcome:
+  - Existing coverage and remaining check:
   - Risk:
 
 ### P2
 - [ ] Behavior:
   - Evidence:
+  - Expected outcome:
+  - Existing coverage and remaining check:
   - Risk:
 
 ## Risks And Unknowns

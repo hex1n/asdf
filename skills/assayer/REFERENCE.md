@@ -20,34 +20,25 @@ review_scope: implementation-authorization | correctness-only
 review_budget:
 ```
 
-When no upstream envelope exists, the Entry Gate may freeze a minimal
-user-owned envelope from an explicit user confirmation:
-`decision: BUILD, source: user`. An explicit correctness-only ask sets
-`review_scope: correctness-only`; its closing report carries
-`implementation_decision: UNCHANGED` with an explicit "no implementation
-authorization granted" line.
+Ordinary technical review defaults to `correctness-only`, with any upstream
+decision recorded as context or explicitly absent. It closes with
+`implementation_decision: UNCHANGED` and grants no implementation authorization.
+The envelope above is required only for implementation-authorization scope;
+reuse an existing user decision as `decision: BUILD, source: user` when applicable.
+Review budget is resolved at review entry in either scope.
 
-Non-entry and non-pass outcomes:
+Non-pass outcomes:
 
-- `NOT_READY`: no upstream decision either way, no user confirmation, and no
-  correctness-only ask; the loop was not entered.
-- `DEFERRED`: the upstream decision is `DEFER`, `NO_BUILD`, or
-  `RESEARCH_FIRST`; the loop was not entered and the value question stays
-  with the planner.
-- `WITHDRAWN`: implementation intent ended mid-review.
-- `SUSPENDED`: the gate is unpassed and continuing is blocked or no longer
-  justified — reviewer unavailable, budget expired, envelope invalidated, or
-  user input required.
+- `NOT_READY`: the candidate is missing, or an explicitly requested
+  implementation-authorization gate lacks a build decision.
+- `DEFERRED`: that authorization gate has a standing non-BUILD decision.
+- `WITHDRAWN`: the user withdrew the review.
+- `SUSPENDED`: unresolved material disagreement, unavailable reviewer,
+  exhausted budget, required user input, or an invalid authorization envelope.
 
-None of these outcomes is a technical pass, and none of them grants
-implementation authorization.
-
-Envelope invalidation is domain-independent: a required fix that turns a
-three-day migration into a multi-week build with a permanent reconciliation
-layer, and a required fix that turns a one-week process automation into a
-cross-system integration project, both break the frozen
-`delivery_and_maintenance_cost`; in both cases the review suspends and the
-planner re-runs its Value Gate on the revised candidate.
+None grants technical GO or implementation authorization. A cost or scope
+change invalidates the frozen envelope only as an authorization gate; a
+correctness-only review can continue with the new assumptions explicitly stated.
 
 ## Compact Review Packet
 
@@ -60,6 +51,7 @@ decision_constraints
 rubric
 evidence_scope
 review_kind
+review_mode: review-only | review-and-revise
 finding_ledger_when_rechecking
 ```
 
@@ -203,8 +195,9 @@ the reviewer it probed, and a close it postdates is a close it put in doubt.
 
 A `blocker-sweep` report contains only blocker and verification-gap payloads.
 Each verification gap declares `gap_scope: decision_blocking |
-outside_closing_scope` with an evidence-backed reason. Decision-blocking gaps
-remain open; only outside-closing-scope gaps may use `defer-gap`.
+outside_closing_scope` with an evidence-backed reason. Unresolved
+decision-blocking gaps prevent GO; only outside-closing-scope gaps may use
+`defer-gap`. Resolved gaps follow [Verification Gap Closure](#verification-gap-closure).
 
 The gate state freezes `required_rubric_dimensions`. Every `complete` report
 includes `coverage.rubric_dimensions` matching that set and
@@ -227,3 +220,27 @@ node scripts/check-gate-state.mjs review-state.json
 The checker prints `{ "pass": boolean, "failures": [...] }` and exits zero only
 for a pass. Its JSON fields mirror the Gate Contract. It is a mechanical guard,
 not a substitute for parent finding validation or reviewer judgment.
+
+## Verification Gap Closure
+
+Keep the original finding payload, `revision`, `source_invocation_id`, and
+`gap_scope` unchanged. Update its owner, parent validation and evidence,
+disposition, and `closed` state separately. A resolved gap uses either:
+
+- `validation: confirmed`, `disposition: fix`, with the supplied evidence; or
+- `validation: challenged`, `disposition: rebut`, with the contrary evidence
+  and `reviewer_rebuttal_accepted: true`.
+
+In either case, `closed: true` requires a current-revision complete GO from the
+originating reviewer, whose receipt occurs after the original gap receipt.
+The normal closing-verdict checks bind that GO to its full report and required
+reviewer class. Supplying evidence without changing the candidate may retain
+the same hash; a candidate edit still creates a new revision. The checker
+verifies these links, while parent validation establishes what the evidence
+actually proves. A closed flag alone, deferring a decision-blocking gap, or
+editing the original scope cannot establish resolution.
+
+An unresolved outside-closing-scope gap may instead be dispositioned with
+`validation: confirmed`, `disposition: defer-gap`, owner, next check, and
+`closed: true`. This closes its disposition only; report it as an outstanding
+evidence limitation, not as a resolved gap.

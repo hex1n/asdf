@@ -138,7 +138,8 @@ export function evaluateGateState(state) {
     if (finding?.disposition != null && !VALID_DISPOSITIONS.has(finding.disposition)) {
       failures.push(`${id} has invalid disposition`);
     }
-    if (finding?.validation === "confirmed" && finding?.disposition === "fix" &&
+    if (finding?.severity !== "verification_gap" &&
+        finding?.validation === "confirmed" && finding?.disposition === "fix" &&
         finding?.closed === true && finding?.revision === revision) {
       failures.push(`${id} cannot be fixed without a new revision`);
     }
@@ -167,11 +168,6 @@ export function evaluateGateState(state) {
         failures.push(`${id} verification gap has invalid gap scope`);
       }
       if (!nonEmptyString(finding?.gap_scope_reason)) failures.push(`${id} verification gap has no scope reason`);
-      if (finding?.gap_scope === "decision_blocking") {
-        failures.push(`decision-blocking verification gap remains: ${id}`);
-      } else if (finding?.validation === "confirmed" && finding?.disposition !== "defer-gap") {
-        failures.push(`${id} confirmed verification gap must use defer-gap`);
-      }
       if (finding?.closed !== true) failures.push(`verification gap ${id} is not dispositioned`);
     }
   }
@@ -430,6 +426,25 @@ export function evaluateGateState(state) {
     if (source.length !== 1) continue;
     if (source[0].revision_hash !== finding.revision) {
       failures.push(`${finding.id} reviewed revision does not match its source receipt`);
+    }
+    if (finding?.severity === "verification_gap") {
+      // Preserve the original gap payload. Resolution is a later review event,
+      // not a rewrite of its former scope or a bare closed flag. Supplying
+      // missing evidence can resolve a gap without editing the candidate.
+      const sourceIndex = receipts.indexOf(source[0]);
+      const reviewedAfterGap = verdicts.some((verdict) =>
+        verdict?.reviewer === source[0].reviewer && verdict?.revision === revision &&
+        verdict?.review_kind === "complete" && verdict?.verdict === "GO" &&
+        receipts.findIndex((receipt) => receipt?.invocation_id === verdict?.invocation_id) > sourceIndex);
+      const resolved = finding.closed === true && reviewedAfterGap && (
+        (finding.validation === "confirmed" && finding.disposition === "fix") ||
+        (finding.validation === "challenged" && finding.disposition === "rebut" &&
+          finding.reviewer_rebuttal_accepted === true));
+      const deferred = finding.closed === true && finding.gap_scope === "outside_closing_scope" &&
+        finding.validation === "confirmed" && finding.disposition === "defer-gap";
+      if (!resolved && !deferred) {
+        failures.push(`${finding.id} verification gap needs a later complete GO accepting its resolution, or an outside-scope deferral`);
+      }
     }
   }
 

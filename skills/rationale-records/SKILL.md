@@ -41,6 +41,15 @@ one current owner.
 6. Run a full check after creating, migrating, or restructuring records. Normal
    Codex and Claude Stop hooks use the incremental check.
 
+Before relying on an existing explanation, check whether the current task
+changes its callers, producers, configuration, or dependency semantics even if
+the anchored snippet is unchanged. Search affected domain terms and source
+references, then reread only the explanations whose assumptions could change.
+Update or remove stale explanations from current code; preserve a missing fact
+as unresolved rather than treating an anchor match as semantic validation.
+In linked worktrees, put this correction in the handoff note instead of editing
+active records.
+
 The checker proves only mechanics: ordered files, exact schema, unique W-IDs,
 existing source paths, and file-unique token snippets. Shape matching ignores
 whitespace, indentation, and line breaks but preserves strings, comments, and

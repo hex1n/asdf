@@ -65,8 +65,9 @@ Give the reviewer:
 - the target: the changed contracts, the entry points that reach them, and the
   paths the builder's trace left unresolved. A second full trace is the
   builder's job; the review's budget goes to falsifying the changed contracts;
-- the repository gates that already ran and their result, so the budget goes to
-  hypotheses rather than repeating the gate;
+- the available repository gate commands and their coverage boundaries. Share
+  prior results after the reviewer derives its initial failure cases, so they
+  can avoid redundant runs without anchoring that first derivation;
 - the focus questions below that this change actually threatens, usually two
   or three, with the others left out. A consolidated guard threatens the
   obligation and coverage questions; a moved decision threatens the ownership
@@ -112,7 +113,10 @@ reported as pre-existing, whatever label the reviewer gave it.
 
 One focused review, revisited on the affected conclusions after a material
 design repair, a newly discovered path, or an unresolved material finding, is
-the target. Review evidence must still apply to the final material revision.
+the target. Review evidence must still apply to the final material revision and the source,
+configuration, dependency versions, and runtime assumptions supporting it. A
+stable diff does not preserve evidence when those inputs change; revisit the
+affected conclusions and checks, retaining unaffected evidence.
 
 A review finding or approval cannot substitute for runtime evidence. When no
 fresh-context reviewer is available, label self-review accurately, use the

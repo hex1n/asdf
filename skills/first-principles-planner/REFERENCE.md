@@ -105,7 +105,7 @@ P95 below 500ms without sacrificing data freshness."
 
 ### Assumption Audit
 
-For Light depth, list 3-5 assumptions inline. For Standard/Deep, use:
+State only load-bearing assumptions; a short inline account suffices for Light depth. For multiple interacting assumptions, use:
 
 | # | Assumption | Type | If wrong... | Verification |
 |---|---|---|---|---|
@@ -126,7 +126,7 @@ all.
 
 ### Mechanism Families
 
-Compare at least these families as real candidates, not strawmen:
+Consider these families where feasible; compare viable candidates and explain material exclusions. No fixed candidate count is required:
 
 | Family | Typical form |
 |---|---|
@@ -137,7 +137,7 @@ Compare at least these families as real candidates, not strawmen:
 
 ### Economic Evidence
 
-Judge from evidence already at hand; the gate never launches research to fill
+Judge from evidence already at hand; avoid broad research just to populate
 fields. Weigh:
 
 - how often the problem occurs and how far it reaches;
@@ -147,7 +147,10 @@ fields. Weigh:
 - the single fact that would flip the decision.
 
 When a load-bearing economic fact is unknown and could flip the decision,
-return `RESEARCH_FIRST` naming that fact and its check instead of guessing.
+set `RESEARCH_FIRST` naming that fact and its check instead of guessing.
+The planning workflow performs the scoped check when available and authorized,
+then resumes the decision. Return an unresolved research handoff only when the
+check cannot be completed within the request; name the blocker.
 Judge the build-or-change family at its cheapest credible mechanism — a
 proposed expensive design is not the family's floor. When family-level
 economics are too close to call, continue to option reconstruction and freeze
@@ -155,9 +158,10 @@ the envelope once the winner is known.
 
 ### Decision Envelope
 
-Freeze the outcome in this envelope. A downstream review skill consumes it
-unchanged; it is the contract separating "technically best" from "worth
-building".
+For a durable decision handoff, record the outcome in this envelope; a chat
+answer may use a compact equivalent. A technical review can proceed without
+it. The envelope constrains implementation authorization only when that gate
+is explicitly requested.
 
 ```yaml
 decision: BUILD | DEFER | NO_BUILD | RESEARCH_FIRST
@@ -176,8 +180,8 @@ review_budget: <explicit budget, calibrated default, or user-authorized unbounde
 - `DEFER` / `NO_BUILD`: answer in Decision mode with the envelope and its flip
   condition; plan synthesis and independent tournaments stay unrun.
   `review_scope` and `review_budget` bind only under `decision: BUILD`; for
-  any other decision write `n/a` — a later explicit correctness-only review
-  ask sets its own scope at review entry.
+  any other decision write `n/a` — a later technical review
+  defaults to correctness-only and sets its own budget at entry.
 - `RESEARCH_FIRST`: name the missing fact and the check that resolves it.
 - A user who has already committed to building is the decision source: record
   `decision: BUILD` and choose the mechanism rather than re-litigating a
@@ -296,7 +300,7 @@ Answer these five checks compactly:
 
 | Check | Question |
 |---|---|
-| Fit criteria | What 3-5 constraints decide "best" for this problem? |
+| Fit criteria | Which load-bearing constraints decide "best" for this problem? |
 | Winner | Which mechanism wins against those criteria, and why? |
 | Closest alternative | What is the strongest competing mechanism? |
 | Defeat condition | What new fact would make the closest alternative better? |
@@ -322,7 +326,7 @@ For Plan mode, make the plan specific enough to price and falsify the
 decision:
 
 - What changes, including likely files/modules when known
-- Effort estimate with arithmetic, not vague size words
+- Effort ranges tied to identifiable work and explicit assumptions; mark unknowns instead of inventing numerical precision
 - Code examples only when the mechanism is non-obvious
 
 The plan names its next verification step: the cheapest check that could flip
@@ -337,7 +341,7 @@ hazards (a change that must land before another to stay safe) are named as
 constraints; task-level slicing and sequencing belong to the implementing
 session.
 
-Price the decision in a scope table. Rows are the scope components the
+For a material investment decision, price it in a scope table; for a bounded implementation choice, a short account of changed responsibilities, dependencies, transition, and acceptance is sufficient. When pricing, rows are the scope components the
 decision buys — core (the decision stands on it), supporting (evidence,
 observability, closure), optional (separately decidable, excluded from the
 total) — not steps in an execution order. Every acceptance-oracle obligation,
@@ -360,7 +364,7 @@ reasoning in both.
 
 ## Evidence Conventions
 
-- `verified`: read, fetched, queried, invoked, or ran in this session.
+- `verified`: source evidence whose identity and relevant version/environment have been established, including still-applicable prior receipts.
 - `? unverified`: recalled, inferred, or not checked.
 - Quantify feasibility, scale, and effort where possible.
 - Present tradeoffs honestly. Do not force a pick when constraints do not

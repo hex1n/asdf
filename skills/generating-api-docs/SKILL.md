@@ -31,8 +31,8 @@ If the protocol is not explicit, detect it in step 1.
 
 ### 1. Load Or Build Project Profile
 - Find `docs/api-doc-profile.md`; if absent, check `.api-doc-profile.md` at the repository root.
-- If the profile exists, read it and continue to step 2.
-- If the profile is missing, detect the protocol and read only the needed adapter:
+- Treat an existing profile as a discovery index. Recheck the endpoint, validation, serialization, auth, and output conventions used by this task against current sources; update stale facts and retain unresolved values as unknown.
+- Detect the protocol and read its adapter when the profile is missing, incomplete, or contradicted by current code:
   - RPC: service/export annotations, registry or gateway dispatch, service interfaces, or generated stubs.
   - HTTP: controllers, route annotations, HTTP method/path declarations.
 - Write discovered project conventions to `docs/api-doc-profile.md`.
@@ -53,8 +53,8 @@ Profile skeleton:
 ### 2. Build Interface Inventory
 - Single interface or method: inventory is the target interface or method.
 - Feature request: inventory is changed interfaces plus operation keys, methods, or constants named by design context.
-- Diff request: inventory comes from changed interface files plus any referenced reused interfaces.
-- Classify each item as added, modified, or reused.
+- Diff request: resolve the requested base/head or working-tree snapshot first. Include changed interfaces and reverse-trace changed DTOs, validators, serializers, shared wrappers, auth configuration, schemas, and dispatch rules to affected operations. Include deletions and referenced reused interfaces; record unresolved consumers as coverage gaps.
+- Classify each item as added, modified, deleted, or reused.
 - Completion criterion: all relevant interfaces are covered, including reused interfaces that did not change and therefore cannot be found by diff alone.
 
 ```bash
@@ -66,21 +66,21 @@ grep -rE "\b{method}\b" {source-root} --include="{profile file pattern}"
 ### 3. Align Only Unknown Decisions
 - Use code and design context when they determine the value; do not ask about facts that can be read.
 - Ask once, with the inventory attached, only for unresolved decisions.
-- Completion criterion: no field, scope, enum source, nested object strategy, or ID convention remains ambiguous.
+- Completion criterion: user-owned decisions needed to proceed are resolved; factual unknowns carry their missing source and impact. Use code-declared wire types and the default expansion below unless the user requests another presentation.
 
 Common decisions:
 - Scope: whole feature / single interface
 - Nested objects: expand fully / reference type only
 - Enum source: caller-supplied code / lookup interface
 - Field-level change markers: include / omit
-- Compatibility verdicts: whether the caller inventory is known well enough to say `compatible` rather than `not-assessed`
+- Compatibility scope: the supported contract/version and rollout direction, when not established by project evidence
 - ID type: code-declared type / normalized string
 
 ### 4. Parse Each Interface From Code
 - Interface declaration: extract address or route and operation identifier according to the profile.
 - Implementation and validation: extract auth and required fields according to the profile.
-- Request and response models: recursively expand nested objects and list elements.
-- Completion criterion: every field has type and requiredness verified from code; no `TBD` remains.
+- Request and response models: resolve generics, wire names, ignored fields, null handling, defaults, and active validation paths. Expand nested objects and list elements; for recursion, link back to the already-defined type instead of expanding indefinitely.
+- Completion criterion: each documented fact has a source; unresolved type, requiredness, or behavior is explicitly unknown with a next check. Distinguish declared intent from enforced behavior when they disagree.
 
 ### 5. Write Markdown
 - Use the profile output directory. If absent, find the majority location of existing `*_API_Doc.md` files with a filesystem glob; do not use `git ls-files` because it misses untracked docs. Fall back to `docs/facade/`.
@@ -92,14 +92,14 @@ Common decisions:
 - Every Markdown anchor target exists.
 - Table of contents and interface sections match.
 - Every changed or deleted interface carries a Compatibility verdict, and every changed field row carries one; no changed row is left blank.
-- The document contains caller contract only: no business-rule section, private enum, private event, or implementation details.
+- Include caller-visible preconditions, conditional requirements, ordering, idempotency, and errors when supported. Exclude private implementation mechanisms. Check examples against documented fields, wire types, and constraints; label synthetic examples as illustrative.
 - Known defects are not written as the target contract. Mention at most a short note pointing to the issue or test.
 
 ## Contract Rules
 
 **Target contract**: describe the intended external contract, not current bugs or internal implementation.
 
-**Field expansion**: expand nested objects and list elements in place. Use `field.sub`, `field[].sub`, and `data.field` paths. Do not say "same as another section" for reusable types.
+**Field expansion**: use `field.sub`, `field[].sub`, and `data.field` paths. Expand acyclic fields in place; use explicit type links for cycles and polymorphic alternatives. Requiredness distinguishes missing, null, empty, and conditionally required values; absence of a discovered constraint is not proof that a field is optional.
 
 **Field-level changes**:
 - Add a one-line change summary for added or modified interfaces.
@@ -109,30 +109,36 @@ Common decisions:
 - A fully added interface can mark the section as added without marking every field.
 
 **Compatibility**: every changed or deleted interface carries exactly one
-verdict — `compatible`, `breaking`, or `not-assessed` — telling a caller
-whether their existing integration survives. Silence is not a verdict: a reader
-cannot tell an unbroken contract from an unchecked one, so `not-assessed` is
-written out whenever the callers or their usage could not be established.
+verdict — `compatible`, `breaking`, or `not-assessed` — against the supported
+old contract. Establish that contract from its published schema, declarations,
+documented guarantees, or other authoritative evidence. A counterexample that
+was valid under the old contract and fails under the new one establishes
+`breaking`, even when the actual caller inventory is unavailable. Record known
+consumer impact and missing consumer inventory separately; unknown impact
+does not erase a proven contract violation.
 
-Direction decides the verdict, and the same edit flips between the two:
+Assess compatibility for the supported old caller talking to the new server;
+include the reverse direction when rollout or mixed versions require it.
+Compare accepted inputs, promised outputs, and observable effects, using the
+actual wire format. Include source/library compatibility when callers use
+published signatures or generated clients. Known consumer checks can demonstrate
+additional breaks; absence of observed usage does not retire a published
+guarantee. These are investigation prompts, not automatic verdicts:
 
-| Edit | In the request | In the response |
-| --- | --- | --- |
-| field added | compatible | compatible |
-| field deleted | compatible (server ignores it) | **breaking** |
-| required `N->Y` | **breaking** | compatible |
-| required `Y->N` | compatible | **breaking** — callers dereference it |
-| type changed | **breaking** | **breaking** |
-| `enum +VALUE` | compatible | **breaking** — exhaustive branches miss it |
-| `enum -VALUE` | **breaking** | compatible |
-| validation tightened | **breaking** | — |
-| validation relaxed | compatible | — |
+| Change | What must be established |
+| --- | --- |
+| Request field added | Old requests remain valid; any required value has a compatible default or negotiated version |
+| Request field removed | Old payloads are still accepted and dropping the value preserves promised semantics |
+| Response field added | Supported consumers tolerate unknown fields and the payload still satisfies the schema |
+| Response field removed or made nullable | Published presence/nullability guarantees remain satisfied; if a guarantee is removed, report breaking |
+| Type, enum, or validation changed | Old valid inputs remain accepted and new outputs remain within consumers' supported domain |
+| Route or operation replaced | The old entry remains supported, or report breaking and name its replacement |
 
-An operation identifier, route, or interface that is renamed or deleted is
-`breaking` regardless of its fields. When one interface carries edits of both
-verdicts, the interface is `breaking`. Name the breaking edit and the caller's
-migration in the change summary; for a deleted interface, name its replacement
-or say there is none.
+A proven old-contract violation is `breaking`; all affected contract obligations
+established preserved is `compatible`; otherwise use `not-assessed` and name
+the undecidable obligation and missing evidence. Aggregate interfaces as breaking if any change is
+breaking, otherwise not-assessed if any remains unknown. Describe the breaking
+interaction and migration, not just the changed declaration.
 
 **Protocol-specific facts** such as auth, requiredness, address, request envelope, response wrapper, parameter position, and ID type live in adapters and the project profile. Do not duplicate those rules in this spine.
 
@@ -152,6 +158,6 @@ First read:
   <project>/docs/api-doc-profile.md
   <skill>/SKILL.md
   <skill>/template.md
-  <skill>/adapters/{rpc|http}.md only if the profile is missing or incomplete
-Follow the workflow, contract rules, adapter, and project profile. Every field must be verified from code. Write the generated document in the user's requested language, or the user's prompt language if no language is explicit.
+  <skill>/adapters/{rpc|http}.md when the profile is missing, incomplete, or contradicted by current code
+Follow the workflow, contract rules, adapter, and project profile. Verify fields from code; label missing factual evidence as unknown with its next check. Write the generated document in the user's requested language, or the user's prompt language if no language is explicit.
 ```

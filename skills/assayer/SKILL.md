@@ -1,8 +1,8 @@
 ---
 name: assayer
 description: >
-  Review one completed design or plan through independent falsification until
-  the exact final revision passes. Enter only on an explicit review ask against
+  Review one completed design or plan through independent falsification; when
+  revision is requested, iterate against the exact final revision. Enter only on an explicit review ask against
   one existing design or plan: 审查到通过, 方案评审, 计划评审,
   证伪/多视角审查现有方案或计划, or a second-model review before
   implementation; a candidate merely being finished is not an ask. For competing
@@ -11,31 +11,31 @@ description: >
 
 # Plan Review
 
-Falsify and revise one completed candidate — a design, a plan, or any artifact
-that says what will be built and how. Revise only the named candidate;
-implementation remains outside this skill.
+Falsify one completed candidate — a design, plan, or artifact describing what
+will be built and how. A plain review request authorizes inspection and reporting;
+keep the candidate unchanged. When the user asks to revise, fix findings, or
+review until passing, edit only the named candidate and iterate within the
+resolved budget. Product implementation remains outside this skill.
+
+Record `review_mode: review-only | review-and-revise` separately from review
+scope. Review-only ends after the complete review and parent validation with
+GO, NO_GO, or SUSPENDED plus actionable findings. It does not require findings to
+be fixed before reporting NO_GO. Review-and-revise uses the correction loop
+below; neither mode can report GO without satisfying the Exact Gate.
 
 ## Entry Gate
 
-Review verifies an upstream build decision; it never creates one. Before any
-freeze, resolve what this review may authorize
-([REFERENCE.md](REFERENCE.md#decision-envelope-and-entry-states)):
+Review the named candidate on its technical merits. Default to
+`review_scope: correctness-only`; missing or non-BUILD investment decisions do
+not prevent technical review and require no confirmation. Preserve any upstream
+decision as context. Technical GO grants no implementation authorization.
 
-- The plan carries a Decision Envelope (or equivalent upstream decision
-  record) whose decision is `BUILD`: review with
-  `review_scope: implementation-authorization`. A review ask alone — even
-  "review this before we implement" — never creates that decision; when no
-  envelope exists, ask once whether worth-building has been decided, and only
-  the user's explicit worth-building confirmation freezes a user-owned `BUILD`.
-- The user explicitly asks for a correctness-only review — this takes
-  precedence over any non-`BUILD` upstream decision: review with
-  `review_scope: correctness-only`, and the report states that no
-  implementation authorization is granted.
-- The upstream decision is `DEFER`, `NO_BUILD`, or `RESEARCH_FIRST`, or the
-  user says worth-building is unsettled: return `DEFERRED` without entering
-  the review loop; the value question belongs to the planner, never to a
-  reviewer. With no upstream decision either way and no confirmation, return
-  `NOT_READY`.
+Use `review_scope: implementation-authorization` only when the user explicitly
+asks for that gate. It requires a still-valid upstream BUILD decision or the
+user's existing explicit decision to build. Reuse that authorization; ask only
+if this requested gate lacks a user-owned decision. Without it, report NOT_READY
+(or DEFERRED for a standing non-BUILD decision); do not invent BUILD.
+See [entry states](REFERENCE.md#decision-envelope-and-entry-states).
 
 Every closing report separates two tracks:
 
@@ -47,12 +47,12 @@ implementation_decision: BUILD | DEFER | NO_BUILD | UNCHANGED
 `GO` states only that the exact current revision passed complete review; it
 carries no implementation priority or investment advice. `NONE` records that
 no closing technical verdict exists: the loop was not entered (`NOT_READY`,
-`DEFERRED`) or implementation intent ended (`WITHDRAWN`). The implementation
-decision is copied from the still-valid frozen envelope; `UNCHANGED` means
-this review granted and changed nothing — the standing upstream decision,
-named in the report, still governs, and after envelope invalidation the
-report also states that no valid `BUILD` authorization remains until the
-planner re-decides. Both tracks always carry exactly one of their listed
+`DEFERRED`) or the user withdrew the review (`WITHDRAWN`). Correctness-only scope always reports
+`implementation_decision: UNCHANGED`, naming any standing decision or its
+absence. Authorization scope reports only a still-valid frozen decision;
+after envelope invalidation it reports UNCHANGED and explicitly leaves the
+authorization gate unpassed until the user or upstream decision is renewed.
+Both tracks always carry exactly one of their listed
 tokens; prose may qualify a token, never replace it. A `DEFERRED`,
 `WITHDRAWN`, or exhausted-budget outcome is never a technical pass.
 
@@ -69,7 +69,7 @@ is a traced fact, never a self-written sentence, and that review is
 independence-limited in its closing report. Freeze:
 
 - the exact candidate and content hash;
-- the Decision Envelope and review scope resolved by the Entry Gate;
+- the review scope and any upstream decision resolved by the Entry Gate;
 - author identity; required reviewers, their frozen classes, explicit
   second-model selections, which reviewer holds the operator-on-call walk at
   full depth, depth, and second-model availability with its basis;
@@ -126,8 +126,9 @@ Severity is fixed by consequence, never by review cost: `blocker` — could make
 the result unsafe, wrong, unexecutable, or unverifiable; `should-fix` —
 materially changes execution behavior, compatibility, migration/rollback,
 acceptance evidence, or a key decision; `optional` — wording, non-material
-precision, readability, or convenience. When a confirmed blocker or should-fix
-is no longer worth fixing, withdraw or suspend instead of closing.
+precision, readability, or convenience. In review-and-revise mode, when a confirmed blocker or should-fix
+is no longer worth fixing, withdraw or suspend instead of claiming GO.
+Review-only may finish with NO_GO and the validated finding.
 
 ## Evidence Loop
 
@@ -135,12 +136,14 @@ is no longer worth fixing, withdraw or suspend instead of closing.
 
 Take an existing plan. If no plan exists, route to the relevant planner and
 return after it is complete. Record the candidate hash and reviewers, then the
-rubric and evidence scope, depth calibration, budget, and ledger. Freeze the
-Decision Envelope beside the candidate; its decision, review scope, and budget
-bind every later round.
+rubric and evidence scope, depth calibration, budget, and ledger. Record the review scope, any upstream decision, and budget beside
+the candidate.
+The implementation-authorization scope additionally freezes the BUILD envelope.
 
 Keep review records outside the candidate. A material edit creates a new
-revision and invalidates every prior GO. A post-GO translation or reformat is
+revision and invalidates every prior GO. Pin the versions or snapshots of
+authority sources used for material claims too; changes to those sources
+invalidate affected conclusions even when the candidate hash is unchanged. A post-GO translation or reformat is
 `derived-unreviewed` unless byte-identical.
 
 For long or remote transfer, read
@@ -165,11 +168,13 @@ helper limits, and retry recovery are in
 [REFERENCE.md](REFERENCE.md#runtime-and-invocation).
 
 Give a first-pass reviewer only the candidate, constraints, rubric, and evidence
-scope. Run a **blocker sweep**: exhaustively identify independently actionable
-blockers and verification gaps that prevent a correctness decision. Keep
-should-fix and optional lanes deferred during this sweep; a finding that is
-inseparable from a blocker stays inside that blocker. The sweep does not stop
-after finding the first reason for NO-GO. Give every result a stable finding ID.
+scope. In review-only mode, run a complete review across all rubric dimensions
+and severities, even when a blocker is found early. In review-and-revise mode,
+also default to a complete review; for a large candidate with unresolved
+foundational assumptions or many interacting failure paths, a blocker sweep
+may precede it. Record why separating that sweep will improve the review. The sweep examines
+blockers and verification gaps exhaustively, deferring independent should-fix
+and optional findings. Give every finding a stable ID.
 Compare failure and degradation contracts across the frozen evidence. Under the
 same execution context, preconditions, policy scope, and authority priority, if
 the same missing or invalid condition can produce incompatible outcomes such as
@@ -202,12 +207,11 @@ active severities. A complete review lists every frozen rubric dimension and all
 four severities. The parent copies these reviewer-returned fields into the round
 report; it does not infer or upgrade coverage or gap scope.
 
-When the blocker sweep returns no blocker or decision-blocking verification gap,
+When an optional blocker sweep returns no blocker or decision-blocking verification gap,
 run a complete review on that same revision across every rubric dimension and
 severity. Only a complete review may return the closing GO.
 
-Completion: a valid exhaustive blocker-sweep result, a complete all-severity
-result when the blocker lane is clear, or an explicit availability/permission
+Completion: a complete all-severity result, an intermediate blocker-sweep result, or an explicit availability/permission
 failure is recorded for the attempted invocation.
 
 ### 3. Disclose And Validate
@@ -236,20 +240,40 @@ parent_evidence_and_reason
 
 Show one parent-validation result for every finding. Preserve reviewer claims
 separately. A challenged finding remains open until the reviewer accepts the
-rebuttal; `needs_evidence` remains open or becomes a named verification gap.
+evidence-backed rebuttal; `needs_evidence` remains open or becomes a named
+verification gap. If a rebuttal produces no new evidence or narrowing of the
+disagreement, preserve both claims and suspend the disputed gate rather than
+repeat persuasion. The parent cannot turn unresolved disagreement into GO.
 
 Completion: every finding has exactly one disclosed validation record backed by
 concrete evidence or a named missing-evidence check.
 
 ### 4. Adjudicate And Revise
 
-Give every finding an owner and one disposition:
+In both modes, give findings an owner and record their disposition. Keep
+unresolved findings open; proposing a remedy does not mean applying it.
+Disposition choices for closing findings are:
 
 - `fix`: revise the candidate;
 - `rebut`: return concrete contrary evidence to the reviewer;
 - `accept-risk`: optional findings only;
 - `defer-gap`: verification gaps outside closing scope, with owner and next check;
 - `needs-input`: a missing user decision or authority source.
+
+In review-only mode, complete non-editing dispositions such as optional
+`accept-risk`, an evidence-backed rebuttal, or an outside-scope `defer-gap`.
+Report GO only after the Exact Gate below passes; report NO_GO for confirmed
+material defects or SUSPENDED when correctness remains undecidable. Include
+proposed remedies and all open findings without changing the candidate.
+The correction loop below applies only to review-and-revise.
+
+For a resolved verification gap, preserve its original payload and scope.
+Record the resolving evidence or rebuttal in the parent validation, use `fix`
+for supplied evidence or `rebut` for a reviewer-accepted challenge, and close
+it only after the originating reviewer gives a later complete GO on the
+current revision. Evidence-only resolution may keep the candidate hash;
+changes to the candidate still require a new revision. See
+[gap closure](REFERENCE.md#verification-gap-closure).
 
 Two disciplines govern writing the fix. **Verify before you write**: every
 existing-system claim the revision adds or sharpens is checked against its
@@ -268,11 +292,12 @@ the gate. Use it only for edits contained by finding-linked scope; uncertainty
 or cross-cutting change requires a complete review. See
 [REFERENCE.md](REFERENCE.md#focused-recheck).
 
-A revision that materially raises delivery or maintenance cost, shrinks the
-expected benefit, changes the core mechanism or applicable scope, or breaks a
-key assumption of the frozen Decision Envelope invalidates that envelope:
-suspend the review and return the value decision to the planner rather than
-reviewing the changed economics to GO.
+For implementation-authorization scope, a revision that materially changes the
+frozen BUILD decision's cost, benefit, mechanism, scope, or key assumptions
+invalidates that envelope: suspend that authorization gate for a renewed user
+or upstream decision. For correctness-only scope, report the changed assumption
+and continue technical review while it remains useful and authorized. Ask only
+when the technical target itself needs a user decision.
 
 Completion: every finding is validated, owned, and dispositioned; every
 existing-system claim the revision adds carries a source verified this round;
@@ -293,15 +318,15 @@ does not stop merely because a non-GO verdict is already justified.
 Within the resolved budget, new or narrowing findings are progress and continue
 the loop; a bare round count outside the frozen budget never closes or suspends
 the gate — an expiring frozen budget is a budget event, not a round count. Each continued
-round also requires live implementation intent and an expectation that the next
+round also requires an active request for this review and an expectation that the next
 round closes a gate-blocking finding or changes the technical or implementation
 decision. Suspend when a required reviewer remains unavailable, reviewers
 disagree, the same blocker survives three consecutive revisions, budget
-expires, the Decision Envelope is invalidated, or user input is required; when
+expires, the authorization envelope is invalidated in implementation-authorization scope, or user input is required; when
 continuing is no longer justified while the gate is unpassed, the outcome is
 `SUSPENDED` or `WITHDRAWN`, never a pass.
 
-Before success, apply the Exact Gate mechanically with
+Before reporting GO in either mode, apply the Exact Gate mechanically with
 `scripts/check-gate-state.mjs` when Node is available. Report the two-track
 outcome (technical verdict and implementation decision), the final revision,
 reviewers and independence level, rounds, finding dispositions, remaining
@@ -310,5 +335,6 @@ verification gaps, and each round's model plus observable cost.
 Restart all required reviews when a late material edit changes the passed
 revision. There is no approximate pass.
 
-Completion: the exact gate passes, or the review suspends with the last revision,
+Completion: review-only delivers a complete validated review (GO only through
+the Exact Gate); review-and-revise passes that gate or suspends with the last revision,
 open findings, evidence limitation, and exact next action preserved.

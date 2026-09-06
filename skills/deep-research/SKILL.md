@@ -7,9 +7,9 @@ description: >
 # Deep Research
 
 ## Core Move
-Deep Research produces understanding, a decision, or a handoff. It does not implement changes unless the user explicitly asks for implementation after the research result. Answer with current-session evidence. Every material claim needs a receipt: file path and line, command output, current-state result, fetched URL, or explicitly marked uncertainty.
+Deep Research produces understanding, a decision, or a handoff. It implements no changes for a research-only request. For a combined request such as "investigate and fix", preserve the existing implementation authorization and continue that work after resolving the necessary uncertainty. Ground answers in evidence whose identity and applicability have been checked. Every material claim needs a receipt: file path and line, command output, current-state result, fetched URL, or explicitly marked uncertainty.
 
-Evidence gate: if a conclusion depends on evidence you have not verified in this session, do not state it as fact. Either verify it, mark the uncertainty, or stop and name the missing check.
+Evidence gate: if a conclusion depends on evidence whose source or current applicability you have not established, do not state it as fact. Either verify it, mark the uncertainty, or stop and name the missing check.
 
 ## Routing Gate
 Use this skill when the job is to determine what is true, why it works or fails, how a system behaves, or which option is supported by evidence.
@@ -17,7 +17,7 @@ Use this skill when the job is to determine what is true, why it works or fails,
 Use another workflow first when:
 - The user asks to reproduce and fix a live bug: use a diagnosis workflow, then return here only for broader synthesis.
 - The user asks for code review: use review stance and lead with findings.
-- The user already selected an implementation task: research only enough to produce a handoff unless they ask for deeper investigation.
+- The user already selected an implementation task: investigate only the uncertainties needed for it, then continue the authorized implementation using the appropriate workflow. A workflow transition does not end the user task.
 - The question is a single file, tiny snippet, or direct local fact: read the source and answer directly as a Quick answer, skipping the rest of this workflow.
 
 For vague broad requests such as "understand everything", "entire project", or "all details", choose the first useful verifiable slice, list out-of-scope slices, and use [REFERENCE.md](REFERENCE.md#broad-task-staging) if the investigation keeps expanding.
@@ -50,14 +50,14 @@ For Standard/Deep:
 8. For article/report/proposal/technical-claim verification, extract factual claims first. Verify each claim against source/code evidence or mark it unsupported; do not summarize first and fact-check later. Grade claims as `Explicitly supported`, `Partially supported`, `Inferred`, `Unsupported`, or `Not checked` when that distinction affects the answer.
 9. Follow uncertainty, not section order. After each step, decide: continue, replan, escalate, or stop.
 
-Stop early when the premise is wrong, the answer is clear, or two consecutive steps no longer change the conclusion. Before each new read or search, ask whether it could change a conclusion; if it would only confirm what you already have, stop. For Quick depth, skip the diagram unless one line of structure clarifies the answer.
+Stop when the material questions are answered, the strongest plausible counterexample has been checked where it matters, and remaining unknowns cannot change the scoped conclusion or are explicitly left open. Repeated supporting reads are a signal to choose a distinguishing check, not proof of closure. Before a new read, identify which uncertainty it could resolve. For Quick depth, skip the diagram unless one line of structure clarifies the answer.
 
-Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to a handoff — name the target and hand off. An adopt/replace/upgrade decision belongs to a first-principles planning workflow: deliver the evidence findings and route the decision there rather than owning it.
+Escalate mid-flight, not only at entry, when the real task has shifted out of research: a live bug reproduction belongs to a diagnosis workflow and an approved implementation to the implementation workflow — carry the evidence forward and continue the authorized task. An adopt/replace/upgrade decision belongs to a first-principles planning workflow: carry the evidence findings into that workflow and complete the requested decision without asking the user to repeat the request.
 
 Use [REFERENCE.md](REFERENCE.md) for diagram examples, a compressed worked example, current-state research, session-history analysis, broad-task staging, output patterns, saved artifact headers, and research-to-work handoff.
 
 ## 3. Evidence Discipline
-- Verified means read, fetched, queried, invoked, or ran in this session.
+- Evidence is verified for the claim when its source, version or snapshot, and relevant environment are established. Prior receipts may be reused after checking that their dependencies remain applicable; reread or rerun changed and uncertain parts. Distinguish direct observations, inferences, and unverified claims.
 - Source code and command output are primary evidence for implementation reality.
 - Official docs/source repositories are primary evidence for external API behavior; fetch them to answer a named uncertainty rather than to browse, and bind versioned sources to local applicability.
 - Blog posts, memory, and prior unsourced claims are leads, not verification.
@@ -90,7 +90,7 @@ When saving, match the workspace/project docs taxonomy. Never save investigation
 Name saved research artifacts with `YYYY-MM-DD-topic.md` by default. Prefer updating the same file for the same topic on the same day; add `-2` or `-HHmm` only when multiple same-day artifacts must coexist, preferring `-HHmm` for time-sensitive snapshots such as runtime/current-state checks. Do not add dates to canonical docs such as `CONTEXT.md`, ADRs, or project profiles.
 
 ## Anti-Patterns
-- State a confident conclusion before verifying the evidence in this session.
+- State a confident conclusion without establishing the evidence and its applicability.
 - Keep reading broadly because the request says "deep" after the decision boundary is already answered.
 - Draw a decorative diagram with no receipts or silently remove `?` markers from unverified elements.
 - Apply external docs to local behavior without checking version, config, or environment applicability.

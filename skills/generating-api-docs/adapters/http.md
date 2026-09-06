@@ -31,14 +31,15 @@ For request bodies, recursively expand object fields and mark their position as 
 
 ## Auth
 
-Read existing declarations only. Check method/class annotations, security configuration, filters, and interceptors. Common sources include `@PreAuthorize`, `@Secured`, `@RolesAllowed`, custom auth annotations, `SecurityFilterChain`, and path-prefix rules. If no declaration is found, mark auth as unknown and ask for confirmation.
+Read existing declarations only. Check method/class annotations, security configuration, filters, and interceptors. Common sources include `@PreAuthorize`, `@Secured`, `@RolesAllowed`, custom auth annotations, `SecurityFilterChain`, and path-prefix rules. If auth cannot be established, mark it unknown and name the missing source; ask only when a user-owned decision is necessary to finish the requested scope.
 
 ## Requiredness
 
-+ `@PathVariable`: Y.
-+ `@RequestParam`: Y unless `required=false` or `defaultValue` is present.
-+ `@RequestHeader`: Y unless `required=false` is present.
-+ `@RequestBody` fields: Y when validation annotations such as `@NotNull`, `@NotBlank`, `@NotEmpty`, or `@Valid` require them; otherwise N.
++ Resolve requiredness per concrete route and active parameter binding, including optional parameter types.
++ `@PathVariable` defaults to required. A variable in a matched URI template must be supplied to match that route; `required=false` permits an absent binding on an alternate route that omits the variable. Document those routes separately.
++ `@RequestParam` and `@RequestHeader` default to required. `required=false` or a declared `defaultValue` permits omission; document the effective default. Check any additional validation that can still reject the bound value.
++ Body fields: inspect the effective validation entry point, groups, custom checks, deserializer, and defaults. `@Valid` cascades into a present value; it does not itself require non-null. Record conditional constraints explicitly. A missing annotation alone does not prove optionality.
++ Distinguish an absent request body from an absent, null, or empty field. Resolve header/query defaults from their actual binding configuration as well as annotations.
 
 ## ID Type
 

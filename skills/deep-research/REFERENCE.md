@@ -25,7 +25,7 @@ Use this when local code/config/runtime evidence and external documentation both
 
 | Field | Completion criterion |
 |---|---|
-| Local fact | The local version, dependency, config, runtime path, feature flag, or observed behavior that decides applicability is verified in this session. |
+| Local fact | The local version, dependency, config, runtime path, feature flag, or observed behavior that decides applicability is verified for the relevant version and environment. |
 | External source | The official source, source repository, published artifact, spec, or release note is identified with version/date/channel or marked unknown. |
 | Applicability result | State `applies`, `does not apply`, or `unknown/blocked`; do not leave the result implied. |
 | Conflict | Name any mismatch between local evidence and external source, or state `none found`. |
@@ -65,7 +65,7 @@ For Standard/Deep source audit in Chinese requests:
 
 | 主张 | 来源 | 获取方式 |
 |---|---|---|
-| ... | path, URL, command, current-state result | read/fetched/ran/queried/invoked in this session |
+| ... | path, URL, command, current-state result | source receipt and applicability check |
 
 For unresolved contradictions in Chinese requests:
 
@@ -182,7 +182,7 @@ When keyword matching is used, keep a false-positive note and manually inspect r
 
 ## Research-To-Work Handoff
 
-`deep-research` produces understanding. If research naturally leads to implementation, write or emit this handoff before any implementation step; if edits are not requested, stop there:
+`deep-research` produces understanding. When transferring substantial research into implementation, keep a compact handoff using the fields below; a local fix needs only the decisive evidence and next check. Continue implementation already authorized in the original request. If edits were not requested, stop at the research result:
 
 ```md
 Decision:

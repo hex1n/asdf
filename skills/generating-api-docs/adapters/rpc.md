@@ -21,11 +21,11 @@ This adapter is a discovery recipe. Do not hard-code one project's endpoint, env
 
 ## Auth
 
-Read existing declarations only; do not add missing auth to code. Identify method/class annotations, gateway filters, interceptors, or AOP checks that validate identity, token, role, or permission. If no declaration is found, mark auth as unknown and ask for confirmation.
+Read existing declarations only; do not add missing auth to code. Identify method/class annotations, gateway filters, interceptors, or AOP checks that validate identity, token, role, or permission. If auth cannot be established, mark it unknown and name the missing source; ask only when a user-owned decision is necessary to finish the requested scope.
 
 ## Requiredness
 
-Use the strongest code evidence available: entry validation assertions, standard validation annotations such as `@NotNull` or `@Valid`, then default N. If a field is business-required but not code-declared, mark N and note the business requirement.
+Inspect active entry validation, validation groups, schema presence semantics, custom assertions, and defaults. `@Valid` cascades into a present object; it does not require non-null. Distinguish omitted, null, empty, and conditionally required values. Record intended requirements separately from enforcement discrepancies; use unknown when the active validation path cannot be established.
 
 ## ID Type
 

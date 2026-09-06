@@ -34,11 +34,10 @@ or relocated. Establish which obligation each serves before changing it.
 Investigate technical unknowns directly. Ask only for missing user-owned intent
 or authority decisions, and continue work that does not depend on the answer.
 
-Before the first edit, list the assumptions the change rests on that you have
-not read for yourself: what a dependency returns, what a tool a hint points at
-can answer, what an entry point already rejects. Read each one now. An
-assumption that survives only because nothing has checked it is where the
-review will find the defect later, at a higher price.
+Before each meaningful slice, verify the unconfirmed assumptions that could
+make that slice wrong: dependency results, entry guards, or available tool
+capabilities. Defer unrelated investigation until a later decision needs it;
+keep unresolved load-bearing assumptions visible.
 
 ## Trace the affected behavior
 

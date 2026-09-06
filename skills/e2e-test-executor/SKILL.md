@@ -80,7 +80,9 @@ in its full response. Compare it with an independently computed approved expecta
 the response cannot supply its own expected value. For persistent writes, read the
 required committed state before cleanup; for async effects, observe the completion
 predicate. Acceptance alone cannot prove those outcomes. A rejection promising
-unchanged state also requires that invariant checked. A path established as read-only
+unchanged state also requires that invariant checked. An absence claim — no write, no
+log line, no event — is proven by the probe that would have found it and that probe's
+empty result, retained like any other observation. A path established as read-only
 needs no invented datastore or zero-write probe unless requested or a write risk exists.
 
 For each executed scenario retain, together:
@@ -104,6 +106,11 @@ own slice. A child exit code alone is not proof of all its scenario outcomes.
 | `blocked` | A required starting condition, capability, authority, or completion observation prevents a verdict; say whether a trigger occurred. |
 | `skipped` | Deliberately excluded from this selected run, with a reason. |
 | `unverified` | Execution occurred but retained evidence or a valid oracle is insufficient. Never use for an unexecuted case. |
+
+A scenario's status aggregates its Expected Results one by one: `passed` needs every
+result satisfied with its own evidence; one violated result makes the scenario
+`failed`; one result lacking a valid observation or oracle caps it at `unverified`.
+An expectation corrected under §1 is judged by its corrected value.
 
 Name the oracle `specified` (approved expected value), `derived` (independent
 reference, invariant, differential, or metamorphic calculation), or `implicit`

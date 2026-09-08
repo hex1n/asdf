@@ -47,6 +47,11 @@ runtime wiring, alternate entry points, historical data, and compatibility where
 they can carry the change. Include schemas, generated consumers, documentation,
 and examples that encode an affected contract.
 
+For fixes, separate a suspected cause from observed execution. When an
+unconfirmed execution-path or causal claim could change the repair choice,
+use a focused execution probe to distinguish the plausible alternatives before
+relying on it. Keep untested alternatives as hypotheses.
+
 Expand until evidence bounds how the change propagates. Record unresolved paths
 and limit coverage claims to what was actually checked. When several flows or
 release stages are involved, keep a compact impact record connecting them to
@@ -115,9 +120,15 @@ the affected behavior; the following are options, not a universal checklist:
 | Structure | Rule ownership, caller knowledge, dependency direction, and obsolete path removal |
 
 Discover the repository's actual commands and test entry points. Confirm the
-relevant tests execute and observe the claimed result. Add or strengthen tests
-where a missing case matters; routine reversible edits do not need new tests
-that merely repeat the implementation.
+relevant tests execute and observe the claimed result. For new or changed tests,
+identify the contract behind the expectation and the claim the test supports.
+For a reproduction claim, verify that the same test fails on the before-state
+for the target defect and passes after the fix when feasible; record any missing
+observation. A test passing both states can protect preserved behavior but does
+not establish reproduction. An unrelated setup or compilation failure is not
+evidence of the target defect.
+Add or strengthen tests where a missing case matters; routine reversible edits
+do not need new tests that merely repeat the implementation.
 
 Use [targeted mutation or fault injection](references/verification.md#targeted-mutation-and-fault-injection)
 when confidence depends on whether checks detect a plausible critical mistake,

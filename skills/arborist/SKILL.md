@@ -47,6 +47,10 @@ runtime wiring, alternate entry points, historical data, and compatibility where
 they can carry the change. Include schemas, generated consumers, documentation,
 and examples that encode an affected contract.
 
+Distinguish source-level reachability from the path the failing input took.
+When that uncertainty could change the fix, use a focused execution probe
+before relying on the causal claim; keep any unresolved claim explicit.
+
 Expand until evidence bounds how the change propagates. Record unresolved paths
 and limit coverage claims to what was actually checked. When several flows or
 release stages are involved, keep a compact impact record connecting them to
@@ -115,9 +119,15 @@ the affected behavior; the following are options, not a universal checklist:
 | Structure | Rule ownership, caller knowledge, dependency direction, and obsolete path removal |
 
 Discover the repository's actual commands and test entry points. Confirm the
-relevant tests execute and observe the claimed result. Add or strengthen tests
-where a missing case matters; routine reversible edits do not need new tests
-that merely repeat the implementation.
+relevant tests execute and observe the claimed result. For new or changed tests,
+derive expected behavior from the contract rather than the proposed patch.
+When claiming reproduction, confirm the target defect on the before-state when
+feasible and its absence after the fix. A check passing both versions can
+protect behavior but does not establish reproduction. Keep the limits of
+intermittent or unavailable reproduction explicit.
+
+Add or strengthen tests where a missing case matters; routine reversible edits
+do not need new tests that merely repeat the implementation.
 
 Use [targeted mutation or fault injection](references/verification.md#targeted-mutation-and-fault-injection)
 when confidence depends on whether checks detect a plausible critical mistake,

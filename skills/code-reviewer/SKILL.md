@@ -49,7 +49,9 @@ established, report independent review as blocked with the observed cause; do
 not silently continue in the caller's context. A delegated reviewer that detects
 inherited builder context reports it to the caller instead of delegating again.
 Same-context self-review requires explicit user authorization and is labeled as
-self-review, never as an independent pass.
+self-review, never as an independent pass. Such authorization does not fulfill
+a required independent-review gate or waive repository review rules. The caller
+keeps that obligation open while continuing work that does not depend on review.
 
 ## Establish the review boundary
 

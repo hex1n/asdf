@@ -6,37 +6,37 @@ P3C-derived profile in codestyle.xml, plus the fluent-chain pass in src/.
 Maven dependencies are pinned so JDK 8 remains sufficient.
 
 The installer links this directory and the sibling rationale-records tool under
-~/.agents/tools, then merges one Stop hook into each installed runtime. The
-hook discovers the Git worktree from its session working directory, formats the
-Java files in its watched scope, validates changed rationale anchors, and then
-runs docs/tools/run-agent-gates.mjs when that repository provides additional
-gates. When it rewrites a file it blocks the stop once so the diff is inspected.
+~/.agents/tools, then merges one Stop hook into each installed runtime. Stop
+checks rationale anchors and invokes docs/tools/run-agent-gates.mjs when present.
+It never runs the formatter in write mode. Repository dispatchers own their own
+side effects; the shared formatter does not infer file ownership from timestamps.
 
-The formatter keeps Javadoc blocks byte-for-byte. Formatted layout uses CRLF
-when the source contains CRLF and LF otherwise. It changes layout only;
-removing unused imports stays outside its contract.
+The formatter keeps Javadoc blocks byte-for-byte and preserves LF/CRLF layout.
+Removing unused imports stays outside its contract.
 
-## Watched scope
+## Explicit task scope
 
-The hook rewrites files, so it formats only what moved while it was watching a
-worktree, never the whole HEAD diff. Production Java source is the default
-scope; `src/test`, `test`, `tests`, and `app/test` are excluded. Each stop stores
-one observation per repository under ~/.agents/state/java-formatter: a digest
-per changed Java file and the time of that observation.
+Before verification and staging, format the files owned by the current task in
+that task's worktree. A shell command's cwd does not change its parent session's
+Stop cwd. Do not format the whole changed set while another writer uses it.
 
-A Java file is formatted when its digest differs from the previous observation,
-or when it appeared after it. It is adopted unchanged when the repository has no
-compatible observation yet, or when it is older than the previous observation —
-a fresh install and a `git reset --mixed` therefore leave work the agent never
-touched alone. Editing an adopted file brings it back into scope on the next
-stop. Changing codestyle.xml or the formatter sources re-applies the profile to
-the whole watched scope.
+    node ~/.agents/tools/java-formatter/format-changed-java.mjs --files src/main/java/Example.java
+    node ~/.agents/tools/java-formatter/format-changed-java.mjs --check --files src/main/java/Example.java
 
-Run `node format-changed-java.mjs` directly to format the complete changed
-production set regardless of the watched scope. Use `--include-tests` only when
-test sources should be formatted, for example:
+Direct invocation without --files retains the legacy whole-changed-set behavior;
+use it only when that complete set belongs to the task. The automatic Stop hook
+never selects this behavior.
 
-    node format-changed-java.mjs --include-tests --files src/test/java/ExampleTest.java
+The formatter exits 3 when it changed files, or when --check detects required
+formatting; 0 means no changes, 1 means execution failed. --check never writes
+source. An empty --files list is an error. Production Java is the default scope;
+--include-tests admits explicitly requested test files.
+
+Stop optionally accepts --files <paths> for read-only format checks and reports
+required formatting as a blocking hook result. Without an explicit list it only
+runs the existing rationale/repository checks, so another task's Java changes or
+a formatter upgrade cannot create unsolicited source changes. Old observation
+cache files are unused and may remain on disk.
 
 Requirements: Node.js 18+, JDK 8+, Maven 3.6+, and Git.
 
@@ -48,7 +48,3 @@ Commands:
 
 Installation is idempotent. Codex requires newly changed hook definitions to
 be reviewed once through /hooks.
-
-## 不属于 agent 的内容不格式化
-
-工作树里内容与 `HEAD` 或合并中的 `MERGE_HEAD` 对应 blob 相同的 Java 文件(`git checkout --`、`git merge`、stash pop 写出的字节)不进入格式化范围;否则合并进来的上游文件每次 Stop 都会被重排一遍。判定用 `git diff --quiet <ref> -- <path>`,与 add 时相同的换行归一化。只在这两个 ref 里比对:其他提交里的内容被检出到工作树仍按 agent 改动处理。

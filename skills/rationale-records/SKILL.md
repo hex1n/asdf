@@ -1,6 +1,12 @@
 ---
 name: rationale-records
-description: Create, update, validate, hand off, or query personal current-code rationale while implementing, debugging, reviewing, or navigating code when a natural-looking rewrite could break behavior. Use in repositories with or without AGENTS.md, tests, Javadoc rules, or existing rationale files; active records stay Git-ignored under docs/rationale.
+description: >
+  Maintain personal docs/rationale records that explain why a code snippet has
+  its exact shape. Use when a change touches code an existing W-record anchors
+  or the callers, producers, or configuration that record depends on, when a
+  change leaves a constraint a natural-looking rewrite would break, when the
+  user asks to record or query such a reason, or during worktree handoff of
+  rationale notes.
 ---
 
 # Rationale Records
@@ -59,7 +65,7 @@ handoff, read every explanation changed in the task and keep only sentences
 needed to teach the anchored code's current mechanism; how it was discovered,
 who decided it, dated outcomes, and verification material belong elsewhere.
 
-Active records are personal memory: keep `docs/rationale/` ignored and never
+Active records are personal memory: keep `docs/rationale/` Git-ignored and never
 stage or commit it. The checker state and handoff receipts live under the user's
 `.agents/state/rationale-records`, not in the repository.
 

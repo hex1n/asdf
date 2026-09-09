@@ -1,7 +1,11 @@
 ---
 name: arborist
 description: >
-  Implement and refactor existing code while preserving affected behavior and improving code clarity and architecture. Use for features, fixes, refactoring, and migrations involving existing contracts, shared rules, state, or dependencies — 实现, 修复, 改造, 重构, 继续做完, 按设计文档落地, implement, fix, refactor, migrate. Read-only research, planning, and review are outside scope.
+  Implement or refactor code that changes a shared contract, moves rule
+  ownership, or spans more than one module, with evidence that affected
+  contracts hold. Use when the user asks to 按设计文档落地 / 重构 / 迁移 or names
+  this skill. A local, contract-preserving fix already covered by AGENTS.md
+  runs without it.
 ---
 
 # Arborist
@@ -47,14 +51,16 @@ runtime wiring, alternate entry points, historical data, and compatibility where
 they can carry the change. Include schemas, generated consumers, documentation,
 and examples that encode an affected contract.
 
-Distinguish source-level reachability from the path the failing input took.
-When that uncertainty could change the fix, use a focused execution probe
-before relying on the causal claim; keep any unresolved claim explicit.
+Distinguish source-level reachability from the path actually taken for the
+relevant inputs and state. When this uncertainty could change the next
+implementation decision, use a focused test or run to observe the relevant
+branches, state changes, or effects before relying on the causal claim.
 
-Expand until evidence bounds how the change propagates. Record unresolved paths
-and limit coverage claims to what was actually checked. When several flows or
-release stages are involved, keep a compact impact record connecting them to
-their contracts and evidence. A local change usually needs only a brief account.
+Expand until evidence bounds how the change propagates. Record unresolved
+paths and causal assumptions, and limit coverage claims to what was actually
+checked. When several flows or release stages are involved, keep a compact
+impact record connecting them to their contracts and evidence. A local
+change usually needs only a brief account.
 
 ## Improve code and architecture
 
@@ -136,20 +142,20 @@ the affected behavior, including unchanged and relocated logic. Use controlled
 interleavings or dependency failures when they expose the risk better than a
 syntactic mutation.
 
-Brief and run one [focused independent review](references/verification.md#focused-independent-review)
-before reporting completion when the change touches:
-
-- responsibility ownership, public interfaces, or dependency direction;
-- shared state, concurrency, or authorization semantics;
-- data spanning versions or effects that are difficult to recover;
-- important shared or external guards being deleted or consolidated.
+Run one [focused independent review](references/verification.md#focused-independent-review)
+before reporting completion when the task, the repository's AGENTS.md, or a
+selected verification Gate asks for it, or when the change touches concurrency
+or authorization semantics, data spanning versions or effects that are
+difficult to recover, or deletes or consolidates a shared guard; otherwise
+report the change as self-reviewed.
 
 Independent means a fresh-context reviewer, such as a subagent, that derives
 failure cases from the requirements and code before seeing the builder's
 conclusions. A reviewer that reads the builder's reasoning, including an
-advisor call, is self-review: useful, and reported as such. Dispatch the
-review once the diff is reviewable and run the remaining gates while it works;
-code changed after dispatch means revisiting the affected conclusions.
+advisor call, is self-review: useful, and reported as such. The builder owns
+the handoff, finding disposition, and affected rechecks; the reviewer owns
+the independent pass. Follow [review lifecycle](references/verification.md#review-lifecycle)
+for reuse, dispatch, and unavailable-review handling.
 
 Local or mechanical edits preserving these contracts need focused verification
 only. Follow stricter repository requirements when present. Review is
@@ -162,8 +168,10 @@ unchanged. Rerun invalidated checks and all required repository gates.
 
 Before reporting completion, check that the requested behavior has evidence,
 affected preserved contracts hold, and requested structural gains are observable.
-When the change met a review trigger, the review ran, its evidence still applies
-to the final material revision, and every finding has a reported disposition.
+When review is required, acceptance also needs a completed review whose evidence
+applies to the final material revision, with every finding dispositioned. If that
+review is pending or blocked, report implementation and local verification
+separately, without claiming complete acceptance.
 For refactoring, also close the removal target or state the remaining migration
 stage. Inspect the final diff for scope and unintended changes.
 

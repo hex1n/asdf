@@ -165,6 +165,7 @@ export function formatChangedJava(options = {}) {
     }
 
     const changed = prepared.filter((item) => item.before !== item.after);
+    if (options.checkOnly) return changed.map((item) => item.file);
     const written = [];
     try {
       for (const item of changed) {
@@ -189,6 +190,7 @@ function parseExplicitFiles(args) {
     if (arg.startsWith("--")) break;
     files.push(arg);
   }
+  if (files.length === 0) throw new Error("--files requires at least one task-owned path.");
   return files;
 }
 
@@ -214,9 +216,11 @@ function main(args) {
     cwd: process.cwd(),
     explicitFiles: parseExplicitFiles(args),
     includeTests: args.includes("--include-tests"),
+    checkOnly: args.includes("--check"),
   });
   if (changed.length > 0) {
-    process.stdout.write("Formatted " + changed.length + " changed Java file(s); inspect the diff and stop again.\n");
+    process.stdout.write((args.includes("--check") ? "Formatting required for " : "Formatted ")
+      + changed.length + " Java file(s); inspect the explicit file scope.\n");
     process.exitCode = 3;
   }
 }

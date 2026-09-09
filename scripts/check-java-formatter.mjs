@@ -296,8 +296,6 @@ function hookRun(repo, stateRoot, label, extraEnv = {}) {
   }
 }
 
-// The hook rewrites the worktree, so its scope must be what moved while it was
-// watching — not every Java file that differs from HEAD.
 function runHookScopeContract(temporaryDir) {
   const repo = path.join(temporaryDir, "scope-repo");
   const stateRoot = path.join(temporaryDir, "scope-state");
@@ -308,46 +306,45 @@ function runHookScopeContract(temporaryDir) {
   write(path.join(repo, "notes.txt"), "seed\n");
   git(repo, ["add", "."]);
   git(repo, ["commit", "-qm", "seed"]);
+  const peer = path.join(repo, "Peer.java");
+  const peerBytes = "class Peer { void peer( ) { } }\n";
+  write(peer, peerBytes);
+  git(repo, ["add", "Peer.java"]);
+  const indexPath = path.join(repo, ".git", "index");
+  const indexBefore = fs.readFileSync(indexPath);
+  assert.deepEqual(hookRun(repo, stateRoot, "reader A stop"), {});
+  const newerBytes = peerBytes.replace("peer", "peerEditing");
+  write(peer, newerBytes);
+  assert.deepEqual(hookRun(repo, stateRoot, "reader A after writer B"), {});
+  assert.equal(fs.readFileSync(peer, "utf8"), newerBytes);
+  assert.deepEqual(fs.readFileSync(indexPath), indexBefore, "Stop must not stage or rewrite the index");
 
-  const adopted = path.join(repo, "Adopted.java");
-  const adoptedSource = "class Adopted { void a( ) { } }\n";
-  write(adopted, adoptedSource);
+  const alternateConfig = path.join(temporaryDir, "profile-upgrade.xml");
+  write(alternateConfig, fs.readFileSync(CONFIG, "utf8").replace('value="140"', 'value="100"'));
+  assert.deepEqual(hookRun(repo, stateRoot, "profile upgrade", { ASDF_JAVA_FORMAT_CONFIG: alternateConfig }), {});
+  assert.equal(fs.readFileSync(peer, "utf8"), newerBytes, "profile changes must not widen writes");
 
-  assert.deepEqual(hookRun(repo, stateRoot, "first observation"), {},
-    "the first observation of a repository must not block");
-  assert.equal(fs.readFileSync(adopted, "utf8"), adoptedSource,
-    "the first observation must adopt pre-existing changed files instead of formatting them");
-
-  assert.deepEqual(hookRun(repo, stateRoot, "quiet observation"), {}, "a quiet stop must not block");
-  assert.equal(fs.readFileSync(adopted, "utf8"), adoptedSource,
-    "an adopted file must stay adopted while nothing touches it");
-
-  const restored = path.join(repo, "Restored.java");
-  const restoredSource = "class Restored { void a( ) { } }\n";
-  write(restored, restoredSource);
-  const stale = new Date(Date.now() - 3600000);
-  fs.utimesSync(restored, stale, stale);
-  const touched = path.join(repo, "Touched.java");
-  write(touched, "class Touched { void a( ) { } }\n");
-
-  const blocked = hookRun(repo, stateRoot, "touched observation");
-  assert.equal(blocked.decision, "block", "formatting a touched file must block once");
-  assert.match(blocked.reason, /Touched\.java/, "the block reason must name what it rewrote");
-  assert.doesNotMatch(blocked.reason, /Adopted\.java|Restored\.java/,
-    "the block reason must not claim files outside the watched scope");
-  assert.match(fs.readFileSync(touched, "utf8"), /void a\(\) \{/, "a file touched while watching must be formatted");
-  assert.equal(fs.readFileSync(adopted, "utf8"), adoptedSource,
-    "an untouched peer must not be reformatted by another file's stop");
-  assert.equal(fs.readFileSync(restored, "utf8"), restoredSource,
-    "a file older than the last observation must be adopted, not reformatted");
-
-  assert.deepEqual(hookRun(repo, stateRoot, "settled observation"), {},
-    "an already formatted file must not block again");
-
-  write(adopted, "class Adopted { void b( ) { } }\n");
-  const reentered = hookRun(repo, stateRoot, "edited observation");
-  assert.equal(reentered.decision, "block", "editing an adopted file must bring it back into scope");
-  assert.match(fs.readFileSync(adopted, "utf8"), /void b\(\) \{/);
+  const worktree = path.join(temporaryDir, "task-worktree");
+  git(repo, ["worktree", "add", "-qb", "task", worktree]);
+  const taskIndexPath = path.resolve(worktree, run("git", ["rev-parse", "--git-path", "index"], { cwd: worktree }).stdout.trim());
+  const taskIndexBefore = fs.readFileSync(taskIndexPath);
+  const owned = path.join(worktree, "Owned.java");
+  const ownedBytes = "class Owned { void mine( ) { } }\n";
+  write(owned, ownedBytes);
+  assert.deepEqual(hookRun(worktree, stateRoot, "worktree stop"), {});
+  const check = run(process.execPath, [HOOK, "--files", "Owned.java"], { cwd: worktree, input: "{}" });
+  requireStatus(check, 0, "explicit Stop check");
+  assert.equal(JSON.parse(check.stdout).decision, "block");
+  assert.equal(fs.readFileSync(owned, "utf8"), ownedBytes, "explicit Stop check is read-only");
+  assert.deepEqual(fs.readFileSync(taskIndexPath), taskIndexBefore, "worktree Stop must not stage files");
+  assert.equal(fs.readFileSync(peer, "utf8"), newerBytes, "worktree check must not write the main checkout");
+  requireStatus(run(process.execPath, [FORMATTER, "--check", "--files", owned], { cwd: worktree }), 3, "read-only formatter");
+  assert.equal(fs.readFileSync(owned, "utf8"), ownedBytes);
+  requireStatus(run(process.execPath, [FORMATTER, "--files", owned], { cwd: worktree }), 3, "explicit owned format");
+  assert.match(fs.readFileSync(owned, "utf8"), /void mine\(\) \{/);
+  assert.equal(fs.readFileSync(peer, "utf8"), newerBytes);
+  assert.deepEqual(fs.readFileSync(indexPath), indexBefore);
+  requireStatus(run(process.execPath, [FORMATTER, "--files"], { cwd: worktree }), 1, "empty scope must not widen");
 }
 
 // A missing checker is a setup failure. Reporting it as a record failure sends

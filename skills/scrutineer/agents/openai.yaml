@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scrutineer"
+  short_description: "Fresh-context code review with evidence-backed findings"
+  default_prompt: "Use $scrutineer to review this code or change in a fresh reviewer context by default, report evidence-backed findings and coverage gaps, and keep the candidate unchanged."

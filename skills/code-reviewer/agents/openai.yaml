@@ -1,4 +1,0 @@
-interface:
-  display_name: "Code Reviewer"
-  short_description: "Fresh-context code review with evidence-backed findings"
-  default_prompt: "Use $code-reviewer to review this code or change in a fresh reviewer context by default, report evidence-backed findings and coverage gaps, and keep the candidate unchanged."

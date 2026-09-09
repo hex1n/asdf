@@ -18,7 +18,7 @@
 | [`assayer`](skills/assayer/) | 验证 | 对同一份完整的方案或计划 revision 反复独立证伪，直到所有必需 reviewer 返回 GO 或审查挂起；深度随候选风险标定，并决定 reviewer 强度。 |
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`arborist`](skills/arborist/) | 实现 | 实现与重构现有代码，保住受影响行为，改善代码与架构，并按风险选择验证方式。 |
-| [`code-reviewer`](skills/code-reviewer/) | 审查 | 用有证据的反例审查代码与变更，区分缺陷、未验证风险和可选改进；只读报告，不代替实施修复。 |
+| [`scrutineer`](skills/scrutineer/) | 审查 | 用有证据的反例审查代码与变更，区分缺陷、未验证风险和可选改进；只读报告，不代替实施修复。 |
 | [`e2e-test-workflow`](skills/e2e-test-workflow/) | 验证 | 规划、执行并呈现端到端测试：可溯源的业务场景树、驱动修复循环直至全绿的证据化执行报告、HTML 阅读视图。开头带 `plan`、`run` 或 `render` 时选定模式：plan 出计划并渲染；run 执行并渲染，无计划时先规划；render 只渲染已有产物。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
@@ -34,7 +34,7 @@
 | `assayer` | 波普尔证伪：由独立 reviewer 攻击方案，第二模型作为对同模型盲区更强的证伪者；失效关闭的精确门禁，不存在近似通过；严重度只由后果决定，不由评审成本决定；full depth 时让一名 reviewer 以"值班运维"视角走读——Perspective-Based Reading（Basili）经 A/B 实验收窄到唯一值回成本的那个视角；Decision Envelope 把技术判定与价值决策分开。 |
 | `deep-research` | 证据层级（一手与非一手来源）、多条独立证据通道的三角验证、强推断（Platt；Chamberlin 的多重工作假设）：让竞争解释并存，直到区分性检查把它们分开。 |
 | `arborist` | 可观察契约与变更影响追踪；深 Module（Ousterhout）与特征化测试（Feathers）；通过兼容迁移和旧路径删除完成重构；按风险选择验证，在需要时加入定向变异和独立审查。 |
-| `code-reviewer` | 基于契约的双向证伪：用反例挑战实现，再核对能推翻候选发现的证据；严重度与证据强度分离；分别验证问题与修法；证据绑定被审版本。 |
+| `scrutineer` | 基于契约的双向证伪：用反例挑战实现，再核对能推翻候选发现的证据；严重度与证据强度分离；分别验证问题与修法；证据绑定被审版本。 |
 | `e2e-test-workflow` | 规划：基于模型的测试设计——对输入空间（Base-Choice、Pairwise）、状态图、决策逻辑三个模型施加覆盖准则，复合规则的每个独立条件各欠一条义务（Ammann & Offutt；判定条件思想取自 MC/DC）；预言机独立于实现，期望结果权威与实现证据分离；变更爆炸半径。执行：RIPR 模型——可达与感染对应可控性，传播与揭示对应可观测性；按易失性顺序采集证据（数字取证）；PROV 式溯源，使计划、运行、产物仅凭产物即可重建；显式的 SUT 边界，声明每个真实依赖与替身。呈现：Markdown 为正本，HTML 是经核对的投影。 |
 | `generating-api-docs` | 契约式设计与信息隐藏（Parnas）：只写调用方契约，不写实现；写目标契约，不写当前缺陷。 |
 | `generating-test-scope` | 基于依赖追踪的变更影响分析、基于风险的测试优先级、每条建议都映射到证据。 |
@@ -45,7 +45,7 @@
 ```
 规划   first-principles-planner → assayer       ← 先定方案，再证伪
 实现   arborist                                 ← 先追根系，再做最小安全改造
-审查   code-reviewer                            ← 证伪实现，也核实发现；只读报告
+审查   scrutineer                            ← 证伪实现，也核实发现；只读报告
 验证   e2e-test-workflow（plan → run → render）· generating-test-scope · generating-api-docs
 调研   deep-research                            ← 按需求证
         ↑ 新发现的未知回馈下一轮规划
@@ -67,7 +67,7 @@ reviewer 始终只读。
 装过这两个名字的机器，只删除链接目标写着本仓库 `skills/` 目录的那两条安装链接（目标已不存在，
 看链接本身记录的路径），保留真实目录和指向别处的链接，然后重新运行安装器。
 
-`code-reviewer` 可独立调用，也可交给实现流程中的 fresh-context reviewer 使用。
+`scrutineer` 可独立调用，也可交给实现流程中的 fresh-context reviewer 使用。
 它负责代码审查，`arborist` 负责实施，`assayer` 负责方案/计划评审；三者均无强制依赖。
 
 ## 仓库结构

@@ -1,7 +1,13 @@
 ---
 name: e2e-test-executor
 description: >
-  Execute or rerun an existing E2E plan, execution report, or concrete scenario in local or test environments, retaining evidence and reproducible results. A bare E2E request with no plan, report, or concrete scenario needs scenario planning first.
+  Execute or rerun an existing E2E test plan or execution report against a
+  local or test environment, retaining evidence and reproducible results. Use
+  when the user names such a plan or report, or asks to 跑 E2E / 端到端 / 验收
+  scenarios. A bare E2E ask with no plan goes to e2e-test-planner first; a unit
+  or focused test run uses the repository's own test commands, and a plain
+  RPC or facade call with no acceptance scenario is an ordinary call, not an
+  E2E run.
 ---
 
 # E2E Test Executor

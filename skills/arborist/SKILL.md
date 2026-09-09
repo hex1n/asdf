@@ -1,7 +1,11 @@
 ---
 name: arborist
 description: >
-  Implement and refactor existing code while preserving affected behavior and improving code clarity and architecture. Use for features, fixes, refactoring, and migrations involving existing contracts, shared rules, state, or dependencies — 实现, 修复, 改造, 重构, 继续做完, 按设计文档落地, implement, fix, refactor, migrate. Read-only research, planning, and review are outside scope.
+  Implement or refactor code that changes a shared contract, moves rule
+  ownership, or spans more than one module, with evidence that affected
+  contracts hold. Use when the user asks to 按设计文档落地 / 重构 / 迁移 or names
+  this skill. A local, contract-preserving fix already covered by AGENTS.md
+  runs without it.
 ---
 
 # Arborist
@@ -126,13 +130,12 @@ the affected behavior, including unchanged and relocated logic. Use controlled
 interleavings or dependency failures when they expose the risk better than a
 syntactic mutation.
 
-Brief and run one [focused independent review](references/verification.md#focused-independent-review)
-before reporting completion when the change touches:
-
-- responsibility ownership, public interfaces, or dependency direction;
-- shared state, concurrency, or authorization semantics;
-- data spanning versions or effects that are difficult to recover;
-- important shared or external guards being deleted or consolidated.
+Run one [focused independent review](references/verification.md#focused-independent-review)
+before reporting completion when the task, the repository's AGENTS.md, or a
+selected verification Gate asks for it, or when the change touches concurrency
+or authorization semantics, data spanning versions or effects that are
+difficult to recover, or deletes or consolidates a shared guard; otherwise
+report the change as self-reviewed.
 
 Independent means a fresh-context reviewer, such as a subagent, that derives
 failure cases from the requirements and code before seeing the builder's

@@ -1,21 +1,10 @@
 ---
 name: first-principles-planner
 description: >
-  Creates first-principles recommendations and plans: reframes the root
-  problem, compares mechanisms, and returns the current-best path with its
-  failure conditions and next verification step. Use for a best/better plan,
-  implementation strategy, or design direction (最佳方案, 还有更好,
-  给出最佳改进), plan-first asks (先不写代码), adopt/replace/tradeoff and
-  worth-building-now decisions (ROI), converging or falsifying competing
-  options or an unresolved decision (收敛方案, 方案选型, 多方案对比/证伪),
-  第一性原理 asks, and mid-conversation follow-ups — a best-fix ask after
-  analysis in this conversation (根据上面分析给出最佳改进方案,
-  基于上面分析还有哪些可以改进的点) or a challenge to the recommendation just given
-  (上面的是最佳方案/改进吗). Do not use for pure fact-finding research, live
-  bug diagnosis, implementation, quick naming or wording polish, code review,
-  reviewing or falsifying one existing plan (计划评审, 方案评审 — use
-  assayer), durable ADR/CONTEXT capture, or skill-writing audits unless
-  the user explicitly asks to re-plan from first principles.
+  Plan or decide from the root problem: compare mechanisms and return the
+  current-best path with its failure condition and next check. Use for 最佳方案 /
+  方案选型 / 要不要做（ROI） asks, and for a challenge to a recommendation just
+  given. Reviewing one existing plan is assayer.
 ---
 
 # First-Principles Planner

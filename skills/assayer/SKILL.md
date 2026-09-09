@@ -1,12 +1,10 @@
 ---
 name: assayer
 description: >
-  Review one completed design or plan through independent falsification; when
-  revision is requested, iterate against the exact final revision. Enter only on an explicit review ask against
-  one existing design or plan: 审查到通过, 方案评审, 计划评审,
-  证伪/多视角审查现有方案或计划, or a second-model review before
-  implementation; a candidate merely being finished is not an ask. For competing
-  options or an unresolved decision, use first-principles-planner.
+  Falsify one completed design or plan through independent review, iterating on
+  the exact final revision when revision is requested. Use on an explicit review
+  ask: 审查到通过 / 方案评审 / 计划评审 / 证伪现有方案, or a second-model review
+  before implementation. Competing options go to first-principles-planner.
 ---
 
 # Plan Review

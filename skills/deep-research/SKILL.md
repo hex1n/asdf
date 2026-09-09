@@ -1,7 +1,10 @@
 ---
 name: deep-research
 description: >
-  Conducts evidence-backed technical investigations to determine what is true, why behavior occurs, or which option the evidence supports. Use for technical research, causal analysis, system tracing, comparison, or evaluation when the user asks to "调研", "分析", "梳理", "追踪", "为什么", "对比", "评估", "research", "investigate", "figure out why", "trace", "compare", or "evaluate"; the deliverable is evidence-backed findings, not a fix or a plan.
+  Evidence-backed investigation whose deliverable is written findings, not a
+  fix. Use when the user asks to 调研 / 梳理 a system, 追踪 a behaviour across
+  components, or 对比 / 评估 options. A quick 为什么 about one file or one
+  failing test is answered directly.
 ---
 
 # Deep Research

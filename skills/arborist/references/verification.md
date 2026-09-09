@@ -111,14 +111,27 @@ user decides; the builder does not settle it by relabeling the finding.
 Severity is judged against this change: a defect the diff did not introduce is
 reported as pre-existing, whatever label the reviewer gave it.
 
-One focused review, revisited on the affected conclusions after a material
-design repair, a newly discovered path, or an unresolved material finding, is
-the target. Review evidence must still apply to the final material revision and the source,
-configuration, dependency versions, and runtime assumptions supporting it. A
-stable diff does not preserve evidence when those inputs change; revisit the
-affected conclusions and checks, retaining unaffected evidence.
+## Review lifecycle
 
-A review finding or approval cannot substitute for runtime evidence. When no
-fresh-context reviewer is available, label self-review accurately, use the
-strongest available checks, disclose the limitation, and keep unresolved
-high-impact claims open.
+Before dispatch, check whether a completed or active independent review covers
+the same candidate, scope, and supporting inputs. Reuse valid completed
+evidence or await the applicable active review rather than launching another.
+An installed review skill is optional: give it to the selected reviewer,
+not to a second reviewer. Keep the reviewer context separate from the builder.
+
+Dispatch once the diff is reviewable and continue the remaining checks.
+Revisit only the affected conclusions after a material repair, a new path,
+an unresolved material finding, or a change to supporting source, configuration,
+dependencies, or runtime assumptions. A stable diff alone does not preserve
+review evidence.
+
+A review finding or approval cannot substitute for runtime evidence. If a
+required review cannot run, fails, or its independence cannot be established,
+report it as blocked with the observed cause. Continue implementation and
+checks that do not depend on it. Local self-checks remain the builder's work,
+not fulfillment of the independent-review requirement. Keep unmet requirements
+and high-impact unknowns open.
+
+Only an explicit user decision can change a user-owned review requirement.
+Permission to self-review is not completion of an independent-review gate
+and does not waive repository-mandated review.

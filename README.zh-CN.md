@@ -18,7 +18,7 @@
 | [`assayer`](skills/assayer/) | 验证 | 对同一份完整的方案或计划 revision 反复独立证伪，直到所有必需 reviewer 返回 GO 或审查挂起；深度随候选风险标定，并决定 reviewer 强度。 |
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的技术调研：判断事实真相、行为成因、应得出何种决策。 |
 | [`arborist`](skills/arborist/) | 实现 | 实现与重构现有代码，保住受影响行为，改善代码与架构，并按风险选择验证方式。 |
-| [`scrutineer`](skills/scrutineer/) | 审查 | 用有证据的反例审查代码与变更，区分缺陷、未验证风险和可选改进；只读报告，不代替实施修复。 |
+| [`scrutineer`](skills/scrutineer/) | 审查 | 用有证据的反例审查代码与变更，区分缺陷、未验证风险、待决事项和可选改进；只读报告，不代替实施修复。 |
 | [`e2e-test-workflow`](skills/e2e-test-workflow/) | 验证 | 规划、执行并呈现端到端测试：可溯源的业务场景树、驱动修复循环直至全绿的证据化执行报告、HTML 阅读视图。开头带 `plan`、`run` 或 `render` 时选定模式：plan 出计划并渲染；run 执行并渲染，无计划时先规划；render 只渲染已有产物。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档。 |
 | [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |

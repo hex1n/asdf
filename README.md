@@ -20,6 +20,7 @@ for the distribution vocabulary.
 | [`assayer`](skills/assayer/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`arborist`](skills/arborist/) | implement | Implement and refactor existing code with preserved behavior, clearer architecture, and verification matched to risk. |
+| [`code-reviewer`](skills/code-reviewer/) | review | Review code and changes through evidence-backed counterexamples; separate defects, uncertainty, and optional improvements without editing the candidate. |
 | [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
 | [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
@@ -38,6 +39,7 @@ look when extending it.
 | `assayer` | Popperian falsification by independent reviewers, with a second model as a stronger falsifier for same-model blind spots; a fail-closed exact gate with no approximate pass; severity fixed by consequence, never by review cost; an operator-on-call walk for one full-depth reviewer — perspective-based reading (Basili) narrowed to the single perspective an A/B trial found worth its cost; a Decision Envelope separating the technical verdict from the value decision. |
 | `deep-research` | Evidence hierarchy (primary versus non-primary sources), triangulation through independent evidence lanes, and strong inference (Platt; Chamberlin's multiple working hypotheses): rival explanations kept alive until a distinguishing check separates them. |
 | `arborist` | Observable contracts and traced change impact; deep modules (Ousterhout) and characterization tests (Feathers); staged refactoring through compatibility and obsolete-path removal; verification matched to risk, with targeted mutation and focused independent review when warranted. |
+| `code-reviewer` | Contract-based review; counterexample search and disconfirmation of candidate findings; consequence-based severity separate from evidence strength; findings and remedies validated separately; revision-bound evidence. |
 | `e2e-test-planner` | Model-based test design: coverage criteria over the input space (Base-Choice, Pairwise), state graph, and decision logic, where a rule firing on several independent conditions owes one obligation per condition (Ammann & Offutt; the deciding-condition idea from MC/DC); an oracle independent of the implementation, with expected-result authority separated from implementation evidence; change blast radius. |
 | `e2e-test-executor` | The RIPR model — reachability and infection as controllability, propagation and revealability as observability; evidence captured in order of volatility (digital forensics); PROV-style provenance so plan, run, and artifacts reconstruct from the artifacts alone; an explicit SUT boundary declaring every real dependency and double. |
 | `generating-api-docs` | Design by contract and information hiding (Parnas): document the caller contract, never the implementation; the target contract, never a current defect. |
@@ -49,6 +51,7 @@ look when extending it.
 ```
 plan         first-principles-planner → assayer       ← decide the plan, then falsify it
 implement    arborist                                 ← trace the roots, then shape the smallest safe change
+review-code  code-reviewer                            ← challenge the code and the findings; report without editing
 verify       e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
 investigate  deep-research                            ← answer questions from evidence
               ↑ discovered unknowns feed the next plan
@@ -65,6 +68,10 @@ independently distributable.
 `assayer` binds the same portable workflow to each host's read-only reviewer:
 a configured second-model connector or fresh collaboration subagent in Codex,
 and an external second model or fresh Agent subagent in Claude Code.
+
+`code-reviewer` can run directly or in a fresh-context reviewer delegated by an
+implementation workflow. It owns code review, `arborist` owns implementation,
+and `assayer` owns design/plan review; none requires the others to be installed.
 
 ## Repository layout
 

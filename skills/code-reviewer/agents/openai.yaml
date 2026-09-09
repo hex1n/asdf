@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Reviewer"
+  short_description: "Evidence-led code review without needless rewrites"
+  default_prompt: "Use $code-reviewer to review this code or change, challenge its contracts, and report verified findings and coverage gaps without editing it."

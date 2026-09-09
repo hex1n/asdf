@@ -1,19 +1,12 @@
 #!/usr/bin/env node
 
-import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import {
-  changedJavaFiles,
-  findGitRoot,
-  formatChangedJava,
-  formatterInputs,
-  run,
-} from "./format-changed-java.mjs";
+import { findGitRoot, formatChangedJava } from "./format-changed-java.mjs";
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url));
 // The rationale checker is a separate asset, so this tool locates it instead of
@@ -21,19 +14,6 @@ const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url));
 // installed skill. A missing checker is a setup failure, never a record failure.
 const RATIONALE_SOURCE_CLI = path.resolve(TOOL_ROOT, "..", "..", "skills", "rationale-records", "scripts", "rationale.mjs");
 const RATIONALE_INSTALLED_CLI = path.join(os.homedir(), ".agents", "skills", "rationale-records", "scripts", "rationale.mjs");
-// The hook rewrites files, so its scope is what moved while it was watching this
-// worktree, not the whole HEAD diff. A repository it has never observed is
-// adopted as a baseline, and so is a file older than the last observation: work
-// the agent never touched must not be reformatted underneath it. Bytes that git
-// itself produced are not agent work either: a file whose content equals its
-// blob in HEAD or in the merge parent (`git checkout --`, `git merge`, a stash
-// pop) is skipped, otherwise every restore of an upstream file would be
-// reformatted again on the next stop.
-const STATE_VERSION = 2;
-// Coarse filesystem timestamps must not silence a real edit, so an ambiguous
-// mtime formats (loud) rather than adopting (silent).
-const MTIME_TOLERANCE_MS = 2000;
-
 function readInput() {
   const raw = fs.readFileSync(0, "utf8").trim();
   if (!raw) return { raw: "", value: {} };
@@ -48,115 +28,6 @@ export function blockingPayload(input, reason) {
   return input.stop_hook_active
     ? { continue: false, stopReason: reason }
     : { decision: "block", reason };
-}
-
-function fileDigest(file) {
-  const digest = crypto.createHash("sha256");
-  digest.update(fs.existsSync(file) ? fs.readFileSync(file) : Buffer.from("<deleted>"));
-  return digest.digest("hex");
-}
-
-export function toolDigest(files = formatterInputs()) {
-  const digest = crypto.createHash("sha256");
-  for (const file of [...files].sort()) {
-    digest.update(path.basename(file)).update("\0");
-    digest.update(fs.existsSync(file) ? fs.readFileSync(file) : Buffer.from("<deleted>")).update("\0");
-  }
-  return digest.digest("hex");
-}
-
-// Refs whose trees hold content git may have written into the worktree without
-// an editor: the checked-out commit and, while a merge is in progress, its
-// other parent.
-function committedContentRefs(repoRoot) {
-  const gitDir = run("git", ["rev-parse", "--git-dir"], { cwd: repoRoot });
-  const refs = ["HEAD"];
-  if (gitDir.status === 0 && fs.existsSync(path.resolve(repoRoot, gitDir.stdout.trim(), "MERGE_HEAD"))) refs.push("MERGE_HEAD");
-  return refs;
-}
-
-// `git diff --quiet` compares after the same normalisation git applies on add,
-// so a CRLF checkout of an LF blob still counts as the committed content. A path
-// absent from the ref is never a match: an untracked file is new work.
-export function matchesCommittedContent(repoRoot, relative, refs = committedContentRefs(repoRoot)) {
-  for (const ref of refs) {
-    const exists = run("git", ["cat-file", "-e", ref + ":" + relative], { cwd: repoRoot });
-    if (exists.status !== 0) continue;
-    const same = run("git", ["diff", "--quiet", ref, "--", relative], { cwd: repoRoot });
-    if (same.status === 0) return true;
-  }
-  return false;
-}
-
-export function observe(repoRoot, files) {
-  const observed = new Map();
-  const refs = committedContentRefs(repoRoot);
-  for (const file of files.slice().sort()) {
-    const relative = path.relative(repoRoot, file).replaceAll("\\", "/");
-    const stat = fs.statSync(file, { throwIfNoEntry: false });
-    observed.set(relative, {
-      digest: fileDigest(file),
-      mtimeMs: stat ? stat.mtimeMs : 0,
-      committed: fs.existsSync(file) && matchesCommittedContent(repoRoot, relative, refs),
-    });
-  }
-  return observed;
-}
-
-// `state` is the previous observation of this worktree and `observed` is the
-// current one. A file enters the scope only when the hook can see that it moved
-// between the two.
-export function selectJavaTargets(state, observed, context) {
-  const baseline = state && state.version === STATE_VERSION
-    && state.java && typeof state.java === "object" && !Array.isArray(state.java)
-    ? state.java
-    : null;
-  if (!baseline) return { targets: [], scope: "adopted-repository" };
-  if (state.tools !== context.tools) return { targets: [...observed.keys()], scope: "formatter-changed" };
-  const since = Number(state.observedAt) || 0;
-  const targets = [];
-  for (const [file, current] of observed) {
-    if (current.committed) continue;
-    if (!Object.prototype.hasOwnProperty.call(baseline, file)) {
-      if (current.mtimeMs + MTIME_TOLERANCE_MS >= since) targets.push(file);
-      continue;
-    }
-    if (baseline[file] !== current.digest) targets.push(file);
-  }
-  return { targets, scope: "watched" };
-}
-
-function observationState(repoRoot, observed, context, now) {
-  const java = {};
-  for (const file of observed.keys()) java[file] = fileDigest(path.resolve(repoRoot, file));
-  return { version: STATE_VERSION, observedAt: now, tools: context.tools, java };
-}
-
-function stateFile(repoRoot) {
-  const stateRoot = process.env.ASDF_AGENT_STATE_ROOT
-    || path.join(os.homedir(), ".agents", "state", "java-formatter");
-  const key = crypto.createHash("sha256").update(repoRoot).digest("hex");
-  return path.join(stateRoot, key + ".json");
-}
-
-function readState(file) {
-  try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-function writeState(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const staged = file + ".staged-" + process.pid;
-  fs.writeFileSync(staged, JSON.stringify(value, null, 2) + "\n", "utf8");
-  try {
-    fs.renameSync(staged, file);
-  } catch {
-    fs.copyFileSync(staged, file);
-    fs.rmSync(staged, { force: true });
-  }
 }
 
 export function repositoryDispatcher(repoRoot) {
@@ -255,43 +126,6 @@ function selfTest() {
   if (claude.continue !== false || claude.stopReason !== "x") throw new Error("Claude block payload mismatch.");
   if (codex.decision !== "block" || codex.reason !== "x") throw new Error("Codex block payload mismatch.");
 
-  const now = 1000000;
-  const context = { tools: "t1" };
-  const watched = { version: STATE_VERSION, observedAt: now, tools: "t1", java: { "Known.java": "d1" } };
-  const observed = new Map([
-    ["Known.java", { digest: "d1", mtimeMs: now - 60000 }],
-    ["Appeared.java", { digest: "d2", mtimeMs: now + 1 }],
-  ]);
-  if (selectJavaTargets({}, observed, context).scope !== "adopted-repository"
-    || selectJavaTargets({}, observed, context).targets.length !== 0) {
-    throw new Error("An unobserved repository must be adopted, not reformatted.");
-  }
-  if (selectJavaTargets({ javaDigest: "legacy" }, observed, context).targets.length !== 0) {
-    throw new Error("Incompatible stored state must be adopted, not reformatted.");
-  }
-  if (selectJavaTargets(watched, observed, context).targets.join() !== "Appeared.java") {
-    throw new Error("A file that appeared while watching must be formatted, and an unchanged one skipped.");
-  }
-  const edited = new Map([["Known.java", { digest: "d2", mtimeMs: now + 1 }]]);
-  if (selectJavaTargets(watched, edited, context).targets.join() !== "Known.java") {
-    throw new Error("A watched file whose content changed must be formatted.");
-  }
-  const restored = new Map([["Restored.java", { digest: "d3", mtimeMs: now - 60000 }]]);
-  if (selectJavaTargets(watched, restored, context).targets.length !== 0) {
-    throw new Error("A file older than the last observation must be adopted, not reformatted.");
-  }
-  if (selectJavaTargets(watched, observed, { tools: "t2" }).targets.length !== 2) {
-    throw new Error("A changed formatter profile must re-apply to the whole watched scope.");
-  }
-  const checkedOut = new Map([
-    ["Known.java", { digest: "d2", mtimeMs: now + 1, committed: true }],
-    ["Merged.java", { digest: "d4", mtimeMs: now + 1, committed: true }],
-    ["Edited.java", { digest: "d5", mtimeMs: now + 1, committed: false }],
-  ]);
-  if (selectJavaTargets(watched, checkedOut, context).targets.join() !== "Edited.java") {
-    throw new Error("Content that equals a committed blob was written by git, not the agent, and must not be formatted.");
-  }
-
   const present = fileURLToPath(import.meta.url);
   const absent = present + ".missing";
   if (resolveRationaleCli({ ASDF_RATIONALE_CLI: present }) !== present) {
@@ -341,28 +175,20 @@ function main() {
   }
 
   try {
-    const cacheFile = stateFile(repoRoot);
-    const state = readState(cacheFile);
-    const context = { tools: toolDigest() };
-    const observed = observe(repoRoot, changedJavaFiles(repoRoot));
-    const selection = selectJavaTargets(state, observed, context);
-    const formatted = selection.targets.length > 0
-      ? formatChangedJava({
-        repoRoot,
-        explicitFiles: selection.targets.map((file) => path.resolve(repoRoot, file)),
-      })
-      : [];
-    // Record the observation even when a later gate fails: the bytes on disk
-    // already moved, and re-formatting them on the next stop proves nothing.
-    writeState(cacheFile, observationState(repoRoot, observed, context, Date.now()));
-
-    if (formatted.length > 0) {
-      const names = formatted.map((file) => path.relative(repoRoot, file).replaceAll("\\", "/"));
-      const shown = names.slice(0, 10).join(", ") + (names.length > 10 ? ", ..." : "");
-      const reason = "Formatted " + names.length + " Java file(s) touched since the last stop: "
-        + shown + ". Inspect the diff, then stop again.";
-      process.stdout.write(JSON.stringify(blockingPayload(input.value, reason)) + "\n");
-      return;
+    const marker = process.argv.indexOf("--files");
+    if (marker !== -1) {
+      const files = process.argv.slice(marker + 1);
+      if (files.length === 0 || files.some((file) => file.startsWith("--"))) {
+        throw new Error("Stop formatting checks require an explicit non-empty --files list.");
+      }
+      const pending = formatChangedJava({ repoRoot, explicitFiles: files, checkOnly: true });
+      if (pending.length > 0) {
+        const names = pending.map((file) => path.relative(repoRoot, file)).join(", ");
+        process.stdout.write(JSON.stringify(blockingPayload(input.value,
+          "Java formatting required for explicit files: " + names
+          + ". Run format-changed-java.mjs --files <task-owned files>, inspect, then verify and stage.")) + "\n");
+        return;
+      }
     }
 
     if (fs.existsSync(path.join(repoRoot, "docs", "rationale"))) runRationaleGate(repoRoot);

@@ -20,8 +20,7 @@ for the distribution vocabulary.
 | [`assayer`](skills/assayer/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`arborist`](skills/arborist/) | implement | Implement and refactor existing code with preserved behavior, clearer architecture, and verification matched to risk. |
-| [`e2e-test-planner`](skills/e2e-test-planner/) | verify | Build source-backed end-to-end test plans from design, requirements, and code. |
-| [`e2e-test-executor`](skills/e2e-test-executor/) | verify | Execute E2E test plans and produce evidence-backed reports; drives the fix loop until green. |
+| [`e2e-test-workflow`](skills/e2e-test-workflow/) | verify | Plan, execute, and present end-to-end tests: source-backed scenario trees, evidence-backed execution reports that drive the fix loop until green, and HTML reader views. Typed first, `plan`, `run`, or `render` selects the mode: plan and render it; run, planning first when no plan exists, and render; or render an existing artifact. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
 | [`rationale-records`](skills/rationale-records/) | navigate | Maintain and query Git-ignored personal current-code rationale, with strict source anchors and worktree handoff. |
@@ -38,8 +37,7 @@ look when extending it.
 | `assayer` | Popperian falsification by independent reviewers, with a second model as a stronger falsifier for same-model blind spots; a fail-closed exact gate with no approximate pass; severity fixed by consequence, never by review cost; an operator-on-call walk for one full-depth reviewer — perspective-based reading (Basili) narrowed to the single perspective an A/B trial found worth its cost; a Decision Envelope separating the technical verdict from the value decision. |
 | `deep-research` | Evidence hierarchy (primary versus non-primary sources), triangulation through independent evidence lanes, and strong inference (Platt; Chamberlin's multiple working hypotheses): rival explanations kept alive until a distinguishing check separates them. |
 | `arborist` | Observable contracts and traced change impact; deep modules (Ousterhout) and characterization tests (Feathers); staged refactoring through compatibility and obsolete-path removal; verification matched to risk, with targeted mutation and focused independent review when warranted. |
-| `e2e-test-planner` | Model-based test design: coverage criteria over the input space (Base-Choice, Pairwise), state graph, and decision logic, where a rule firing on several independent conditions owes one obligation per condition (Ammann & Offutt; the deciding-condition idea from MC/DC); an oracle independent of the implementation, with expected-result authority separated from implementation evidence; change blast radius. |
-| `e2e-test-executor` | The RIPR model — reachability and infection as controllability, propagation and revealability as observability; evidence captured in order of volatility (digital forensics); PROV-style provenance so plan, run, and artifacts reconstruct from the artifacts alone; an explicit SUT boundary declaring every real dependency and double. |
+| `e2e-test-workflow` | Planning: model-based test design — coverage criteria over the input space (Base-Choice, Pairwise), state graph, and decision logic, where a rule firing on several independent conditions owes one obligation per condition (Ammann & Offutt; the deciding-condition idea from MC/DC); an oracle independent of the implementation, with expected-result authority separated from implementation evidence; change blast radius. Execution: the RIPR model — reachability and infection as controllability, propagation and revealability as observability; evidence captured in order of volatility (digital forensics); PROV-style provenance so plan, run, and artifacts reconstruct from the artifacts alone; an explicit SUT boundary declaring every real dependency and double. Presentation: Markdown canonical, HTML a checked projection of it. |
 | `generating-api-docs` | Design by contract and information hiding (Parnas): document the caller contract, never the implementation; the target contract, never a current defect. |
 | `generating-test-scope` | Change-impact analysis by dependency tracing, risk-based test prioritization, and evidence-mapped recommendations. |
 | `rationale-records` | Chesterton's fence — record why the code has its exact shape before a natural-looking rewrite removes it; one invariant, one current owner; anchored reverse index from source to reason. |
@@ -49,7 +47,7 @@ look when extending it.
 ```
 plan         first-principles-planner → assayer       ← decide the plan, then falsify it
 implement    arborist                                 ← trace the roots, then shape the smallest safe change
-verify       e2e-test-planner → e2e-test-executor · generating-test-scope · generating-api-docs
+verify       e2e-test-workflow (plan → run → render) · generating-test-scope · generating-api-docs
 investigate  deep-research                            ← answer questions from evidence
               ↑ discovered unknowns feed the next plan
 ```
@@ -65,6 +63,13 @@ independently distributable.
 `assayer` binds the same portable workflow to each host's read-only reviewer:
 a configured second-model connector or fresh collaboration subagent in Codex,
 and an external second model or fresh Agent subagent in Claude Code.
+
+`e2e-test-workflow` is model-invoked in both hosts; typed by hand, a leading `plan`,
+`run`, or `render` selects the mode: `/e2e-test-workflow plan …` in Claude Code,
+`$e2e-test-workflow plan …` in Codex. It replaces the retired `e2e-test-planner` and
+`e2e-test-executor`; on a machine that installed those, remove only the install
+entries for those two names whose stored link target points into this repository's
+`skills/` tree, keep real directories and foreign links, then run the installer.
 
 ## Repository layout
 

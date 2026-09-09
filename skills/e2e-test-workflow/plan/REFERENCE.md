@@ -1,7 +1,7 @@
-# E2E Test Planner Reference
+# Planning reference
 
 Read the section selected by the task. The ordinary planning and handoff rules live
-in `SKILL.md`; this file supplies expanded coverage analysis and HTML presentation.
+in `PLAN.md`; this file supplies expanded coverage analysis.
 
 ## Coverage Models
 
@@ -73,49 +73,3 @@ that asserts it; every scenario requirement link resolves back to its row. Keep 
 stable when revising a referenced plan; document retired obligations when existing
 references need them. Consecutive numbering is unnecessary. Old plans without layer
 columns or a ledger remain valid; preserve their established coverage mappings.
-
-## Reader View Contract
-
-The same-stem HTML is the human reading view; Markdown is the canonical plan. Author
-one self-contained desktop page directly from the finalized Markdown, without a
-bundled renderer or a separate renderer-input artifact.
-
-### Presentation
-
-Start with the business outcome, normal flow, highest-risk branches/decisions, and
-the exact First Test Slice. Use a connected flow only when sequence benefits from a
-diagram. Preserve actual branch ownership and order.
-
-Show the scenario tree as a grouped comparison table with **Scenario**, **Expected
-Input**, and **Expected Result**, localized to the user's language. Each stable
-scenario ID has one detailed home. Expand its effective inputs, actions, observation,
-footprint, authority, evidence, and any coverage links in that row; resolve inherited
-fields with the atomic rule from `SKILL.md`. Summaries link to the same detail.
-
-Keep all plan facts, including models, lower-layer mappings, gaps, and exclusions,
-accessible in the page. Put supporting text or evidence in expandable sections. Link
-canonical Markdown and raw attachments directly for download or inspection; a text
-attachment does not require another HTML page. Add a companion page only when its
-size or a real navigation need warrants one, and audit it if created.
-
-### Offline authoring and checks
-
-Use semantic HTML, inline CSS, native disclosure controls, UTF-8, and localized
-labels. Keep content readable without JavaScript and use no external fonts, scripts,
-or CDNs. Escape raw evidence. Use a desktop layout with readable type, textual status
-labels, visible keyboard focus, and enough room for expected-input/result comparison.
-
-Before delivery:
-
-1. Reconcile scenarios by ID and compare effective field values with Markdown,
-   including expectations, authority, observations, footprint, and dispositions.
-   Matching IDs or row counts alone does not establish fidelity.
-2. Check coverage/gap inventories and the exact first slice in both directions.
-   Summaries introduce no additional plan facts or implied test results.
-3. Check local links and fragments, including raw attachment targets, for existence
-   within the intended report/source boundary; preserve evidence and UTF-8 text.
-4. Render at a normal desktop viewport. Inspect the opening, scenario details,
-   tables, flow continuity when present, links, focus, wrapping, and overflow.
-
-Correct misleading relationships or clipped content. If rendering or a necessary
-fidelity check is unavailable, deliver Markdown and explain why HTML was withheld.

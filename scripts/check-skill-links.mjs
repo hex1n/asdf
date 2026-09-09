@@ -9,9 +9,19 @@
 // planner field the paired executor still gated on. Anchors are checkable
 // mechanically; this script is that check.
 //
-// Scope is deliberately narrow: relative links between .md files inside one
-// skill directory. External URLs, absolute paths, and links that leave the
-// skill are another skill's business and are reported as skipped, not failed.
+// Scope is deliberately narrow: relative links written in .md files inside one
+// skill directory, subdirectories included (`references/`, `plan/`, `run/`),
+// each resolved from the linking file's own directory. A Markdown target must
+// exist and yield the anchor; any other file must exist; a directory must exist
+// and carries no anchor; a trailing slash demands a directory. Dot segments in
+// a target are folded first, as a browser does when it follows the link, and
+// the remaining components are then checked one by one against the real
+// filesystem, so a path that only works through a symlink still counts and a
+// dangling or looping symlink is reported. Name matching is exact-case on
+// purpose: a link that only works because Windows ignores case breaks on a
+// case-sensitive checkout. External URLs, absolute paths, and links that leave
+// the skill are another skill's business and are reported as skipped, not
+// failed.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -19,6 +29,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SKILLS = path.join(ROOT, "skills");
+const MARKDOWN = /\.md$/i;
 
 // GitHub-flavoured heading -> anchor: lowercase, drop everything that is not a
 // word character, space or hyphen, then spaces to hyphens. `&` in a heading
@@ -73,26 +84,74 @@ export function extractLinks(markdown) {
   return links;
 }
 
-function checkSkill(dir, name) {
-  const files = fs.readdirSync(dir, { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith(".md"))
-    .map((e) => e.name)
-    .sort();
+// The Markdown files whose links are checked, as skill-relative posix paths
+// ("run/RUN.md"). Symlinked directories are followed; only a symlink back into
+// its own ancestor chain is cut, which is what stops a cycle. An entry whose
+// symlink cannot be resolved is not a source and is left out.
+export function listMarkdownFiles(dir) {
+  const files = [];
+  const ancestors = new Set();
+  const walk = (rel) => {
+    const abs = path.join(dir, rel);
+    let real;
+    try { real = fs.realpathSync(abs); } catch { return; }
+    if (ancestors.has(real)) return;
+    ancestors.add(real);
+    for (const e of fs.readdirSync(abs, { withFileTypes: true })) {
+      const childRel = rel === "." ? e.name : `${rel}/${e.name}`;
+      let target = e;
+      if (e.isSymbolicLink()) {
+        try { target = fs.statSync(path.join(abs, e.name)); } catch { continue; }
+      }
+      if (target.isDirectory()) walk(childRel);
+      else if (target.isFile() && MARKDOWN.test(e.name)) files.push(childRel);
+    }
+    ancestors.delete(real);
+  };
+  walk(".");
+  return files.sort();
+}
 
-  const anchorsByFile = new Map();
-  const textByFile = new Map();
-  for (const f of files) {
-    const text = fs.readFileSync(path.join(dir, f), "utf8");
-    textByFile.set(f, text);
-    anchorsByFile.set(f, headingAnchors(text));
+// Resolve a skill-relative target one component at a time against the real
+// filesystem: each name must be listed exactly as written (exact case), and
+// symlinks are followed by stat, so a finite path through an alias resolves
+// while a dangling or looping link surfaces as a reason.
+export function resolveTarget(dir, rel) {
+  let abs = dir;
+  let kind = "dir";
+  if (rel === ".") return { kind, abs };
+  for (const part of rel.split("/")) {
+    if (kind !== "dir") return { error: "not a directory on the path" };
+    let names;
+    try { names = fs.readdirSync(abs); } catch { return { error: "unreadable directory on the path" }; }
+    if (!names.includes(part)) return { error: "no such file or directory in skill" };
+    abs = path.join(abs, part);
+    let st;
+    try { st = fs.statSync(abs); } catch (e) {
+      return { error: e && e.code === "ELOOP" ? "symlink loop" : "unresolvable symlink" };
+    }
+    kind = st.isDirectory() ? "dir" : st.isFile() ? "file" : "other";
   }
+  return { kind, abs };
+}
+
+export function checkSkill(dir, name) {
+  const files = listMarkdownFiles(dir);
+  const anchorCache = new Map();
+  const anchorsOf = (abs) => {
+    let key = abs;
+    try { key = fs.realpathSync(abs); } catch {}
+    if (!anchorCache.has(key)) anchorCache.set(key, headingAnchors(fs.readFileSync(abs, "utf8")));
+    return anchorCache.get(key);
+  };
 
   const failures = [];
   let checked = 0;
   let skipped = 0;
 
   for (const f of files) {
-    for (const { target, line } of extractLinks(textByFile.get(f))) {
+    const text = fs.readFileSync(path.join(dir, f), "utf8");
+    for (const { target, line } of extractLinks(text)) {
       // A template file's placeholder link (`#{name}`) is filled in by the
       // agent at authoring time; it has no anchor to resolve here.
       if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith("/") || /[{}]/.test(target)) {
@@ -100,24 +159,44 @@ function checkSkill(dir, name) {
         continue;
       }
       const hashAt = target.indexOf("#");
-      const filePart = hashAt === -1 ? target : target.slice(0, hashAt);
+      const rawFilePart = hashAt === -1 ? target : target.slice(0, hashAt);
       const anchor = hashAt === -1 ? "" : target.slice(hashAt + 1);
-      const resolved = filePart === "" ? f : filePart;
+      // A link target is a URL path: `A%20B.md` names the file "A B.md".
+      let filePart;
+      try {
+        filePart = decodeURIComponent(rawFilePart);
+      } catch {
+        checked++;
+        failures.push(`${name}/${f}:${line} -> ${target} (invalid percent-encoding)`);
+        continue;
+      }
+      const wantsDir = filePart.endsWith("/");
+      // Resolve from the linking file's directory: "../plan/PLAN.md" written in
+      // run/RUN.md names plan/PLAN.md, and a bare "#anchor" names the file itself.
+      const resolved = filePart === ""
+        ? f
+        : path.posix.normalize(path.posix.join(path.posix.dirname(f), filePart)).replace(/\/$/, "") || ".";
 
       // A link that leaves the skill directory is out of scope.
-      if (resolved.includes("/") || resolved.includes("..")) {
+      if (resolved === ".." || resolved.startsWith("../")) {
         skipped++;
         continue;
       }
       checked++;
 
-      if (!anchorsByFile.has(resolved)) {
-        failures.push(`${name}/${f}:${line} -> ${target} (no such file in skill)`);
-        continue;
+      const r = resolveTarget(dir, resolved);
+      if (r.error) {
+        failures.push(`${name}/${f}:${line} -> ${target} (${r.error})`);
+      } else if (wantsDir && r.kind !== "dir") {
+        failures.push(`${name}/${f}:${line} -> ${target} (not a directory)`);
+      } else if (r.kind === "dir") {
+        if (anchor) failures.push(`${name}/${f}:${line} -> ${target} (anchor on a directory)`);
+      } else if (r.kind === "file" && MARKDOWN.test(resolved)) {
+        if (anchor && !anchorsOf(r.abs).has(anchor)) {
+          failures.push(`${name}/${f}:${line} -> ${target} (no heading yields #${anchor})`);
+        }
       }
-      if (anchor && !anchorsByFile.get(resolved).has(anchor)) {
-        failures.push(`${name}/${f}:${line} -> ${target} (no heading yields #${anchor})`);
-      }
+      // Any other existing file (a script, an asset) needs nothing more.
     }
   }
   return { failures, checked, skipped, files: files.length };

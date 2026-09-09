@@ -1,6 +1,6 @@
 # Conditional execution contracts
 
-The ordinary verdict and report contracts live in `SKILL.md` and `REPORTING.md`.
+The ordinary verdict and report contracts live in `RUN.md` and `REPORTING.md`.
 Read these sections only for generated replay orchestration or a repair handoff.
 
 ## Replay Entry Points
@@ -96,7 +96,7 @@ needs separate issue documents.
 
 | Disposition | Meaning |
 |---|---|
-| `OPEN` | Unresolved, actionable now within the acting agent's authority. |
+| `OPEN` | Unresolved, actionable now by the named owner within that owner's authority; a delegated executor does not acquire product-fix authority. |
 | `CLOSED` | Verified complete or no longer applicable. |
 | `MITIGATED` | A workaround exists; residual risk remains explicit. |
 | `ACCEPTED` | Deliberately accepted by the named owner. |
@@ -115,4 +115,4 @@ when several issues need a queue. Include reproduction inputs/steps, expected/ac
 evidence, suspected area and fix constraints, and a post-fix verification/closure
 rule. Link affected results to that issue. Close a product defect only after the fix
 is loaded and its required E2E scenarios and affected dependents have fresh passing
-evidence; preserve earlier reports. Remote issue creation remains separately scoped.
+evidence; preserve earlier reports. Issues live only as these local documents.

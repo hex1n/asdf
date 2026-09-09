@@ -1,10 +1,4 @@
----
-name: e2e-test-planner
-description: >
-  Create source-backed E2E, integration, acceptance, or regression test plans as business scenario trees from requirements, designs, decisions, or code changes. Use for planning scenarios and coverage; executing an existing plan, report, or concrete scenario belongs to e2e-test-executor.
----
-
-# E2E Test Planner
+# Planning stage
 
 Produce an executable business scenario tree with justified expectations and visible
 coverage gaps. Scale the supporting analysis to the behavior: a short flow and
@@ -75,7 +69,7 @@ preserve the token. Each stable scenario ID has a purpose and these effective fa
 | Implementation Evidence | Locators supporting the entry, state, observation, and footprint; these establish mechanics, not business correctness. |
 
 The first four facts are the execution anchors. Resolve business facts here; the
-executor resolves live targets, credentials, commands, safety wait bounds, owner
+execution stage resolves live targets, credentials, commands, safety wait bounds, owner
 markers, and cleanup implementations. Keep a known project command when it is the
 stable entry interface. Missing business decisions stay `NEEDS-DECISION`; missing
 source anchors stay `BLOCKED`. Either can be planned, but neither is execution-ready.
@@ -90,7 +84,7 @@ requires it. Execution-safety timeouts are not business failure thresholds.
 
 Co-locate shared facts on the nearest parent. An omitted child field inherits the
 complete parent value; a child replacement restates the whole effective field.
-This atomic rule also governs execution and HTML projection. Add priority, step IDs,
+This atomic rule also governs execution and any derived view. Add priority, step IDs,
 and `Requirements` links when they aid selection or traceability; their absence does
 not invalidate an otherwise complete handoff.
 
@@ -111,8 +105,18 @@ evidence or capability, and `OUT-OF-SCOPE` for a stated exclusion. `ASSUMED` req
 an explicitly accepted temporary premise and the accepting owner. Keep unresolved
 items and missing lower-layer tests visible without inflating the E2E tree.
 
-Save Markdown under `docs/e2e-test/{feature}/{date}-{feature}-e2e-test-plan.md` unless
-the user specifies a path. Unless Markdown-only is requested, read the
-[Reader View Contract](REFERENCE.md#reader-view-contract) and create a desktop HTML
-companion. Link the HTML and canonical Markdown when available. Planning ends with
-the plan; execute tests or implement test code only when the task authorizes it.
+Save Markdown as `.scratch/{feature}/e2e/{date}-{feature}-e2e-test-plan.md` unless the
+user specifies a path, and link it in the reply. Hand its HTML view to a fresh-context
+agent per the hand-off in [../READER-VIEW.md](../READER-VIEW.md), or author it here
+when the runtime has no subagents. Planning ends with the plan; execute tests or
+implement test code only when the task authorizes it.
+
+## 5. Hand off to execution (run mode only)
+
+Continue to execution only when the selected mode includes execution and the
+scenarios it will select — the user's explicit choice, otherwise the first slice —
+carry no `NEEDS-DECISION` or `BLOCKED` item; otherwise deliver the plan with the
+decisions or evidence it still needs. To execute, read
+[../run/HANDOFF.md](../run/HANDOFF.md) and hand execution to a fresh-context agent —
+never a fork of this window — so the run starts from the plan file; when the runtime
+has no subagents, read [../run/RUN.md](../run/RUN.md) and follow it here.

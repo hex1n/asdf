@@ -1,22 +1,11 @@
----
-name: e2e-test-executor
-description: >
-  Execute or rerun an existing E2E test plan or execution report against a
-  local or test environment, retaining evidence and reproducible results. Use
-  when the user names such a plan or report, or asks to 跑 E2E / 端到端 / 验收
-  scenarios. A bare E2E ask with no plan goes to e2e-test-planner first; a unit
-  or focused test run uses the repository's own test commands, and a plain
-  RPC or facade call with no acceptance scenario is an ordinary call, not an
-  E2E run.
----
-
-# E2E Test Executor
+# Execution stage
 
 Run the selected scenarios, establish their verdicts, and leave enough evidence to
 understand and repeat them. Prefer the project's existing harness or adapter. Author
 test code only when the user or the supplied plan's execution method authorizes it;
-a coverage or automation label is not that authorization. Product fixes and remote
-issue creation require their own authorization.
+a coverage or automation label is not that authorization. Product fixes require
+their own authorization. Defects are recorded locally, in the report or under the run's
+`issues/`; this workflow never creates issues on a remote tracker.
 
 Use the user's requested language, otherwise the plan's language, then the prior
 report's, then the user's prompt. Localize headings and prose; preserve IDs, commands,
@@ -26,9 +15,9 @@ intended audience.
 ## 1. Select and pin the run
 
 Read the upstream plan or report and the latest user constraints before touching the
-system. For a continuation, read [RERUN.md](RERUN.md). For legacy plan formats,
-inherited scenario fields, or conversational handoffs, read [FIRST-RUN.md](FIRST-RUN.md).
-A straightforward plan or concrete scenario can proceed from this entrypoint.
+system. For a continuation, a legacy plan format, or inherited scenario fields, read
+[INTAKE.md](INTAKE.md). A straightforward plan can proceed from this
+entrypoint.
 
 Select explicit user-named scenarios first; otherwise the plan's First Test Slice,
 then an explicit legacy default slice/set, then all ready scenarios by priority.
@@ -52,13 +41,14 @@ and affected scenarios. If code is the designated contract, use its approved rev
 Unknown authority permits characterization, not a business-correctness pass.
 
 Pin the upstream artifact by content hash and retain the consumed expectations in
-this run. For an ad-hoc scenario, record its source instruction and concrete contract.
-Create one fresh run directory under the user's output path, or beside the plan as
-`e2e-run-<plan-name>-<timestamp>/`. Resolve the existing parent inside the authorized
-output/workspace boundary before creation; reject traversal or symlink escape and
-verify the resulting child. Keep historical runs immutable. Record these facts in
-`execution-report.md` as work proceeds; a separate snapshot is needed only to preserve
-otherwise unavailable source facts or complex derived mechanics for a consumer.
+this run. Create one fresh run directory under the user's output path, or at the
+default `.scratch/{feature}/e2e/runs/{yyyymmdd-hhmm}/`. Create missing parents inside
+the authorized output/workspace boundary, resolving each existing level and rejecting
+traversal or symlink escape; when the directory already exists, take the next free
+`-2`, `-3` suffix instead of reusing it, then verify the resulting child. Keep historical runs immutable. Record these
+facts in the report, `{date}-{feature}-e2e-test-report.md` inside that directory, as
+work proceeds; a separate snapshot is needed only to preserve otherwise unavailable
+source facts or complex derived mechanics for a consumer.
 
 ## 2. Resolve the execution context
 
@@ -129,9 +119,11 @@ diagnosis, preserving both outcomes; later success never erases the first failur
 ## 4. Deliver the result
 
 Read [REPORTING.md](REPORTING.md) when assembling the report and before cleanup.
-The default is one Markdown report and one desktop HTML view, with context, scenario
-results/evidence, and continuation or cleanup facts. Additional sections and files
-need an actual state-management, evidence-size, or handoff purpose.
+The default is one Markdown report with context, scenario results/evidence, and
+continuation or cleanup facts, plus its HTML view once the report is final — handed to
+a fresh-context agent per the hand-off in [../READER-VIEW.md](../READER-VIEW.md), or
+authored here when the runtime has no subagents. Additional sections and files need an
+actual state-management, evidence-size, or handoff purpose.
 
 Completion means every selected ID has an honest terminal status and proof or an
 explicit deficit; any retained data has an allowed lifecycle; evidence, current

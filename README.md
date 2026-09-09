@@ -20,7 +20,7 @@ for the distribution vocabulary.
 | [`assayer`](skills/assayer/) | verify | Independently falsify an exact completed design or plan revision until every required reviewer returns GO, or the review suspends; depth follows the candidate's risk and decides reviewer strength. |
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed technical investigation: what is true, why behavior occurs, which option the evidence supports. |
 | [`arborist`](skills/arborist/) | implement | Implement and refactor existing code with preserved behavior, clearer architecture, and verification matched to risk. |
-| [`scrutineer`](skills/scrutineer/) | review | Review code and changes through evidence-backed counterexamples; separate defects, uncertainty, and optional improvements without editing the candidate. |
+| [`scrutineer`](skills/scrutineer/) | review | Review code and changes through evidence-backed counterexamples; separate defects, uncertainty, decision items, and optional improvements without editing the candidate. |
 | [`e2e-test-workflow`](skills/e2e-test-workflow/) | verify | Plan, execute, and present end-to-end tests: source-backed scenario trees, evidence-backed execution reports that drive the fix loop until green, and HTML reader views. Typed first, `plan`, `run`, or `render` selects the mode: plan and render it; run, planning first when no plan exists, and render; or render an existing artifact. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts. |
 | [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |

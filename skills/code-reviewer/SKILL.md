@@ -4,8 +4,9 @@ description: >
   Review existing code, pull requests, commits, or working-tree changes for
   evidence-backed defects, regressions, and material code-quality problems.
   Use for code review, 代码审查, 审查这个 PR, 冷读代码, or re-review after fixes,
-  including a delegated independent review of an implementation. This skill
-  inspects and reports; implementation and design-only review are outside scope.
+  including a delegated independent review of an implementation. Default to one
+  fresh-context reviewer; inspect and report without implementing repairs.
+  Implementation and design-only review are outside scope.
 ---
 
 # Code Reviewer
@@ -14,6 +15,41 @@ Find problems worth acting on without turning correct code into unnecessary
 rewrites. Challenge the implementation with counterexamples, then challenge
 your own findings with evidence that could refute them. An empty finding list
 is a valid result, not a reason to invent work.
+
+## Enter a fresh review context
+
+Default to one fresh-context reviewer using the host's supported delegation
+mechanism with parent conversation inheritance disabled. A different model is
+optional, not a substitute for context separation. A fork that copies the
+builder's history is not a fresh review context.
+
+The caller prepares a neutral handoff, launches the reviewer, and returns its
+report rather than performing the review first. If the host already placed this
+request in a fresh reviewer session, perform the review below directly. Mark
+the delegated reviewer role in the handoff to prevent recursive delegation:
+a reviewer never spawns another reviewer to satisfy this default.
+
+Pass this skill's location or contents, the original request and confirmed user
+corrections, authoritative contract sources, repository rules, and review scope.
+Include the exact candidate and, for change reviews, base snapshots, with access
+to in-scope uncommitted files, permissions, and check entry points. Preserve
+requirements discovered during implementation with their sources; omit the
+builder's conversation, conclusions, suggested findings, and task-specific
+memory. Link prior test evidence for the reviewer to consult after deriving its
+checks; a second handoff round is not required.
+
+Use host launch/configuration evidence to establish the new session and its
+context mode; a role label or the reviewer's claim is not sufficient. Record the
+reviewer/session reference, handoff, and inheritance settings or documented host
+behavior. Keep task-specific builder memory out of automatic context loading.
+Context separation does not grant filesystem isolation or extra permissions.
+
+If fresh execution is unavailable, fails, or its context isolation cannot be
+established, report independent review as blocked with the observed cause; do
+not silently continue in the caller's context. A delegated reviewer that detects
+inherited builder context reports it to the caller instead of delegating again.
+Same-context self-review requires explicit user authorization and is labeled as
+self-review, never as an independent pass.
 
 ## Establish the review boundary
 
@@ -39,9 +75,7 @@ use the host's permission controls and keep limitations visible.
 
 Start from the requirements, diff, and raw source before consulting the builder's
 conclusions or suggested findings. Then use existing test results to focus work
-and avoid redundant checks. A fresh-context reviewer can perform an independent
-review; the builder continuing in the same context is self-review. Record that
-distinction when relevant. A different model is optional, not proof of independence.
+and avoid redundant checks.
 
 Review the changed behavior and required structural outcomes, including omissions
 from the request, not only claims the author chose to make. Follow relevant entry
@@ -119,7 +153,10 @@ stable identifier for follow-up, a precise source location, trigger or structura
 mechanism, violated contract, consequence, and decisive evidence. Include repair
 constraints when useful. Then state material uncertainties, optional improvements
 if any, and the reviewed revision, important coverage, actual checks, and limits.
-Avoid credentials and unnecessary sensitive content in examples or logs.
+Name the execution mode (fresh-context, authorized self-review, or blocked) and
+its host evidence. The caller preserves the reviewer's findings and unresolved
+limits when relaying the report. Avoid credentials and unnecessary sensitive
+content in examples or logs.
 
 Say "no confirmed findings in the inspected scope" when appropriate. Keep
 findings and coverage separate: unavailable inputs, failed tools, timeouts, or

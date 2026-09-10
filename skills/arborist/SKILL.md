@@ -1,11 +1,14 @@
 ---
 name: arborist
 description: >
-  Implement or refactor code that changes a shared contract, moves rule
-  ownership, or spans more than one module, with evidence that affected
-  contracts hold. Use when the user asks to 按设计文档落地 / 重构 / 迁移 or names
-  this skill. A local, contract-preserving fix already covered by AGENTS.md
-  runs without it.
+  Use for 实施 / 实现 / 修复 / 改进 / 重构 / 迁移 / 落地 work on code that already
+  has callers, stored data, or tests to keep working: extraction, consolidation,
+  or ownership moves of a rule, constant, or value domain (magic values,
+  divergent copies of one rule); schema, API, protocol, or data migrations;
+  removing, merging, or relaxing a validation or guard; edits that reach more
+  than one module or a published interface; landing a design document or
+  adjudicated plan — even when the user only says 改一下. Delivers the change
+  with evidence that affected contracts hold.
 ---
 
 # Arborist

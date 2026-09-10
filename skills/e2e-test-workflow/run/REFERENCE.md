@@ -1,7 +1,7 @@
 # Conditional execution contracts
 
 The ordinary verdict and report contracts live in `RUN.md` and `REPORTING.md`.
-Read these sections only for generated replay orchestration or a repair handoff.
+Read these sections for generated replay orchestration or recording a finding.
 
 ## Replay Entry Points
 
@@ -90,9 +90,18 @@ and the fact that its failure was correctly propagated.
 ## Defect Handoffs
 
 Scenario results describe observations; a root cause can affect several scenarios.
-Record each finding once with an ID, affected scenarios, expected/actual, evidence,
-and disposition. Keep findings inline unless a repair workflow or named consumer
-needs separate issue documents.
+As an evidence-backed defect or actionable plan, environment, or tooling blocker is
+identified, create `issues/{id}-{short-slug}.md` under the current run without a
+separate request. Record observed mismatches even when their root cause is unknown;
+label that uncertainty. A failed command or unexplained observation alone is not a
+confirmed product defect. Keep unsupported suspicions in the report's evidence gaps.
+
+Use one stable issue ID/file per distinct problem, linking all affected scenarios;
+combine only established duplicates. Reuse the current run's issue when more evidence
+arrives. A continuation links the earlier issue and records new evidence/disposition
+in its own directory, preserving historical records. With no qualifying findings,
+create no empty issue files or directory. A request to render an existing report
+does not invent findings absent from its source.
 
 | Disposition | Meaning |
 |---|---|
@@ -110,9 +119,13 @@ Only `OPEN` findings become immediate executable next actions; other findings re
 their missing precondition, decision, capability, or scope reason. Superseded plan
 requirements are recorded as overridden, never as product failures.
 
-When using `issues/`, create one document per actionable root cause and an index only
-when several issues need a queue. Include reproduction inputs/steps, expected/actual,
-evidence, suspected area and fix constraints, and a post-fix verification/closure
-rule. Link affected results to that issue. Close a product defect only after the fix
+Each issue names its business impact, category, source run/build, affected scenarios,
+disposition and owner (or unassigned), reproduction inputs/steps, expected/actual,
+evidence, known or suspected cause, fix constraints, and post-fix verification/closure
+rule. Missing authority or fix permission remains an explicit disposition; recording
+the issue does not authorize repair. Add an index only when several issues need a
+queue; the report already provides the ordinary entry point.
+
+Link affected results to that issue. Close a product defect only after the fix
 is loaded and its required E2E scenarios and affected dependents have fresh passing
 evidence; preserve earlier reports. Issues live only as these local documents.

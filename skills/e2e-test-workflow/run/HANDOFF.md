@@ -15,10 +15,8 @@ Carry, in this order:
 - Every constraint and authorization the user stated in this conversation, quoted
   verbatim: target environment, retained-data preferences, test-code authority.
 - The agent's scope: execution, diagnosis, and rendering only. Product fixes stay
-  with the parent whatever the user authorized; the agent records defects locally —
-  findings carrying a disposition from [Defect Handoffs](REFERENCE.md#defect-handoffs),
-  the owner, and any missing authorization, plus `issues/` documents when a repair
-  queue needs them — and stops there.
+  with the parent whatever the user authorized; the agent writes local issue files
+  per [Defect Handoffs](REFERENCE.md#defect-handoffs) and stops there.
 - The user's output path when one was given; otherwise RUN.md's default location
   applies.
 - The return contract below, spelled out.
@@ -32,7 +30,7 @@ retained data, pending cleanup, unfinished evidence capture.
 
 ## The return
 
-The agent returns the report path, the HTML path with the checks that ran on it or
+The agent returns the report and issue paths, the HTML path with the checks that ran on it or
 the reason it was withheld,
 the run summary — every nonzero status count, actionable findings, blockers, retained
 data, and what remains blocked or undecided — and outstanding state obligations. Relay them unchanged; the parent need not reread the report to

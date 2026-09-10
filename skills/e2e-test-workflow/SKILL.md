@@ -51,9 +51,8 @@ rules.
 - **run**: with a plan on disk, read [run/RUN.md](run/RUN.md) and follow it here; it
   ends with the report and its HTML view. Without one, plan first and follow the plan
   file's closing hand-off section, which carries execution on.
-- **render**: hand the named artifact to a fresh-context agent per the hand-off in
-  [READER-VIEW.md](READER-VIEW.md); without subagents, read that file and author the
-  view here.
+- **render**: read [READER-VIEW.md](READER-VIEW.md). Routine execution reports use
+  the bundled renderer; that file routes plans and requested redesigns separately.
 
 Deliver with the HTML view first when it exists, then the canonical Markdown, and the
 summary the stage file specifies.

@@ -53,9 +53,9 @@ preserved contracts, and requested structural goals. Separate requirements from
 current behavior and personal preference; code and tests agreeing does not
 settle a disputed requirement. Ground preservation constraints in an applicable
 requirement or compatibility contract; historical behavior alone is not one.
-For alignment or parity requests, identify the authoritative target and any
-explicit exceptions. An unresolved conflict between that target and a preservation
-requirement needs a decision, not an assumed exemption for the old behavior.
+For an alignment or parity request, follow [references/PARITY.md](references/PARITY.md):
+it names the authoritative target, the obligation ledger, and the acceptance
+rule for that branch.
 
 Resolve the scope before review work starts:
 
@@ -109,20 +109,16 @@ the reason retired or the change explained. Apply repository-owned review
 checklists, such as a breaking-change surface list or a required-test rule,
 where the repository provides them.
 
-For alignment or parity, derive the affected observable outputs from the request
-and target contract, including fields and branches unchanged by the patch. Compare
-each against the target for equivalent inputs and state, preserving distinctions
-such as null versus zero and per-period versus accumulated values. Record each
-obligation with expected, actual, and evidence or an unresolved gap in the
-report's parity ledger; one corrected field or the first finding does not close
-the remaining obligations.
-
 Select checks from the threatened contracts: results, guards, error handling,
 authorization, state, retries, concurrency, compatibility, resource use, and
 recovery. For structural work, inspect rule ownership, caller obligations,
 dependency direction, and obsolete paths. Report complexity through a concrete
 maintenance consequence or an unmet structural goal, not a preferred pattern.
 Prioritize high-consequence paths; disclose material surfaces left unexamined.
+When the change touches error handling, tests, comments or docs, type
+definitions, or dependencies and configuration, read the matching section of
+[references/LENSES.md](references/LENSES.md): each lists the questions that
+surface owes an answer to, so the checklist is derived once, not per run.
 
 ## Test the failure hypothesis
 
@@ -130,7 +126,7 @@ For each material concern, establish the triggering input or state, violated
 contract or structural goal, causal path, and consequence. Search for evidence
 that could defeat it: an upstream guard, database constraint, supported-input
 restriction, alternate owner, or required compatibility behavior. Check where a
-protection takes effect; a uniqueness constraint does not undo an earlier effect.
+protection takes effect; a guard downstream of the effect does not undo it.
 
 Distinguish source-level reachability from an observed execution path. Source,
 types, and documented API semantics can establish a defect without a runnable
@@ -197,9 +193,7 @@ improvement at most.
 Judge severity by consequence, separately from evidence strength. Attribute each
 finding as introduced, pre-existing, or attribution-unknown from the before-state.
 Keep unrelated pre-existing issues separate; do not silently expand the repair
-scope. A pre-existing mismatch that the requested alignment must remove remains
-an unmet delivery requirement; report its origin separately from that obligation.
-Deduplicate findings with the same cause while retaining affected paths.
+scope. Deduplicate findings with the same cause while retaining affected paths.
 
 Validate the finding and the proposed remedy separately. A confirmed defect does
 not establish that a suggested change preserves the affected contracts. Describe
@@ -233,7 +227,5 @@ Inspect the actual new revision: mark earlier findings resolved, still present,
 refuted, or unverified from evidence, and check the repair's new consequences.
 Preserve unaffected evidence; revisit conclusions invalidated by changes to
 source, tests, configuration, dependencies, or assumptions. Resolve findings
-from the new code and evidence, not the builder's "fixed" claim. For alignment
-work, reconcile the result against all recorded obligations, including
-unchanged outputs and remaining gaps, before recommending acceptance. Stop on
-the evidence and scope, not a finding quota or unanimous model agreement.
+from the new code and evidence, not the builder's "fixed" claim. Stop on the
+evidence and scope, not a finding quota or unanimous model agreement.

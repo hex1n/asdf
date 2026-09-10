@@ -4,8 +4,8 @@ Run the selected scenarios, establish their verdicts, and leave enough evidence 
 understand and repeat them. Prefer the project's existing harness or adapter. Author
 test code only when the user or the supplied plan's execution method authorizes it;
 a coverage or automation label is not that authorization. Product fixes require
-their own authorization. Defects are recorded locally, in the report or under the run's
-`issues/`; this workflow never creates issues on a remote tracker.
+their own authorization. Record defects in local issue files linked from the report;
+this workflow never creates issues on a remote tracker.
 
 Use the user's requested language, otherwise the plan's language, then the prior
 report's, then the user's prompt. Localize headings and prose; preserve IDs, commands,
@@ -115,14 +115,16 @@ Classify deficits as `product`, `plan`, `environment`, `tooling`, or `unknown` a
 retain their actionable cause once. A process failure or inaccessible dependency is
 not automatically a product defect. Retry an intermittent result at most once for
 diagnosis, preserving both outcomes; later success never erases the first failure.
+When a supported finding needs correction or resolution, follow
+[Defect Handoffs](REFERENCE.md#defect-handoffs) to persist its local issue record.
 
 ## 4. Deliver the result
 
 Read [REPORTING.md](REPORTING.md) when assembling the report and before cleanup.
 The default is one Markdown report with context, scenario results/evidence, and
-continuation or cleanup facts, plus its HTML view once the report is final — handed to
-a fresh-context agent per the hand-off in [../READER-VIEW.md](../READER-VIEW.md), or
-authored here when the runtime has no subagents. Additional sections and files need an
+continuation or cleanup facts, plus its HTML view once the report is final using
+the report-rendering branch in [../READER-VIEW.md](../READER-VIEW.md).
+Additional sections and files need an
 actual state-management, evidence-size, or handoff purpose.
 
 Completion means every selected ID has an honest terminal status and proof or an

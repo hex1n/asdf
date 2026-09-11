@@ -94,9 +94,9 @@ material design choice, compare credible alternatives, including deletion or a
 direct implementation, against the actual change pressure.
 
 For requested structural work, or structural migration needed by the authorized
-implementation, read [Refactoring](references/refactoring.md) before choosing the
+implementation, read [Refactoring](references/REFACTORING.md) before choosing the
 transition. For compatibility or data migration without a structural redesign,
-read its [transition section](references/refactoring.md#choose-the-transition).
+read its [transition section](references/REFACTORING.md#choose-the-transition).
 
 ## Implement coherent slices
 
@@ -138,14 +138,14 @@ intermittent or unavailable reproduction explicit.
 Add or strengthen tests where a missing case matters; routine reversible edits
 do not need new tests that merely repeat the implementation.
 
-Use [targeted mutation or fault injection](references/verification.md#targeted-mutation-and-fault-injection)
+Use [targeted mutation or fault injection](references/VERIFICATION.md#targeted-mutation-and-fault-injection)
 when confidence depends on whether checks detect a plausible critical mistake,
 especially after guards are narrowed, consolidated, or moved. Select faults from
 the affected behavior, including unchanged and relocated logic. Use controlled
 interleavings or dependency failures when they expose the risk better than a
 syntactic mutation.
 
-Run one [focused independent review](references/verification.md#focused-independent-review)
+Run one [focused independent review](references/VERIFICATION.md#focused-independent-review)
 before reporting completion when the task, the repository's AGENTS.md, or a
 selected verification Gate asks for it, or when the change touches concurrency
 or authorization semantics, data spanning versions or effects that are
@@ -157,7 +157,7 @@ failure cases from the requirements and code before seeing the builder's
 conclusions. A reviewer that reads the builder's reasoning, including an
 advisor call, is self-review: useful, and reported as such. The builder owns
 the handoff, finding disposition, and affected rechecks; the reviewer owns
-the independent pass. Follow [review lifecycle](references/verification.md#review-lifecycle)
+the independent pass. Follow [review lifecycle](references/VERIFICATION.md#review-lifecycle)
 for reuse, dispatch, and unavailable-review handling.
 
 Local or mechanical edits preserving these contracts need focused verification

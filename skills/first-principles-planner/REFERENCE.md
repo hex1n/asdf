@@ -23,14 +23,14 @@ Use this section only when request language, route examples, or saved artifact l
 
 | Route | Signals |
 |---|---|
-| Planner | `第一性原理`, `最佳方案`, `最佳实现`, `给出方案`, `先写方案`, `先不写代码`, `先不要写代码`, `先不coding`, `不coding`, `不要直接改代码`, `还有更好`, `是否应该`, `最佳了吗`, `取舍`, `架构演进`, `优化方案`, `ROI`, `值不值得做`, `现在要不要做` |
+| Planner | `第一性原理`, `最佳方案`, `最佳实现`, `给出方案`, `先写方案`, `还有更好`, `是否应该`, `最佳了吗`, `取舍`, `架构演进`, `优化方案`, `ROI`, `值不值得做`, `现在要不要做` |
 | Research-first | `深度分析`, `排查`, `定位`, `为什么`, `根因`, `掌握链路` |
 | Review/critique | `计划评审`, `方案评审`, `审查计划`, `审查方案`, `看看这个计划有没有问题` |
 
 ### Chinese Route Examples
 
 - `是否应该替换 X?` / `还有更好的吗?` / `最佳了吗?` -> Decision.
-- `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan.
+- `先不写代码，给最佳方案` / `给一个架构演进方案` -> Plan; `给最佳方案` selects the route, `先不写代码` only bounds scope.
 - `深度分析为什么失败` -> Research-first; plan only if the user asks for a fix path.
 - `把方案转成实施计划` / `拆成切片、阶段、工单` -> run the converged-plan conversion check in `SKILL.md` Route Examples.
 - `审查这个方案有没有问题` -> use a review skill; re-plan only if asked.

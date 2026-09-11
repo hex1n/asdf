@@ -7,7 +7,7 @@ description: Generates API docs for backend interfaces across protocols (RPC e.g
 
 API documentation is a caller contract: write only what a caller needs to invoke the interface correctly. Do not document implementation details.
 
-This skill has three parts: the protocol-neutral **spine** in this file, protocol **adapters** in `adapters/{rpc|http}.md`, and the project **profile** at `docs/api-doc-profile.md`. The adapter explains how to discover facts for a protocol; the profile records what was discovered for the current project.
+This skill has three parts: the protocol-neutral **spine** in this file, protocol **adapters** in `adapters/{RPC|HTTP}.md`, and the project **profile** at `docs/api-doc-profile.md`. The adapter explains how to discover facts for a protocol; the profile records what was discovered for the current project.
 
 Before writing, build the interface inventory. Design documents may define scope and business meaning, but code is the source of truth for structure and fields.
 
@@ -84,7 +84,7 @@ Common decisions:
 
 ### 5. Write Markdown
 - Use the profile output directory. If absent, find the majority location of existing `*_API_Doc.md` files with a filesystem glob; do not use `git ls-files` because it misses untracked docs. Fall back to `docs/facade/`.
-- Read `template.md` and fill it using profile facts.
+- Read `TEMPLATE.md` and fill it using profile facts.
 - File names: `{Interface}_API_Doc.md`, `{feature}_API_Doc.md`, or `API_Changes_{date}.md`.
 - Output language: write the generated API document in the language explicitly requested by the user; if none is explicit, match the user's prompt language. Use a project documentation convention only when the user is silent. Keep code identifiers, field names, operation keys, and literal enum values unchanged.
 
@@ -157,7 +157,7 @@ Generate API documentation for {scope}; write it to {output_path}.
 First read:
   <project>/docs/api-doc-profile.md
   <skill>/SKILL.md
-  <skill>/template.md
-  <skill>/adapters/{rpc|http}.md when the profile is missing, incomplete, or contradicted by current code
+  <skill>/TEMPLATE.md
+  <skill>/adapters/{RPC|HTTP}.md when the profile is missing, incomplete, or contradicted by current code
 Follow the workflow, contract rules, adapter, and project profile. Verify fields from code; label missing factual evidence as unknown with its next check. Write the generated document in the user's requested language, or the user's prompt language if no language is explicit.
 ```

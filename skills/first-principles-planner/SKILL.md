@@ -18,7 +18,7 @@ Plan from the root problem, not from the user's first proposed solution. A plann
 Choose the route before work:
 
 - **Planner**: strategic plan, design direction, architecture evolution, improvement proposal, technology tradeoff, or "best/better solution" request.
-- **Research-first**: pure fact-finding requests, including localized investigation phrases in [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules), "investigate", "trace", or "figure out why". If the prompt also includes localized best-plan or no-coding planning signals from that reference, gather facts first, then return to planner mode.
+- **Research-first**: pure fact-finding requests, including localized investigation phrases in [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules), "investigate", "trace", or "figure out why". If the prompt also includes localized best-plan signals from that reference, gather facts first, then return to planner mode.
 - **Review/critique**: plan review, document review, or any localized review phrase from [REFERENCE.md](REFERENCE.md#localized-request-and-output-rules) belongs to a review skill. Use this skill only if the user asks to re-plan from first principles.
 - **No full planner**: implementation, testing, approval, execution breakdown of an already-converged plan (see Route Examples), durable ADR/CONTEXT capture, or narrow code-change tasks unless the user says to plan first.
 

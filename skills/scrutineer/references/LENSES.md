@@ -47,6 +47,10 @@ without a test; changed helpers or fixtures.
   guard; the change must say what now covers that obligation.
 - Do fixtures match the current schema or contract? A stale fixture tests
   yesterday's shape.
+- Does each expected value or fixture carry a provenance the reviewer can
+  check: a captured source that reproduces it, a derivation from the
+  contract, or a declared construction? A provenance that does not
+  reproduce the value is a false claim, not a coverage gap.
 
 ## Comments and documentation
 

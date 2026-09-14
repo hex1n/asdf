@@ -9,7 +9,9 @@ saying it is empty; keep the verdict and coverage sections always.
 ```markdown
 verdict: accept-scoped | needs-attention | blocked
 mode: fresh-context | self-review | blocked — <host mechanism and launch evidence>
-reviewed: <candidate sha or "working tree at <sha>"> against <base sha>; <scope summary>
+review_series: <id from the handoff>; round <n>
+brief: inline | file <path> — <content identity of the brief as received>
+reviewed: <candidate sha or "working tree at <sha>" with its content identity> against <base sha>; <scope summary>
 
 ## Findings
 ### F1 — <title>
@@ -52,7 +54,7 @@ reviewed: <candidate sha or "working tree at <sha>"> against <base sha>; <scope 
 - limits: <unavailable inputs, failed tools, timeouts, truncation>
 
 ## Re-review               (on a requested re-review only)
-| id | builder disposition | reviewer status | evidence |
+| id | fact status | builder action | reviewer status | evidence |
 ```
 
 ## Rules
@@ -71,9 +73,20 @@ reviewed: <candidate sha or "working tree at <sha>"> against <base sha>; <scope 
   text, so a reference survives the builder's edits and a re-review matches on
   content rather than line numbers. A concern with no quotable line is an R,
   not an F.
-- Builder dispositions for re-review: `repaired` with the rerun checks,
-  `refuted` with evidence, `deferred` with an owner, or `open`. Reviewer
-  statuses: `resolved`, `still present`, `refuted`, `unverified`, each from the
-  new revision's evidence rather than the disposition text.
+- Dispositions apply from the first report onward; the re-review table adds
+  the reviewer's check of the new revision. `fact status` is whether
+  the finding holds: `confirmed` with its attribution, `refuted`, or
+  `unverified`. `builder action` is what the builder did: `repaired` with the
+  rerun checks, `refuted` with evidence, `deferred` with an owner, or `open`.
+  `reviewer status` is what the new revision shows: `resolved`,
+  `still present`, `refuted`, or `unverified`, each from the new revision's
+  evidence rather than the action text. `repaired` becomes `resolved` only
+  from that evidence; `deferred` keeps `confirmed` and its owner and grants no
+  acceptance. Ids stay stable across rounds within a review series; sub-items
+  carry their own ids, a merged or reclassified finding keeps its id or names
+  the alias, and a new finding never reuses an old id.
+- When the builder's evidence and the reviewer's conclusion point opposite
+  ways, the report carries both side by side with the observation each rests
+  on. The user decides; relabeling the finding settles nothing.
 - Coverage lists what the review actually touched. Incomplete review is
   reported as a limit, not as acceptance.

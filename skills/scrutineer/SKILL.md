@@ -21,15 +21,36 @@ is a valid result, not a reason to invent work.
 Default to one fresh-context reviewer using the host's supported delegation
 mechanism with parent conversation inheritance disabled. A different model is
 optional, not a substitute for context separation. A fork that copies the
-builder's history is not a fresh review context.
+builder's history, or an advisor that reads it, is not a fresh review context.
 
-The caller fills the handoff in [HANDOFF.md](HANDOFF.md), launches the reviewer
-through the host mechanism that file names, and returns the reviewer's report
-rather than performing the review first. If the host already placed this
-request in a fresh reviewer session, perform the review below directly. The
-handoff marks the delegated reviewer role so the reviewer performs the review
-itself; the one nested dispatch it may start is the bounded falsification
-check in [Test the failure hypothesis](#test-the-failure-hypothesis).
+The caller, whichever session invokes this skill, first checks the review
+lifecycle: a completed review that covers the same candidate content, scope,
+and supporting inputs is reused; an active review that applies is awaited
+rather than duplicated. For a new review the caller reads
+[HANDOFF.md](HANDOFF.md), fills every field from the request, the repository
+rules, and the Git state, checks the brief against that file's exclusion
+list, launches the reviewer through the host mechanism the file names as soon
+as the diff is reviewable, continues the remaining checks while the review
+runs, and returns the reviewer's report rather than performing the review
+first. Only an explicit user decision changes a user-owned review requirement.
+
+When acting on a report, the builder verifies each finding before changing
+code. Repair confirmed in-scope defects and rerun affected checks; carry
+confirmed findings outside that scope as open decisions for the user, with
+their evidence and attribution intact. Report every finding and sub-item,
+including those not repaired, using [REPORT.md](REPORT.md)'s disposition rules.
+
+If the host already placed this request in a fresh reviewer session, accept
+the brief before reviewing: read [HANDOFF.md](HANDOFF.md) for the fields and
+the exclusion list, then check every field present, no excluded content,
+every referenced file readable, launch evidence showing no inherited builder
+context. A brief that fails this check returns `blocked` naming the gap; a
+context that has read the builder's conclusions is not restored by ignoring
+them, so the corrected brief starts a new reviewer. Then perform the review
+below directly. The handoff marks the delegated reviewer role so the reviewer
+performs the review itself; the one nested dispatch it may start is the
+bounded falsification check in
+[Test the failure hypothesis](#test-the-failure-hypothesis).
 
 Use host launch/configuration evidence to establish the new session and its
 context mode; a role label or the reviewer's claim is not sufficient. Record the
@@ -221,10 +242,10 @@ change is clear while an important requested surface remains unexamined. An
 acceptance recommendation is scoped evidence, not merge or release authorization.
 
 One focused pass ends with a report, even if findings remain unfixed. For
-re-review, the builder returns one disposition per identifier: repaired with
-the rerun checks, refuted with evidence, deferred with an owner, or open.
-Inspect the actual new revision: mark earlier findings resolved, still present,
-refuted, or unverified from evidence, and check the repair's new consequences.
+re-review, the builder answers every identifier in the terms of
+[REPORT.md](REPORT.md)'s re-review rules. Inspect the actual new revision: set
+each reviewer status from its evidence, and check the repair's new
+consequences.
 Preserve unaffected evidence; revisit conclusions invalidated by changes to
 source, tests, configuration, dependencies, or assumptions. Resolve findings
 from the new code and evidence, not the builder's "fixed" claim. Stop on the

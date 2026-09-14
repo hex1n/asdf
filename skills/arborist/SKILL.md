@@ -14,7 +14,7 @@ description: >
 # Arborist
 
 Deliver the requested behavior and structural improvement with evidence that
-affected contracts hold. Work within the user's scope and repository rules.
+affected contracts hold.
 
 Resolve the uncertainty most likely to make the next change wrong, implement a
 coherent slice, and inspect the result. Keep local work lightweight. Add records,
@@ -138,34 +138,37 @@ intermittent or unavailable reproduction explicit.
 Add or strengthen tests where a missing case matters; routine reversible edits
 do not need new tests that merely repeat the implementation.
 
-Use [targeted mutation or fault injection](references/VERIFICATION.md#targeted-mutation-and-fault-injection)
-when confidence depends on whether checks detect a plausible critical mistake,
-especially after guards are narrowed, consolidated, or moved. Select faults from
-the affected behavior, including unchanged and relocated logic. Use controlled
-interleavings or dependency failures when they expose the risk better than a
-syntactic mutation.
+Use targeted mutation or fault injection when confidence depends on whether
+checks detect a plausible critical mistake, especially after guards are
+narrowed, consolidated, or moved. Before selecting a fault, writing a mutation
+script, or applying a fault by hand, read
+[targeted mutation and fault injection](references/VERIFICATION.md#targeted-mutation-and-fault-injection)
+for the selection, passing-baseline, isolation, and differential-verdict rules.
 
-Run one [focused independent review](references/VERIFICATION.md#focused-independent-review)
-before reporting completion when the task, the repository's AGENTS.md, or a
-selected verification Gate asks for it, or when the change touches concurrency
-or authorization semantics, data spanning versions or effects that are
-difficult to recover, or deletes or consolidates a shared guard; otherwise
-report the change as self-reviewed.
+Obtain one independent review before reporting completion when the task or
+repository rules require it, or when the change touches concurrency or
+authorization semantics, data spanning versions or effects that are difficult
+to recover, or deletes or consolidates a shared guard; otherwise report the
+change as self-reviewed.
 
-Independent means a fresh-context reviewer, such as a subagent, that derives
-failure cases from the requirements and code before seeing the builder's
-conclusions. A reviewer that reads the builder's reasoning, including an
-advisor call, is self-review: useful, and reported as such. The builder owns
-the handoff, finding disposition, and affected rechecks; the reviewer owns
-the independent pass. Follow [review lifecycle](references/VERIFICATION.md#review-lifecycle)
-for reuse, dispatch, and unavailable-review handling.
+The review protocol belongs to the installed review skill. To obtain a review
+or act on its report, read the caller section of
+[scrutineer](../scrutineer/SKILL.md#enter-a-fresh-review-context) and follow
+it: it defines the fresh-context reviewer, the brief in its `HANDOFF.md`, the
+report and dispositions in its `REPORT.md`, and when an existing review still
+applies. Compose no dispatch from memory. When that skill is absent, use the
+reviewer the task or repository names and its protocol; without one, report
+the review requirement as unmet.
 
 Local or mechanical edits preserving these contracts need focused verification
-only. Follow stricter repository requirements when present. Review is
-additional evidence, not a substitute for execution.
+only. Review is additional evidence, not a substitute for execution.
 
 Reuse evidence only while its relevant source, inputs, and environment remain
-unchanged. Rerun invalidated checks and all required repository gates.
+unchanged. Rerun invalidated checks and all required repository gates. A
+finding that falsifies one evidence claim (a fixture's stated source, a
+claimed reproduction, a reported detection), whoever raises it, reopens every
+claim of the same kind in the slice: re-derive each from its source before
+reporting, and list the claims rechecked.
 
 ## Close the requested outcomes
 
@@ -186,4 +189,5 @@ claim open. Continue independent work when one part is blocked.
 
 Hand off the outcome, structural changes, decisive commands and results, and
 remaining gaps in the user's language. On resumption, use the existing task state:
-current contract, changes, verification status, and next unresolved decision.
+current contract, changes, verification status including any review still
+owed, and next unresolved decision.

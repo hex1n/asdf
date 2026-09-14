@@ -9,8 +9,10 @@ suggested findings, and task-specific memory out of it.
 
 ```text
 role: delegated-reviewer          # perform the review; do not delegate it again
-skill: <path to scrutineer/SKILL.md, or its contents>
+skill: <path to scrutineer/SKILL.md, or its contents; "none" without one>
 language: <report language>
+review: initial | re-review
+review_series: <stable id shared by every round on this candidate>
 
 request:
   original: <the user's request, verbatim or faithfully summarized>
@@ -23,11 +25,16 @@ authority:
   review_checklists: <repository-owned review lists, or "none found">
 
 scope:
-  candidate: <commit, branch tip, or "working tree at <HEAD sha>">
+  candidate: <commit, branch tip, or "working tree at <HEAD sha>" plus a content identity (patch, snapshot, or per-file digest) for the uncommitted files in scope and for the supporting inputs the review evidence depends on>
   base: <merge-base sha, parent sha, or HEAD for working-tree review>
   uncommitted: <included paths, staged/unstaged/untracked, or "none">
   before_state: <snapshot, patch, or list of what existed before moves/deletions, or "not needed">
   coverage_plan: <for a large change: in depth / sampled / left out; otherwise "full">
+
+target:
+  contracts: <the obligations the change touches, each with its authority source>
+  entry_points: <paths or symbols that reach them, producers and consumers included>
+  unresolved_paths: <what the builder's trace left unobserved; "unknown" where that is the truth>
 
 access:
   read_only_mechanism: <host mechanism from the table below, as configured>
@@ -36,12 +43,28 @@ access:
 
 prior_evidence: <link to test results or CI runs; consult after deriving checks>
 report: <path to scrutineer/REPORT.md>
+
+re_review:                        # re-review only
+  previous_report: <path to the prior report>
+  responses: <path to the builder's per-id answers (action, evidence, open items, owner when deferred); read after deriving checks>
 ```
 
 Excluded from the handoff: the builder's transcript, reasoning, advisor
 output, checklist, mutation results, suggested findings, and memory files
 written for the task. Prior test evidence is linked, not summarized, so the
-reviewer derives its own checks first.
+reviewer derives its own checks first. `target` carries facts and unknowns the
+builder holds, never conclusions about them: an entry point is navigation,
+"this path is safe" is a finding. On a re-review the prior report is input;
+the builder's responses are read after the reviewer derives its checks from
+the prior findings and the new code.
+
+The brief is inline or a file the launch message names; a file brief is read
+by the reviewer before the review, and the launch message carries location,
+permissions, and execution notes only. Without a review-method skill the
+reviewer still derives its checks from the requirements and the diff before
+reading builder material, and reports in REPORT.md's skeleton. A length cap
+set by the caller bounds the summary, never the required sections. A brief
+missing any field or carrying excluded content comes back as `blocked`.
 
 ## Host mechanisms
 

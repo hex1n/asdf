@@ -19,9 +19,10 @@
 // filesystem, so a path that only works through a symlink still counts and a
 // dangling or looping symlink is reported. Name matching is exact-case on
 // purpose: a link that only works because Windows ignores case breaks on a
-// case-sensitive checkout. External URLs, absolute paths, and links that leave
-// the skill are another skill's business and are reported as skipped, not
-// failed.
+// case-sensitive checkout. A link into a sibling skill under skills/ is
+// resolved from the skills root and checked the same way, so an optional
+// cross-skill pointer cannot dangle; external URLs, absolute paths, and links
+// that leave skills/ are reported as skipped, not failed.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -177,21 +178,30 @@ export function checkSkill(dir, name) {
         ? f
         : path.posix.normalize(path.posix.join(path.posix.dirname(f), filePart)).replace(/\/$/, "") || ".";
 
-      // A link that leaves the skill directory is out of scope.
+      // A link that leaves the skill directory is checked when it lands in a
+      // sibling skill of this repository (an optional cross-skill pointer such
+      // as arborist -> scrutineer); one that leaves skills/ is out of scope.
+      let base = dir;
+      let rel = resolved;
       if (resolved === ".." || resolved.startsWith("../")) {
-        skipped++;
-        continue;
+        const fromRoot = path.posix.normalize(path.posix.join(name, resolved));
+        if (fromRoot === "." || fromRoot === ".." || fromRoot.startsWith("../")) {
+          skipped++;
+          continue;
+        }
+        base = SKILLS;
+        rel = fromRoot;
       }
       checked++;
 
-      const r = resolveTarget(dir, resolved);
+      const r = resolveTarget(base, rel);
       if (r.error) {
         failures.push(`${name}/${f}:${line} -> ${target} (${r.error})`);
       } else if (wantsDir && r.kind !== "dir") {
         failures.push(`${name}/${f}:${line} -> ${target} (not a directory)`);
       } else if (r.kind === "dir") {
         if (anchor) failures.push(`${name}/${f}:${line} -> ${target} (anchor on a directory)`);
-      } else if (r.kind === "file" && MARKDOWN.test(resolved)) {
+      } else if (r.kind === "file" && MARKDOWN.test(rel)) {
         if (anchor && !anchorsOf(r.abs).has(anchor)) {
           failures.push(`${name}/${f}:${line} -> ${target} (no heading yields #${anchor})`);
         }

@@ -26,12 +26,17 @@ import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.Name;
+import org.eclipse.jdt.core.dom.FieldAccess;
+import org.eclipse.jdt.core.dom.ThisExpression;
 import org.eclipse.jdt.core.dom.ParenthesizedExpression;
 import org.eclipse.jdt.core.dom.SuperMethodInvocation;
 import org.eclipse.jdt.core.formatter.CodeFormatter;
 import org.eclipse.jdt.internal.formatter.DefaultCodeFormatter;
 import org.eclipse.jface.text.Document;
 import org.eclipse.text.edits.TextEdit;
+import org.eclipse.text.edits.MultiTextEdit;
+import org.eclipse.text.edits.ReplaceEdit;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
@@ -107,9 +112,55 @@ public final class JavaFormatter {
         }
         Document chainDocument = new Document(expanded);
         chainEdit.apply(chainDocument);
-        String formatted = chainDocument.get();
+        String formatted = joinInvocationReceivers(chainDocument.get(), options, file, lineSeparator);
         assertSameTokens(source, formatted, file);
         Files.write(file, formatted.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String joinInvocationReceivers(String source, Map<String, String> options, Path file, String lineSeparator)
+            throws Exception {
+        final MultiTextEdit edits = new MultiTextEdit();
+        final int width = integerOption(options, "org.eclipse.jdt.core.formatter.lineSplit", 140);
+        final int continuation = integerOption(options, "org.eclipse.jdt.core.formatter.indentation.size", 4)
+                * integerOption(options, "org.eclipse.jdt.core.formatter.continuation_indentation", 2);
+        parse(source, options, file).accept(new ASTVisitor() {
+            @Override
+            public boolean visit(MethodInvocation invocation) {
+                Expression receiver = invocation.getExpression();
+                if (!(receiver instanceof Name || receiver instanceof FieldAccess || receiver instanceof ThisExpression))
+                    return true;
+                int end = receiver.getStartPosition() + receiver.getLength();
+                int name = invocation.getName().getStartPosition();
+                String separator = source.substring(end, name);
+                if (separator.contains("/*") || separator.contains("//") || !containsLineBreak(source, end, name))
+                    return true;
+                String joined = separator.replaceFirst("^\\s*\\.\\s*", ".");
+                if (separator.equals(joined))
+                    return true;
+                edits.addChild(new ReplaceEdit(end, name - end, joined));
+                int lineStart = source.lastIndexOf('\n', end - 1) + 1;
+                int lineEnd = source.indexOf('\n', name);
+                if (lineEnd < 0)
+                    lineEnd = source.length();
+                if (!invocation.arguments().isEmpty()) {
+                    Expression first = (Expression)invocation.arguments().get(0);
+                    int open = source.indexOf('(', name + invocation.getName().getLength());
+                    int argument = first.getStartPosition();
+                    boolean wrapArguments = end - lineStart + joined.length() + lineEnd - name > width
+                            || containsLineBreak(source, open + 1, argument);
+                    if (wrapArguments && source.substring(open + 1, argument)
+                            .trim()
+                            .isEmpty()) {
+                        String indentation = leadingWhitespace(source, receiver.getStartPosition()) + spaces(continuation);
+                        edits.addChild(new ReplaceEdit(open + 1, argument - open - 1, lineSeparator + indentation));
+                    }
+                }
+                return true;
+            }
+        });
+        Document document = new Document(source);
+        edits.apply(document);
+        return document.get();
     }
 
     private static CompilationUnit parse(String source, Map<String, String> options, Path file) throws IOException {

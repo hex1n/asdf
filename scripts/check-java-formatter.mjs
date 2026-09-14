@@ -61,6 +61,18 @@ function runShapeContracts(temporaryDir) {
     /shape|continuation|assignment|method declaration/i,
     "lineSplit mutation must kill the accepted generic shape contract",
   );
+
+  const wrappedGenerics = path.join(temporaryDir, "wrapped-generics.xml");
+  const wrappedGenericsConfig = config
+    .replace('alignment_for_parameterized_type_references" value="0"', 'alignment_for_parameterized_type_references" value="16"')
+    .replace('alignment_for_type_arguments" value="0"', 'alignment_for_type_arguments" value="16"');
+  assert.notEqual(wrappedGenericsConfig, config, "type-argument wrapping mutation must change the config");
+  write(wrappedGenerics, wrappedGenericsConfig);
+  assert.throws(
+    () => runFormatterShapeContract(temporaryDir, wrappedGenerics),
+    /Fluent chain declaration|not vertical/i,
+    "type-argument wrapping mutation must kill the generic declaration contract",
+  );
 }
 
 function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
@@ -79,6 +91,11 @@ function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
     "    void parenthesizedBuilder() { Item parenthesized = (factory.create()).fieldA(fieldA).fieldB(fieldB).build(); }",
     "    void twoLinkChain() { boolean blank = valueWithAReasonablyLongName.trim().isEmpty(); }",
     "    void genericReceiver() { Map<String, List<GenericItemWithLongName>> grouped = itemsWithAReasonablyLongName.stream().filter(item -> item.isActive()).collect(Collectors.groupingBy(GenericItemWithLongName::group)); }",
+    "    void utilityReceiver() { Object result = NullableValues.orDefault(repository.fetchByDateAndPortfolio(date, Collections.singletonList(portfolioIdentifier), Collections.emptyList())).stream().filter(value -> value.isActive()).findFirst().orElse(null); }",
+    "    void nestedUtilityReceiver() { Object result = Stream.concat(NullableSequence.orEmpty(repository.fetchDividendCommandsByDateAndPortfolio(date, Collections.singletonList(portfolioIdentifier), Collections.emptyList())).stream().filter(value -> value.isActive()), overlay.stream()).filter(value -> value.isVisible()).collect(Collectors.toList()); }",
+    "    void instanceReceiver() { Object result = this.repository.fetchByDateAndPortfolio(date, Collections.singletonList(portfolioIdentifierWithALongNeutralName), Collections.emptyList()).stream().filter(value -> value.isActive()).collect(Collectors.toList()); }",
+    "    void explicitTypeReceiver() { Object result = NullableValues.<Object>orDefault(repository.fetchByDateAndPortfolio(date, Collections.singletonList(portfolioIdentifier), Collections.emptyList())).stream().filter(value -> value.isActive()).findFirst().orElse(null); }",
+    "    void commentedReceiver() { Object result = NullableValues /* keep receiver note */ .orDefault(repository.fetch(date)); }",
     "    void multilineArguments() { MultilineItem multiline = MultilineItem.builder().fieldA(firstArgumentWithAnExtremelyLongNeutralNameDesignedToExceedTheConfiguredLineWidth, secondArgumentWithAnExtremelyLongNeutralNameDesignedToExceedTheConfiguredLineWidth).build(); }",
     "}",
     "",
@@ -125,7 +142,7 @@ function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
   if (!formatted.includes(twoLink)) {
     throw new Error("Two-link chain must stay on one line.\n" + formatted);
   }
-  assertVerticalChain(formatted, lines, "List<GenericItemWithLongName>> grouped = itemsWithAReasonablyLongName.stream()", [
+  assertVerticalChain(formatted, lines, "Map<String, List<GenericItemWithLongName>> grouped = itemsWithAReasonablyLongName.stream()", [
     ".filter(item -> item.isActive())",
     ".collect(Collectors.groupingBy(GenericItemWithLongName::group));",
   ]);
@@ -152,6 +169,13 @@ function runFormatterShapeContract(temporaryDir, configPath = CONFIG) {
       throw new Error("Fluent stage is not vertical: " + stage + "\n" + formatted);
     }
   }
+  for (const receiver of ["NullableValues", "NullableSequence", "Collections", "Stream", "this.repository"]) {
+    const escaped = receiver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.doesNotMatch(formatted, new RegExp(escaped + "\\s*\\r?\\n\\s*\\."),
+      "Invocation receiver must stay attached to its first method: " + receiver);
+  }
+  assert.ok(formatted.includes("/* keep receiver note */"), "Receiver comments must be preserved");
+  assert.match(formatted, /NullableSequence\.orEmpty\(/, "Nested initial invocation must remain joined");
   const repeat = run(process.execPath, [FORMATTER, "--files", file], {
     cwd: repo,
     env: { ...process.env, ASDF_JAVA_FORMAT_CONFIG: configPath },

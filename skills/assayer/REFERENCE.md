@@ -108,32 +108,14 @@ plan: locality is determined by dependency impact, not by domain vocabulary.
 
 ## Round Receipt
 
-Immediately after every attempted review, before parent validation, record:
-
-```text
-round_id
-invocation_id
-revision_hash
-review_kind: blocker-sweep | complete | focused | rebuttal-check
-verdict
-runtime
-provider
-model
-reviewer
-effort
-reviewer_session_id_or_opaque_handle
-reviewer_role: required | diagnostic
-independence_level: fresh-context | second-model
-diagnostic_for_invocation_id: <failed second-model invocation; diagnostic only>
-model_calls
-input_characters
-output_characters
-wall_clock_ms
-physical_sessions
-retries
-measurement_source
-measurement_precision: exact | derived
-```
+Immediately after every attempted review, before parent validation, record one
+receipt. Its fields and their closed vocabularies are the
+`round_receipts` items in [review-ledger-schema.json](review-ledger-schema.json),
+which `scripts/validate-review-ledger.cjs` reads: take the field list from there
+rather than from a copy, so the receipt you write and the receipt the gate
+accepts cannot be two different shapes. `diagnostic_for_invocation_id` is the
+one optional field, and it names the failed second-model invocation a
+diagnostic probes.
 
 Prefer runtime counters. Otherwise measure the exact submitted/returned text in
 characters and elapsed wall-clock. Snapshot cumulative counters immediately
@@ -150,9 +132,9 @@ Compact display:
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
 | R1 | `{hash}` | complete | `{runtime} / {model}` | `{verdict}` | `{n}` | `{n}` | `{n}` | `{n}` | `{n}` | `{n}` | `{precision}` |
 
-## Gate-State Checker
+## Review-Ledger Checker
 
-The state uses `final_reviewer_verdicts` for exactly one authoritative closing
+The ledger uses `final_reviewer_verdicts` for exactly one authoritative closing
 verdict per required reviewer on the current revision. Prior NO-GO, focused, and
 rebuttal-check history lives in round receipts; it is not mixed into the closing
 verdict set. `round_reports` contains exactly one manifest for every receipt that
@@ -165,7 +147,7 @@ every ledger finding maps back to its source manifest and records
 `parent_validation_disclosed: true`. All collection fields are explicit arrays.
 Malformed, missing, or unreconciled collections fail closed.
 
-The gate state freezes `author_identity`, `review_depth: shallow | full`,
+The review ledger freezes `author_identity`, `review_depth: shallow | full`,
 `explicit_second_model_reviewers` as an array of unique identities drawn from
 `required_reviewers`, and `second_model_availability: {available, basis}`; the
 author cannot be a required reviewer. A closing receipt for an identity inside
@@ -199,12 +181,12 @@ outside_closing_scope` with an evidence-backed reason. Unresolved
 decision-blocking gaps prevent GO; only outside-closing-scope gaps may use
 `defer-gap`. Resolved gaps follow [Verification Gap Closure](#verification-gap-closure).
 
-The gate state freezes `required_rubric_dimensions`. Every `complete` report
+The review ledger freezes `required_rubric_dimensions`. Every `complete` report
 includes `coverage.rubric_dimensions` matching that set and
 `coverage.severities` containing blocker, should-fix, optional, and
 verification-gap. Closing GO without this coverage evidence fails closed.
 
-The gate state also freezes `resolved_budget`:
+The review ledger also freezes `resolved_budget`:
 `{source: explicit | calibrated-default | user-authorized-unbounded, unit,
 threshold, user_authorization}`. A bounded source requires a non-empty
 observable unit and a positive safe-integer threshold;
@@ -214,7 +196,7 @@ malformed budget fails closed.
 When Node is available:
 
 ```sh
-node scripts/check-gate-state.mjs review-state.json
+node scripts/validate-review-ledger.cjs review-ledger.json
 ```
 
 The checker prints `{ "pass": boolean, "failures": [...] }` and exits zero only

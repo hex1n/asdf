@@ -24,6 +24,10 @@ authority:
   repository_rules: <AGENTS.md / CLAUDE.md / CONTRIBUTING and the rules that apply>
   review_checklists: <repository-owned review lists, or "none found">
 
+lenses:
+  selected: <each references/LENSES.md section the change triggers, its text copied in verbatim>
+  excluded: <section name — the fact in this change that excludes it>
+
 scope:
   candidate: <commit, branch tip, or "working tree at <HEAD sha>" plus a content identity (patch, snapshot, or per-file digest) for the uncommitted files in scope and for the supporting inputs the review evidence depends on>
   base: <merge-base sha, parent sha, or HEAD for working-tree review>
@@ -42,12 +46,34 @@ access:
   isolated_copy: <path for authorized experiments, or "not authorized">
 
 prior_evidence: <link to test results or CI runs; consult after deriving checks>
-report: <path to scrutineer/REPORT.md>
+report: <path to scrutineer/REPORT.md and scrutineer/review-record-schema.json, or their contents>
+record_output: <path to write the review record, or "inline">
 
 re_review:                        # re-review only
   previous_report: <path to the prior report>
   responses: <path to the builder's per-id answers (action, evidence, open items, owner when deferred); read after deriving checks>
 ```
+
+Carry text, not names, for every field that points at this skill's own files:
+`skill`, `lenses`, and `report`. A reviewer reaches its own filesystem, not
+the caller's context, and several launch modes hand it neither — the host
+table below records that `Explore` and `Plan` skip CLAUDE.md, and a reviewer
+launched without the skill directory has no path to `LENSES.md`, `REPORT.md`,
+or `review-record-schema.json` at all. A named-but-unreadable section is a check
+nobody runs; a named-but-unreadable schema is a record the validator then
+rejects for fields the reviewer was never told about. Before dispatch,
+establish which of the three the reviewer can read and inline the rest —
+`review-record-schema.json` verbatim, because the contract that validates the record
+has to be the contract the reviewer was given.
+
+The caller selects the lenses, because selection reads the diff and the
+reviewer has not seen it yet: take each section of
+[references/LENSES.md](references/LENSES.md) whose trigger the change meets,
+copy its text into `selected`, and name the rest in `excluded` with the fact
+that excludes each. The two fields partition that file: every section appears
+once, on one side or the other. A brief that leaves sections unaccounted for
+shows the selection was never made, and the reviewer treats it as it treats a
+missing field.
 
 Excluded from the handoff: the builder's transcript, reasoning, advisor
 output, checklist, mutation results, suggested findings, and memory files

@@ -5,6 +5,11 @@ consequence a "no" carries; a "no" becomes a finding only with the evidence
 [SKILL.md](../SKILL.md#test-the-failure-hypothesis) requires, and a question
 with no consequence in this change is skipped, not reported.
 
+The headings below are a shared vocabulary: a brief selects sections by them,
+a report's coverage cites them as written, and
+[scripts/validate-review-record.cjs](../scripts/validate-review-record.cjs) resolves them
+against this file. Renaming one invalidates every report that cited it.
+
 ## Error handling and fallbacks
 
 Trigger: a catch or except block, error callback, fallback or default value on

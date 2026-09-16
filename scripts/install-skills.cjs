@@ -8,25 +8,24 @@
 //
 // Every installed entry is a link back at the source tree, never a copy. One
 // skill therefore exists once on disk, in this repository: editing the source
-// updates every runtime at once and drift is not representable. check-all's
+// updates every runtime at once and drift is not representable. the gate's
 // byte-identity check keeps passing because a link reads as its own target.
 
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = path.join(__dirname, "..");
 const SKILLS_ROOT = path.join(ROOT, "skills");
 
-export const TARGET_RUNTIMES = [".agents", ".claude"];
+const TARGET_RUNTIMES = [".agents", ".claude"];
 
 // Windows refuses directory symlinks without Developer Mode or elevation; a
 // junction needs neither, Node reports it via isSymbolicLink(), and readdir
 // resolves through it — which is all the drift check relies on.
 const LINK_TYPE = process.platform === "win32" ? "junction" : "dir";
 
-export function listSourceSkills(skillsRoot = SKILLS_ROOT) {
+function listSourceSkills(skillsRoot = SKILLS_ROOT) {
   return fs
     .readdirSync(skillsRoot, { withFileTypes: true })
     // A skill is a directory carrying SKILL.md; anything else under skills/
@@ -38,7 +37,7 @@ export function listSourceSkills(skillsRoot = SKILLS_ROOT) {
 
 // Classify what currently occupies an install path, so the caller can tell a
 // no-op from a replacement and never reports "installed" for a stale copy.
-export function classify(installPath, sourceDir) {
+function classify(installPath, sourceDir) {
   let stat;
   try {
     stat = fs.lstatSync(installPath);
@@ -58,7 +57,7 @@ export function classify(installPath, sourceDir) {
   return "copy";
 }
 
-export function linkSkill(installPath, sourceDir, io = fs) {
+function linkSkill(installPath, sourceDir, io = fs) {
   io.mkdirSync(path.dirname(installPath), { recursive: true });
   // Build the link at a staged sibling first: if creation fails (Windows
   // permissions, locked path, bad target), the existing install must survive
@@ -102,7 +101,7 @@ export function linkSkill(installPath, sourceDir, io = fs) {
   }
 }
 
-export function planInstall(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
+function planInstall(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
   const plan = [];
   for (const runtime of TARGET_RUNTIMES) {
     const skillsDir = path.join(home, runtime, "skills");
@@ -123,7 +122,7 @@ export function planInstall(skills, home = os.homedir(), skillsRoot = SKILLS_ROO
 // resolving back at this repository's source is ours; a same-name real
 // directory or a link elsewhere may be a user-owned local override
 // (CONTEXT.md: user-owned, separate from us) and is never removed.
-export function findStrays(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
+function findStrays(skills, home = os.homedir(), skillsRoot = SKILLS_ROOT) {
   const strays = [];
   const wanted = new Set(skills);
   // A runtime may read the managed root through a link rather than carrying
@@ -215,6 +214,12 @@ function main(argv) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  main(process.argv.slice(2));
-}
+// require.main is a module identity, not a path comparison, so it stays correct
+// when this script is reached through a symlink or junction, and on Windows,
+// where drive-letter casing and MSYS path translation make any
+// argv-versus-module-URL comparison unreliable. The ESM form this replaced
+// silently exited 0 without running, which for a gate or an installer is the
+// worst failure available.
+if (require.main === module) main(process.argv.slice(2));
+
+module.exports = { TARGET_RUNTIMES, listSourceSkills, classify, linkSkill, planInstall, findStrays };

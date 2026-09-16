@@ -79,7 +79,7 @@ default calibrated from the same irreversibility, blast-radius, and value
 basis as depth, or user-authorized `unbounded`. A bounded budget is recorded
 with an observable unit and threshold — reviewer invocations, wall-clock, or
 output volume — plus its basis; a missing budget never resolves to
-`unbounded`, and `scripts/check-gate-state.mjs` fails closed without this
+`unbounded`, and `scripts/validate-review-ledger.cjs` fails closed without this
 record. Sanity-check a declared budget against the candidate's claim surface
 at freeze: a candidate hundreds of lines dense with existing-system claims
 runs several rounds, and an envelope declaring one round for it is challenged
@@ -325,7 +325,7 @@ continuing is no longer justified while the gate is unpassed, the outcome is
 `SUSPENDED` or `WITHDRAWN`, never a pass.
 
 Before reporting GO in either mode, apply the Exact Gate mechanically with
-`scripts/check-gate-state.mjs` when Node is available. Report the two-track
+`scripts/validate-review-ledger.cjs` when Node is available. Report the two-track
 outcome (technical verdict and implementation decision), the final revision,
 reviewers and independence level, rounds, finding dispositions, remaining
 verification gaps, and each round's model plus observable cost.

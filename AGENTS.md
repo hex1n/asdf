@@ -23,7 +23,7 @@ Edit repository-owned source assets. Managed installed skills must resolve to,
 or remain byte-identical with, their source. Personal divergence belongs in a
 separate override skill.
 
-Install managed skills by linking with `node scripts/install-skills.mjs`.
+Install managed skills by linking with `node scripts/install-skills.cjs`.
 The default invocation previews changes; `--apply` performs them.
 
 Keep user-level tool implementations and runtime hook configuration out of
@@ -53,24 +53,54 @@ current runtime's official guidance for invocation settings and metadata.
 skills and shared agent instructions. Apply its wording, information hierarchy,
 context-pointer, and pruning guidance while preserving the intended behavior.
 
+## Scripts
+
+A script's prefix decides what runs it, and `scripts/gate.mjs` discovers both
+prefixes rather than listing them. Name a repository gate `assert-*` and the
+gate runs it — that is the whole registration step. Name an external-toolchain
+check (JDK, Maven, git fixtures) `contract-*` and the gate names it on exit
+instead of running it, so it stays runnable anywhere Node is. A script that
+must stay out of the gate says so by taking neither prefix.
+`validate-<record>` ships inside a skill and checks an agent-authored record
+against its sibling `<record>-schema.json`.
+
+The gate is `gate.mjs`, not `check-all`, because it deliberately leaves
+`contract-*` out: a name promising "all" licenses a completeness claim its run
+does not support.
+
+A script that is both importable and runnable as a CLI is `.cjs`, so
+`require.main === module` decides whether it executes. The ESM alternative
+compares `import.meta.url` against `process.argv[1]`, which silently exits 0
+without running when the script is reached through a symlink or junction —
+which is exactly how skills and tools are installed. A script that only ever
+runs top-level stays `.mjs`.
+
+A skill's record schema is declarative and lives at the skill root, next to
+`SKILL.md`, because a reference file hands the same field list to the agent
+that must emit the record. Where more than one skill needs the schema
+interpreter, each carries its own copy — an import reaching outside the skill
+directory resolves in this checkout and nowhere else — delimited by the
+`shared-validator-helpers` markers that `scripts/assert-validator-helpers.mjs`
+pins byte-identical.
+
 ## Target-Specific Requirements
 
 When changing these targets:
 
 - `tools/java-formatter/` or its installer: read
   [tools/java-formatter/README.md](tools/java-formatter/README.md) and run
-  `node scripts/check-java-formatter.mjs`.
+  `node scripts/contract-java-formatter.mjs`.
 - `skills/rationale-records/`: read
   [skills/rationale-records/README.md](skills/rationale-records/README.md) and run
-  `node scripts/check-rationale-records.mjs`.
+  `node scripts/contract-rationale-records.mjs`.
 
 ## Verification And Completion
 
 For any skill change or shared maintenance-rule change, run
-`node scripts/check-all.mjs` before and after the change, plus relevant focused
-checks. It discovers local `.test.mjs` suites and checks skill links and
-installed copies. It does not replace target-specific contract
-checks or behavioral validation selected by the official `skill-creator`.
+`node scripts/gate.mjs` before and after the change, plus relevant focused
+checks. It discovers local `.test.mjs` and `.test.cjs` suites and runs every
+`assert-*` gate. It does not replace the `contract-*` checks it names on exit,
+or behavioral validation selected by the official `skill-creator`.
 
 For tool or installer changes, run the affected tool's documented contract
 checks and relevant maintenance tests.

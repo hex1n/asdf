@@ -6,12 +6,11 @@
 // its source skill. Nothing enforced that, so a copy could silently sit two
 // revisions behind while the source looked correct in review.
 
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-import { TARGET_RUNTIMES, classify } from "./install-skills.mjs";
+const { TARGET_RUNTIMES, classify } = require("./install-skills.cjs");
 
 // Runtimes are discovered, never hard-coded: this machine carries our skills in
 // .agents, .claude, .codex and .factory, and a hard-coded pair silently reported
@@ -40,7 +39,7 @@ function sameBytes(a, b) {
   }
 }
 
-export function compareSkillTree(sourceDir, installedDir) {
+function compareSkillTree(sourceDir, installedDir) {
   if (!fs.existsSync(installedDir)) return { installed: false, drift: [], missing: [], extra: [] };
   const sourceFiles = listFilesRecursive(sourceDir);
   const installedFiles = listFilesRecursive(installedDir);
@@ -56,7 +55,7 @@ export function compareSkillTree(sourceDir, installedDir) {
   return { installed: true, drift, missing, extra };
 }
 
-export function scanSkills(skillsRoot, runtimeRoots) {
+function scanSkills(skillsRoot, runtimeRoots) {
   const results = [];
   const skills = fs
     .readdirSync(skillsRoot, { withFileTypes: true })
@@ -98,7 +97,7 @@ export function scanSkills(skillsRoot, runtimeRoots) {
   return results;
 }
 
-export function summarize(results) {
+function summarize(results) {
   const overrides = results.filter((r) => r.override);
   const managed = results.filter((r) => !r.override);
   const clean = managed.filter((r) => r.installed && !r.drift.length && !r.missing.length && !r.extra.length);
@@ -107,7 +106,7 @@ export function summarize(results) {
   return { clean, dirty, absent, overrides, pass: dirty.length === 0 };
 }
 
-export function discoverRuntimes(explicit, skillsRoot, home = os.homedir()) {
+function discoverRuntimes(explicit, skillsRoot, home = os.homedir()) {
   if (explicit.length) {
     return explicit.map((dir) => ({
       label: path.basename(path.dirname(dir)) || dir,
@@ -175,7 +174,7 @@ function main(argv) {
   const json = argv.includes("--json");
   const skillsRoot = path.resolve(
     argv.find((a) => a.startsWith("--skills-dir="))?.split("=")[1] ??
-      path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "skills"),
+      path.join(__dirname, "..", "skills"),
   );
   if (!fs.existsSync(skillsRoot)) {
     process.stderr.write(`skills directory not found: ${skillsRoot}\n`);
@@ -249,4 +248,12 @@ function main(argv) {
   process.exitCode = pass ? 0 : 1;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) main(process.argv.slice(2));
+// require.main is a module identity, not a path comparison, so it stays correct
+// when this script is reached through a symlink or junction, and on Windows,
+// where drive-letter casing and MSYS path translation make any
+// argv-versus-module-URL comparison unreliable. The ESM form this replaced
+// silently exited 0 without running, which for a gate or an installer is the
+// worst failure available.
+if (require.main === module) main(process.argv.slice(2));
+
+module.exports = { compareSkillTree, scanSkills, summarize, discoverRuntimes };

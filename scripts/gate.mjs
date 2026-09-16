@@ -30,7 +30,7 @@ function findTests(dir, seen = new Set()) {
     const target = entry.isSymbolicLink() ? fs.statSync(full, { throwIfNoEntry: false }) : entry;
     if (!target) continue;
     if (target.isDirectory()) found.push(...findTests(full, seen));
-    else if (entry.name.endsWith(".test.mjs")) found.push(full);
+    else if (entry.name.endsWith(".test.mjs") || entry.name.endsWith(".test.cjs")) found.push(full);
   }
   return found;
 }
@@ -49,8 +49,21 @@ const steps = [];
 if (suites.length > 0) {
   steps.push({ name: `test suites (${suites.length} files)`, args: ["--test", ...suites] });
 }
-steps.push({ name: "skill links", args: [path.join(ROOT, "scripts", "check-skill-links.mjs")] });
-steps.push({ name: "installed copies", args: [path.join(ROOT, "scripts", "check-installed-copies.mjs")] });
+// Both prefixes are discovered, never listed: a check added later must not have
+// to remember to announce itself here, and a hand-kept list is how one silently
+// stops running. `assert-` is therefore a contract and not decoration — dropping
+// `assert-foo.cjs` into scripts/ puts it in the gate, and a script that must stay
+// out of the gate says so by taking another prefix. Alphabetical order keeps
+// runs comparable; these checks are independent, so no other order is owed.
+const scriptsDir = path.join(ROOT, "scripts");
+const scriptNames = fs.readdirSync(scriptsDir).sort();
+for (const name of scriptNames) {
+  if (!name.startsWith("assert-") || name.includes(".test.")) continue;
+  steps.push({
+    name: name.replace(/^assert-/u, "").replace(/\.[cm]js$/u, "").replace(/-/gu, " "),
+    args: [path.join(scriptsDir, name)],
+  });
+}
 
 let failed = false;
 for (const step of steps) {
@@ -61,21 +74,10 @@ for (const step of steps) {
 if (suites.length === 0) {
   process.stdout.write(`note: no local test suites found on this machine (they are local-only, never published); ran ${steps.map((step) => step.name).join(", ")}\n`);
 }
-// Discovered rather than listed: a contract check added later must not have to
-// remember to announce itself here.
-// Derived from the steps actually run above, so adding a step here is the only
-// edit needed: a hand-maintained list drifted the moment a step was added and
-// announced a gated check as "not in this gate".
-const covered = new Set(["check-all.mjs"]);
-for (const step of steps) {
-  for (const arg of step.args) {
-    if (typeof arg === "string" && arg.endsWith(".mjs")) covered.add(path.basename(arg));
-  }
-}
-const external = fs.readdirSync(path.join(ROOT, "scripts"))
-  .filter((name) => name.startsWith("check-") && name.endsWith(".mjs")
-    && !name.endsWith(".test.mjs") && !covered.has(name))
-  .sort();
+// `contract-` names the scripts that drive an external toolchain (JDK, Maven,
+// git fixtures) and therefore stay out of a gate that must run anywhere Node
+// does. Naming them on exit keeps the boundary explicit instead of implicit.
+const external = scriptNames.filter((name) => name.startsWith("contract-"));
 if (external.length > 0) {
   process.stdout.write(`note: not in this gate (external toolchain) — run directly: ${
     external.map((name) => `node scripts/${name}`).join(", ")}\n`);

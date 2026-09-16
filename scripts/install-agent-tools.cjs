@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
-import { classify, linkSkill } from "./install-skills.mjs";
+const { classify, linkSkill } = require("./install-skills.cjs");
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = path.join(__dirname, "..");
 const ASSET_SPECS = [
   { name: "java-formatter", source: ["tools", "java-formatter"], install: [".agents", "tools", "java-formatter"] },
   { name: "rationale-records", source: ["skills", "rationale-records"], install: [".agents", "skills", "rationale-records"] },
@@ -15,7 +14,7 @@ const ASSET_SPECS = [
 const MANAGED_FRAGMENT = ".agents/tools/java-formatter/run-agent-hook.mjs";
 const STATUS = "Formatting changed production Java and checking local rationale/repository gates";
 
-export function hookHandler(runtime, platform = process.platform) {
+function hookHandler(runtime, platform = process.platform) {
   const command = 'node "$HOME/.agents/tools/java-formatter/run-agent-hook.mjs"';
   if (runtime === "claude") {
     return { type: "command", command, timeout: 180, statusMessage: STATUS };
@@ -33,7 +32,7 @@ function isManaged(handler) {
     && handler.command.replaceAll("\\", "/").includes(MANAGED_FRAGMENT);
 }
 
-export function mergeStopHook(document, handler) {
+function mergeStopHook(document, handler) {
   const result = structuredClone(document || {});
   if (!result.hooks || typeof result.hooks !== "object" || Array.isArray(result.hooks)) result.hooks = {};
   const current = Array.isArray(result.hooks.Stop) ? result.hooks.Stop : [];
@@ -60,7 +59,7 @@ function readJson(file) {
   }
 }
 
-export function writeJsonAtomic(file, value, io = fs) {
+function writeJsonAtomic(file, value, io = fs) {
   io.mkdirSync(path.dirname(file), { recursive: true });
   const staged = file + ".asdf-tools-staged";
   const backup = file + ".asdf-tools-backup";
@@ -84,7 +83,7 @@ export function writeJsonAtomic(file, value, io = fs) {
   }
 }
 
-export function planInstall(home = os.homedir(), sourceRoot = ROOT, platform = process.platform) {
+function planInstall(home = os.homedir(), sourceRoot = ROOT, platform = process.platform) {
   const assets = ASSET_SPECS.map((spec) => {
     const source = path.join(sourceRoot, ...spec.source);
     const installPath = path.join(home, ...spec.install);
@@ -109,7 +108,7 @@ export function planInstall(home = os.homedir(), sourceRoot = ROOT, platform = p
   };
 }
 
-export function applyInstall(plan) {
+function applyInstall(plan) {
   for (const asset of plan.assets) {
     if (asset.linkState !== "linked") linkSkill(asset.installPath, asset.source);
   }
@@ -141,6 +140,12 @@ function main(args) {
   }
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  main(process.argv.slice(2));
-}
+// require.main is a module identity, not a path comparison, so it stays correct
+// when this script is reached through a symlink or junction, and on Windows,
+// where drive-letter casing and MSYS path translation make any
+// argv-versus-module-URL comparison unreliable. The ESM form this replaced
+// silently exited 0 without running, which for a gate or an installer is the
+// worst failure available.
+if (require.main === module) main(process.argv.slice(2));
+
+module.exports = { hookHandler, mergeStopHook, writeJsonAtomic, planInstall, applyInstall };

@@ -104,7 +104,7 @@ function runRationaleGate(repoRoot) {
   const cli = resolveRationaleCli();
   if (!cli) {
     throw new Error("This repository has docs/rationale, but the rationale-records checker is not installed.\n"
-      + "Install it from the asdf-skills source tree with: node scripts/install-agent-tools.mjs --apply\n"
+      + "Install it from the asdf-skills source tree with: node scripts/install-agent-tools.cjs --apply\n"
       + "Or point ASDF_RATIONALE_CLI at an existing rationale.mjs.");
   }
   const result = spawnSync(process.execPath,

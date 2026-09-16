@@ -1,0 +1,211 @@
+{
+  "title": "Scrutineer review record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "mode", "review_series", "round", "brief", "reviewed", "entries", "coverage"],
+  "properties": {
+    "verdict": {
+      "enum": ["accept-scoped", "needs-attention", "blocked"]
+    },
+    "mode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["context", "host_evidence"],
+      "properties": {
+        "context": { "enum": ["fresh-context", "self-review", "blocked"] },
+        "host_evidence": { "type": "string", "visibleContent": true, "minLength": 12 }
+      }
+    },
+    "review_series": { "type": "string", "visibleContent": true, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+    "round": { "type": "integer", "minimum": 1 },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "content_identity"],
+      "properties": {
+        "source": { "enum": ["inline", "file"] },
+        "path": { "type": "string", "visibleContent": true },
+        "content_identity": { "type": "string", "visibleContent": true }
+      }
+    },
+    "reviewed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "base", "scope"],
+      "properties": {
+        "candidate": { "type": "string", "visibleContent": true },
+        "base": { "type": "string", "visibleContent": true },
+        "scope": { "type": "string", "visibleContent": true }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id", "title", "severity", "attribution", "evidence", "location", "line_text", "trigger", "contract", "consequence", "evidence_detail"],
+            "properties": {
+              "kind": { "const": "finding" },
+              "id": { "type": "string", "pattern": "^F[1-9][0-9]*$" },
+              "title": { "type": "string", "visibleContent": true },
+              "severity": { "enum": ["critical", "high", "medium", "low"] },
+              "attribution": { "enum": ["introduced", "pre-existing", "unknown"] },
+              "evidence": { "enum": ["observed", "source-established"] },
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["file", "line"],
+                "properties": {
+                  "file": { "type": "string", "visibleContent": true },
+                  "line": { "type": "integer", "minimum": 1 }
+                }
+              },
+              "line_text": { "type": "string", "visibleContent": true },
+              "trigger": { "type": "string", "visibleContent": true },
+              "contract": { "type": "string", "visibleContent": true },
+              "consequence": { "type": "string", "visibleContent": true },
+              "evidence_detail": { "type": "string", "visibleContent": true },
+              "repair_constraints": { "type": "string", "visibleContent": true }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id", "title", "severity", "unknown", "smallest_resolving_check", "blocks"],
+            "properties": {
+              "kind": { "const": "risk" },
+              "id": { "type": "string", "pattern": "^R[1-9][0-9]*$" },
+              "title": { "type": "string", "visibleContent": true },
+              "severity": { "enum": ["critical", "high", "medium", "low"] },
+              "unknown": { "type": "string", "visibleContent": true },
+              "smallest_resolving_check": { "type": "string", "visibleContent": true },
+              "blocks": { "type": "string", "visibleContent": true }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id", "title", "decision_kind", "severity", "attribution", "evidence", "evidence_detail", "decision_needed"],
+            "properties": {
+              "kind": { "const": "decision" },
+              "id": { "type": "string", "pattern": "^D[1-9][0-9]*$" },
+              "title": { "type": "string", "visibleContent": true },
+              "decision_kind": { "enum": ["scope deviation", "pre-existing defect", "target-versus-preservation conflict"] },
+              "severity": { "enum": ["critical", "high", "medium", "low"] },
+              "attribution": { "enum": ["introduced", "pre-existing", "unknown"] },
+              "evidence": { "enum": ["observed", "source-established"] },
+              "location": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["file", "line"],
+                "properties": {
+                  "file": { "type": "string", "visibleContent": true },
+                  "line": { "type": "integer", "minimum": 1 }
+                }
+              },
+              "evidence_detail": { "type": "string", "visibleContent": true },
+              "decision_needed": { "type": "string", "visibleContent": true }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id", "title", "benefit"],
+            "properties": {
+              "kind": { "const": "optional" },
+              "id": { "type": "string", "pattern": "^O[1-9][0-9]*$" },
+              "title": { "type": "string", "visibleContent": true },
+              "benefit": { "type": "string", "visibleContent": true }
+            }
+          }
+        ]
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surfaces", "lenses_applied", "lenses_excluded", "checks_run", "limits"],
+      "properties": {
+        "surfaces": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["surface", "depth", "evidence"],
+            "properties": {
+              "surface": { "type": "string", "visibleContent": true },
+              "depth": { "enum": ["in-depth", "sampled", "skipped"] },
+              "evidence": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "lenses_applied": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "visibleContent": true }
+        },
+        "lenses_excluded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lens", "reason"],
+            "properties": {
+              "lens": { "type": "string", "visibleContent": true },
+              "reason": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "checks_run": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command", "revision", "observation"],
+            "properties": {
+              "command": { "type": "string", "visibleContent": true },
+              "revision": { "type": "string", "visibleContent": true },
+              "observation": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "limits": {
+          "type": "array",
+          "items": { "type": "string", "visibleContent": true }
+        }
+      }
+    },
+    "parity_ledger": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["obligation", "expected", "actual", "evidence_or_gap"],
+        "properties": {
+          "obligation": { "type": "string", "visibleContent": true },
+          "expected": { "type": "string", "visibleContent": true },
+          "actual": { "type": "string", "visibleContent": true },
+          "evidence_or_gap": { "type": "string", "visibleContent": true }
+        }
+      }
+    },
+    "re_review": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "fact_status", "builder_action", "reviewer_status", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[FRDO][1-9][0-9]*$" },
+          "fact_status": { "enum": ["confirmed", "refuted", "unverified"] },
+          "builder_action": { "enum": ["repaired", "refuted", "deferred", "open"] },
+          "reviewer_status": { "enum": ["resolved", "still present", "refuted", "unverified"] },
+          "evidence": { "type": "string", "visibleContent": true }
+        }
+      }
+    }
+  }
+}

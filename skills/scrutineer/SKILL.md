@@ -28,11 +28,13 @@ lifecycle: a completed review that covers the same candidate content, scope,
 and supporting inputs is reused; an active review that applies is awaited
 rather than duplicated. For a new review the caller reads
 [HANDOFF.md](HANDOFF.md), fills every field from the request, the repository
-rules, and the Git state, checks the brief against that file's exclusion
-list, launches the reviewer through the host mechanism the file names as soon
-as the diff is reviewable, continues the remaining checks while the review
-runs, and returns the reviewer's report rather than performing the review
-first. Only an explicit user decision changes a user-owned review requirement.
+rules, the Git state, and the diff the lens selection reads, checks the brief
+against that file's exclusion list, launches the reviewer through the host
+mechanism the file names as soon as the diff is reviewable, continues the
+remaining checks while the review runs, and returns the reviewer's report —
+mechanically checked as [REPORT.md](REPORT.md) requires when the reviewer
+could not run that check itself — rather than performing the review first.
+Only an explicit user decision changes a user-owned review requirement.
 
 When acting on a report, the builder verifies each finding before changing
 code. Repair confirmed in-scope defects and rerun affected checks; carry
@@ -48,7 +50,7 @@ context. A brief that fails this check returns `blocked` naming the gap; a
 context that has read the builder's conclusions is not restored by ignoring
 them, so the corrected brief starts a new reviewer. Then perform the review
 below directly. The handoff marks the delegated reviewer role so the reviewer
-performs the review itself; the one nested dispatch it may start is the
+performs the review itself; the only nested dispatch it may start is the
 bounded falsification check in
 [Test the failure hypothesis](#test-the-failure-hypothesis).
 
@@ -89,9 +91,10 @@ Resolve the scope before review work starts:
   A ref that fails to resolve stops the review before dispatch, naming the ref.
 - Preserve a before-state for moves, deletions, or work continued from
   uncommitted changes.
-- For a large change, state the coverage plan first: the surfaces reviewed in
-  depth, sampled, and left out. The report's coverage section then records the
-  plan and its outcome instead of reconstructing them afterward.
+- For a large change, state the coverage plan first, one surface per entry in
+  the `in-depth | sampled | skipped` vocabulary the record's
+  `coverage.surfaces` uses. That list then records the plan and its outcome
+  instead of reconstructing them afterward.
 
 For a component review without a diff, name the inspected source snapshot and
 avoid attributing existing defects to a new change. Resolve technical unknowns
@@ -136,10 +139,13 @@ recovery. For structural work, inspect rule ownership, caller obligations,
 dependency direction, and obsolete paths. Report complexity through a concrete
 maintenance consequence or an unmet structural goal, not a preferred pattern.
 Prioritize high-consequence paths; disclose material surfaces left unexamined.
-When the change touches error handling, tests, comments or docs, type
-definitions, or dependencies and configuration, read the matching section of
-[references/LENSES.md](references/LENSES.md): each lists the questions that
-surface owes an answer to, so the checklist is derived once, not per run.
+Answer every lens section the brief carries, and report each one the brief
+excluded that this change in fact triggers. A brief without lenses, or a
+review whose surfaces run past them, reads the matching section of
+[references/LENSES.md](references/LENSES.md) directly when that file is
+reachable: each lists the questions error handling, tests, comments or docs,
+type definitions, and dependencies and configuration owe an answer to, so the
+checklist is derived once, not per run.
 
 ## Test the failure hypothesis
 
@@ -160,11 +166,15 @@ source-established when source, types, or documented semantics establish it.
 A concern whose case still rests on a premise not yet checked is an unverified
 risk, not a finding, whatever its severity. For a critical or high risk, the
 reviewer may dispatch one falsification check in a separate context that
-receives only the risk and repository access, never the reviewer's reasoning;
+receives only that record and repository access, never the reviewer's reasoning;
 it returns the observation, and the reviewer promotes the risk to a finding
-only when that observation establishes it. One check per risk and none for
-lower severities keeps verification bounded, so the review ends on evidence
-rather than on rounds.
+only when that observation establishes it. The same single check serves a
+critical or high finding whose evidence class is source-established — the one
+finding kind that reaches the builder with neither an execution nor a second
+reader behind it — and an observation that refutes it returns that finding to
+a risk or retires it. One check per risk or finding, none at lower severities
+and none for an observed finding, keeps verification bounded, so the review
+ends on evidence rather than on rounds.
 
 Check that tests observe the relevant property and derive expected behavior from
 the contract, not the proposed patch. Green tests or coverage alone do not prove
@@ -211,8 +221,10 @@ request asks for or directly requires; and a general quality wish with no
 repository rule and no concrete consequence, which stays an optional
 improvement at most.
 
-Judge severity by consequence, separately from evidence strength. Attribute each
-finding as introduced, pre-existing, or attribution-unknown from the before-state.
+Judge severity by consequence, separately from evidence strength, against the
+anchors in [REPORT.md](REPORT.md#rules) so two reviewers of one change land on
+one word. Attribute each finding as introduced, pre-existing, or
+attribution-unknown from the before-state.
 Keep unrelated pre-existing issues separate; do not silently expand the repair
 scope. Deduplicate findings with the same cause while retaining affected paths.
 
@@ -224,16 +236,18 @@ with evidence. Preserve competing evidence when the conclusion remains disputed.
 
 ## Report and re-review
 
-Report in the user's language, findings first, in the skeleton of
-[REPORT.md](REPORT.md): a one-line verdict, then findings, unverified risks,
-decision items, optional improvements, coverage, and the execution mode with its
-host evidence. Each actionable finding carries a stable identifier, a source
-location at the reviewed revision with the triggering line quoted verbatim so
-the reference survives later edits, trigger or structural mechanism,
-violated contract, consequence, evidence class, and decisive evidence, with
-repair constraints when useful. The caller preserves the reviewer's findings and
-unresolved limits when relaying the report. Avoid credentials and unnecessary
-sensitive content in examples or logs.
+Write the review record first, against
+[review-record-schema.json](review-record-schema.json), then render the prose report from it
+in the user's language, findings first: both are defined by
+[REPORT.md](REPORT.md), and the record is the one the caller reconciles rounds
+by. Each actionable finding carries a stable identifier, a source location at
+the reviewed revision with the triggering line quoted verbatim so the reference
+survives later edits, trigger or structural mechanism, violated contract,
+consequence, evidence class, and decisive evidence, with repair constraints
+when useful. Check the record mechanically before returning it, as REPORT.md's
+last rule sets out. The caller preserves the reviewer's findings and unresolved
+limits when relaying the report. Avoid credentials and unnecessary sensitive
+content in examples or logs.
 
 Say "no confirmed findings in the inspected scope" when appropriate. Keep
 findings and coverage separate: unavailable inputs, failed tools, timeouts, or

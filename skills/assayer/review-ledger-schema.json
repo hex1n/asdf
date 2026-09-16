@@ -1,0 +1,259 @@
+{
+  "title": "Assayer gate state",
+  "type": "object",
+  "required": [
+    "current_revision",
+    "required_rubric_dimensions",
+    "required_reviewers",
+    "author_identity",
+    "review_depth",
+    "explicit_second_model_reviewers",
+    "final_reviewer_verdicts",
+    "findings",
+    "active_reviewer_invocations",
+    "material_change_after_go",
+    "resolved_budget",
+    "attempted_invocations",
+    "round_receipts",
+    "round_reports"
+  ],
+  "properties": {
+    "current_revision": { "type": "string", "visibleContent": true },
+    "required_rubric_dimensions": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "visibleContent": true }
+    },
+    "required_reviewers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "visibleContent": true }
+    },
+    "author_identity": { "type": "string", "visibleContent": true },
+    "review_depth": { "enum": ["shallow", "full"] },
+    "review_mode": { "enum": ["review-only", "review-and-revise"] },
+    "explicit_second_model_reviewers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "visibleContent": true }
+    },
+    "second_model_availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available"],
+      "properties": {
+        "available": { "type": "boolean" },
+        "basis": { "type": "string", "visibleContent": true },
+        "probe_invocation_id": { "type": "string", "visibleContent": true }
+      }
+    },
+    "final_reviewer_verdicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reviewer", "revision", "invocation_id", "verdict", "review_kind"],
+        "properties": {
+          "reviewer": { "type": "string", "visibleContent": true },
+          "revision": { "type": "string", "visibleContent": true },
+          "invocation_id": { "type": "string", "visibleContent": true },
+          "verdict": { "enum": ["GO", "CONDITIONAL-GO", "NO-GO", "FAILED", "TIMED-OUT", "CANCELLED", "DISCARDED"] },
+          "review_kind": { "enum": ["blocker-sweep", "complete", "focused", "rebuttal-check"] }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "severity",
+          "claim",
+          "evidence",
+          "affected_section",
+          "source_invocation_id",
+          "revision",
+          "owner",
+          "validation",
+          "parent_evidence_and_reason",
+          "parent_validation_disclosed"
+        ],
+        "properties": {
+          "id": { "type": "string", "visibleContent": true },
+          "severity": { "enum": ["blocker", "should_fix", "optional", "verification_gap"] },
+          "claim": { "type": "string", "visibleContent": true },
+          "evidence": { "type": "string", "visibleContent": true },
+          "affected_section": { "type": "string", "visibleContent": true },
+          "missing_check": { "type": "string", "visibleContent": true },
+          "gap_scope": { "enum": ["decision_blocking", "outside_closing_scope"] },
+          "gap_scope_reason": { "type": "string", "visibleContent": true },
+          "source_invocation_id": { "type": "string", "visibleContent": true },
+          "revision": { "type": "string", "visibleContent": true },
+          "owner": { "type": "string", "visibleContent": true },
+          "validation": { "enum": ["confirmed", "challenged", "needs_evidence"] },
+          "parent_evidence_and_reason": { "type": "string", "visibleContent": true },
+          "parent_validation_disclosed": { "type": "boolean" },
+          "disposition": { "enum": ["fix", "rebut", "accept-risk", "defer-gap", "needs-input"] },
+          "closed": { "type": "boolean" },
+          "reviewer_rebuttal_accepted": { "type": "boolean" }
+        }
+      }
+    },
+    "active_reviewer_invocations": {
+      "type": "array",
+      "items": { "type": "string", "visibleContent": true }
+    },
+    "material_change_after_go": { "type": "boolean" },
+    "resolved_budget": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "unit", "threshold"],
+          "properties": {
+            "source": { "const": "explicit" },
+            "unit": { "type": "string", "visibleContent": true },
+            "threshold": { "type": "integer", "minimum": 1 },
+            "basis": { "type": "string", "visibleContent": true }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "unit", "threshold"],
+          "properties": {
+            "source": { "const": "calibrated-default" },
+            "unit": { "type": "string", "visibleContent": true },
+            "threshold": { "type": "integer", "minimum": 1 },
+            "basis": { "type": "string", "visibleContent": true }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "user_authorization"],
+          "properties": {
+            "source": { "const": "user-authorized-unbounded" },
+            "user_authorization": { "const": true },
+            "basis": { "type": "string", "visibleContent": true }
+          }
+        }
+      ]
+    },
+    "attempted_invocations": {
+      "type": "array",
+      "items": { "type": "string", "visibleContent": true }
+    },
+    "round_receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "round_id",
+          "invocation_id",
+          "revision_hash",
+          "review_kind",
+          "verdict",
+          "runtime",
+          "provider",
+          "model",
+          "reviewer",
+          "reviewer_role",
+          "independence_level",
+          "effort",
+          "reviewer_session_id_or_opaque_handle",
+          "measurement_source",
+          "measurement_precision",
+          "model_calls",
+          "input_characters",
+          "output_characters",
+          "wall_clock_ms",
+          "physical_sessions",
+          "retries"
+        ],
+        "properties": {
+          "round_id": { "type": "string", "visibleContent": true },
+          "invocation_id": { "type": "string", "visibleContent": true },
+          "revision_hash": { "type": "string", "visibleContent": true },
+          "review_kind": { "enum": ["blocker-sweep", "complete", "focused", "rebuttal-check"] },
+          "verdict": { "enum": ["GO", "CONDITIONAL-GO", "NO-GO", "FAILED", "TIMED-OUT", "CANCELLED", "DISCARDED"] },
+          "runtime": { "type": "string", "visibleContent": true },
+          "provider": { "type": "string", "visibleContent": true },
+          "model": { "type": "string", "visibleContent": true },
+          "reviewer": { "type": "string", "visibleContent": true },
+          "reviewer_role": { "enum": ["required", "diagnostic"] },
+          "independence_level": { "enum": ["fresh-context", "second-model"] },
+          "effort": { "type": "string", "visibleContent": true },
+          "reviewer_session_id_or_opaque_handle": { "type": "string", "visibleContent": true },
+          "measurement_source": { "type": "string", "visibleContent": true },
+          "measurement_precision": { "enum": ["exact", "derived"] },
+          "diagnostic_for_invocation_id": { "type": "string", "visibleContent": true },
+          "model_calls": { "type": "integer", "minimum": 0 },
+          "input_characters": { "type": "integer", "minimum": 0 },
+          "output_characters": { "type": "integer", "minimum": 0 },
+          "wall_clock_ms": { "type": "integer", "minimum": 0 },
+          "physical_sessions": { "type": "integer", "minimum": 0 },
+          "retries": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "round_reports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["invocation_id", "revision_hash", "verdict", "review_kind", "reviewer_output_disclosed", "finding_ids", "finding_payloads"],
+        "properties": {
+          "invocation_id": { "type": "string", "visibleContent": true },
+          "revision_hash": { "type": "string", "visibleContent": true },
+          "verdict": { "enum": ["GO", "CONDITIONAL-GO", "NO-GO", "FAILED", "TIMED-OUT", "CANCELLED", "DISCARDED"] },
+          "review_kind": { "enum": ["blocker-sweep", "complete", "focused", "rebuttal-check"] },
+          "reviewer_output_disclosed": { "type": "boolean" },
+          "finding_ids": {
+            "type": "array",
+            "items": { "type": "string", "visibleContent": true }
+          },
+          "finding_payloads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "severity", "claim", "evidence", "affected_section"],
+              "properties": {
+                "id": { "type": "string", "visibleContent": true },
+                "severity": { "enum": ["blocker", "should_fix", "optional", "verification_gap"] },
+                "claim": { "type": "string", "visibleContent": true },
+                "evidence": { "type": "string", "visibleContent": true },
+                "affected_section": { "type": "string", "visibleContent": true },
+                "missing_check": { "type": "string", "visibleContent": true },
+                "gap_scope": { "enum": ["decision_blocking", "outside_closing_scope"] },
+                "gap_scope_reason": { "type": "string", "visibleContent": true }
+              }
+            }
+          },
+          "coverage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rubric_dimensions", "severities"],
+            "properties": {
+              "rubric_dimensions": {
+                "type": "array",
+                "items": { "type": "string", "visibleContent": true }
+              },
+              "severities": {
+                "type": "array",
+                "items": { "enum": ["blocker", "should_fix", "optional", "verification_gap"] }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

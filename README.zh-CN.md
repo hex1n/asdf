@@ -138,7 +138,7 @@ tools/       # 可移植的用户级 agent 工具
 scripts/     # 安装器与契约检查
 docs/        # 调研笔记与计划（仅本机，Git 忽略）
 evals/       # 评测运行产物（仅本机，Git 忽略）
-tests/       # check-all 运行的测试套件（仅本机，Git 忽略）
+tests/       # 门禁运行的测试套件（仅本机，Git 忽略）
 AGENTS.md    # 跨运行时共用仓库约定
 CONTEXT.md   # 技能分发的领域术语
 CLAUDE.md    # 面向 Claude Code 的运行时指引
@@ -153,10 +153,10 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 [rationale-records skill](skills/rationale-records/) 内的脚本为 Codex 和 Claude Code 共用一个 Stop Hook。
 业务仓库可以在 `docs/rationale` 下保存 Git 忽略的个人记录，但不保存 formatter/checker 执行器、运行时 Hook 或 rationale 状态。
 
-    node scripts/install-agent-tools.mjs
-    node scripts/install-agent-tools.mjs --apply
-    node scripts/check-java-formatter.mjs
-    node scripts/check-rationale-records.mjs
+    node scripts/install-agent-tools.cjs
+    node scripts/install-agent-tools.cjs --apply
+    node scripts/contract-java-formatter.mjs
+    node scripts/contract-rationale-records.mjs
 
 安装器把 formatter 链接到 `~/.agents/tools`、完整 rationale skill 链接到
 `~/.agents/skills`，合并全局运行时配置时保留已有 Hook 和其他设置。

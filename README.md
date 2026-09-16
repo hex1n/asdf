@@ -147,7 +147,7 @@ tools/       # portable user-level agent tools
 scripts/     # installers and contract checks
 docs/        # research notes and plans (local-only, Git-ignored)
 evals/       # eval run artifacts (local-only, Git-ignored)
-tests/       # test suites run by check-all (local-only, Git-ignored)
+tests/       # test suites run by the gate (local-only, Git-ignored)
 AGENTS.md    # shared repository contract
 CONTEXT.md   # canonical domain terms for skill distribution
 CLAUDE.md    # runtime guidance for Claude Code
@@ -164,10 +164,10 @@ The [portable Java formatter](tools/java-formatter/) and the scripts inside the
 Claude Code. Business repositories may carry Git-ignored personal records under
 `docs/rationale`, but never formatter/checker executables, runtime hooks, or rationale state.
 
-    node scripts/install-agent-tools.mjs
-    node scripts/install-agent-tools.mjs --apply
-    node scripts/check-java-formatter.mjs
-    node scripts/check-rationale-records.mjs
+    node scripts/install-agent-tools.cjs
+    node scripts/install-agent-tools.cjs --apply
+    node scripts/contract-java-formatter.mjs
+    node scripts/contract-rationale-records.mjs
 
 The installer links the formatter into `~/.agents/tools`, the complete rationale
 skill into `~/.agents/skills`, and merges global runtime settings without

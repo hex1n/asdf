@@ -42,9 +42,9 @@ Requirements: Node.js 18+, JDK 8+, Maven 3.6+, and Git.
 
 Commands:
 
-    node scripts/install-agent-tools.mjs
-    node scripts/install-agent-tools.mjs --apply
-    node scripts/check-java-formatter.mjs
+    node scripts/install-agent-tools.cjs
+    node scripts/install-agent-tools.cjs --apply
+    node scripts/contract-java-formatter.mjs
 
 Installation is idempotent. Codex requires newly changed hook definitions to
 be reviewed once through /hooks.

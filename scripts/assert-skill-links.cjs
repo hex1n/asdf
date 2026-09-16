@@ -24,11 +24,10 @@
 // cross-skill pointer cannot dangle; external URLs, absolute paths, and links
 // that leave skills/ are reported as skipped, not failed.
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+const fs = require("node:fs");
+const path = require("node:path");
 
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const ROOT = path.join(__dirname, "..");
 const SKILLS = path.join(ROOT, "skills");
 const MARKDOWN = /\.md$/i;
 
@@ -36,7 +35,7 @@ const MARKDOWN = /\.md$/i;
 // word character, space or hyphen, then spaces to hyphens. `&` in a heading
 // therefore collapses to a double hyphen, which is why "Gap & Defect
 // Disposition" resolves as `gap--defect-disposition`.
-export function slug(heading) {
+function slug(heading) {
   return heading
     .trim()
     .toLowerCase()
@@ -49,7 +48,7 @@ export function slug(heading) {
     .replace(/\s/g, "-");
 }
 
-export function headingAnchors(markdown) {
+function headingAnchors(markdown) {
   const anchors = new Set();
   let inFence = false;
   for (const line of markdown.split(/\r?\n/)) {
@@ -67,7 +66,7 @@ export function headingAnchors(markdown) {
 // Only inline links: [text](target). Reference-style links and bare URLs are
 // out of scope, as is anything inside a fenced block — a fenced example of a
 // broken link is documentation, not a defect.
-export function extractLinks(markdown) {
+function extractLinks(markdown) {
   const links = [];
   let inFence = false;
   const lines = markdown.split(/\r?\n/);
@@ -89,7 +88,7 @@ export function extractLinks(markdown) {
 // ("run/RUN.md"). Symlinked directories are followed; only a symlink back into
 // its own ancestor chain is cut, which is what stops a cycle. An entry whose
 // symlink cannot be resolved is not a source and is left out.
-export function listMarkdownFiles(dir) {
+function listMarkdownFiles(dir) {
   const files = [];
   const ancestors = new Set();
   const walk = (rel) => {
@@ -117,7 +116,7 @@ export function listMarkdownFiles(dir) {
 // filesystem: each name must be listed exactly as written (exact case), and
 // symlinks are followed by stat, so a finite path through an alias resolves
 // while a dangling or looping link surfaces as a reason.
-export function resolveTarget(dir, rel) {
+function resolveTarget(dir, rel) {
   let abs = dir;
   let kind = "dir";
   if (rel === ".") return { kind, abs };
@@ -136,7 +135,7 @@ export function resolveTarget(dir, rel) {
   return { kind, abs };
 }
 
-export function checkSkill(dir, name) {
+function checkSkill(dir, name) {
   const files = listMarkdownFiles(dir);
   const anchorCache = new Map();
   const anchorsOf = (abs) => {
@@ -240,6 +239,12 @@ function main() {
   process.exit(allFailures.length === 0 ? 0 : 1);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
-  main();
-}
+// require.main is a module identity, not a path comparison, so it stays correct
+// when this script is reached through a symlink or junction, and on Windows,
+// where drive-letter casing and MSYS path translation make any
+// argv-versus-module-URL comparison unreliable. The ESM form this replaced
+// silently exited 0 without running, which for a gate or an installer is the
+// worst failure available.
+if (require.main === module) main();
+
+module.exports = { slug, headingAnchors, extractLinks, listMarkdownFiles, resolveTarget, checkSkill };

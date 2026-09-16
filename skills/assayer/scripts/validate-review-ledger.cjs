@@ -1,27 +1,44 @@
 #!/usr/bin/env node
 
-import fs from "node:fs";
-import { pathToFileURL } from "node:url";
+// Validate an agent-authored review ledger against review-ledger-schema.json and the
+// Exact Gate in SKILL.md.
+//
+// The schema owns the structural layer: which fields exist, their types, and
+// the closed vocabularies. It is a separate file rather than constants here
+// because it has two consumers — this script interprets it, and REFERENCE.md's
+// round-receipt block hands the same field list to the agent that must emit
+// one. A vocabulary that lives only in this file is a vocabulary the author
+// was never given.
+//
+// Everything the schema cannot express stays below: receipt-to-report-to-finding
+// binding, receipt ordering (a diagnostic follows the FAILED second-model
+// invocation it probes; a recovery follows the diagnostic), payload-to-ledger
+// field equality, and the gate conditions themselves.
 
-const VALID_SEVERITIES = new Set(["blocker", "should_fix", "optional", "verification_gap"]);
-const VALID_VALIDATIONS = new Set(["confirmed", "challenged", "needs_evidence"]);
-const VALID_DISPOSITIONS = new Set(["fix", "rebut", "accept-risk", "defer-gap", "needs-input"]);
-const VALID_PRECISIONS = new Set(["exact", "derived"]);
-const VALID_BUDGET_SOURCES = new Set(["explicit", "calibrated-default", "user-authorized-unbounded"]);
-const VALID_REVIEW_KINDS = new Set(["blocker-sweep", "complete", "focused", "rebuttal-check"]);
-const VALID_INDEPENDENCE_LEVELS = new Set(["fresh-context", "second-model"]);
-const VALID_REVIEW_DEPTHS = new Set(["shallow", "full"]);
-const VALID_REVIEWER_ROLES = new Set(["required", "diagnostic"]);
-const VALID_RECEIPT_VERDICTS = new Set([
-  "GO",
-  "CONDITIONAL-GO",
-  "NO-GO",
-  "FAILED",
-  "TIMED-OUT",
-  "CANCELLED",
-  "DISCARDED",
-]);
-const COST_FIELDS = ["model_calls", "input_characters", "output_characters", "wall_clock_ms", "physical_sessions", "retries"];
+const fs = require("node:fs");
+const path = require("node:path");
+
+const SCHEMA = JSON.parse(fs.readFileSync(
+  path.join(__dirname, "..", "review-ledger-schema.json"),
+  "utf8",
+));
+
+const RECEIPT_SCHEMA = SCHEMA.properties.round_receipts.items;
+const FINDING_SCHEMA = SCHEMA.properties.findings.items;
+
+// Only the vocabularies this file still reasons with survive here, and each is
+// read from the schema rather than restated: a vocabulary written twice drifts
+// on the first edit that remembers only one copy. The rest — review kinds,
+// reviewer roles, independence levels, precisions, depths, budget sources —
+// are now enforced where they are declared, and naming them again here would
+// be the second copy.
+const VALID_DISPOSITIONS = new Set(FINDING_SCHEMA.properties.disposition.enum);
+const VALID_RECEIPT_VERDICTS = new Set(RECEIPT_SCHEMA.properties.verdict.enum);
+const COST_FIELDS = RECEIPT_SCHEMA.required.filter((field) => field.endsWith("_characters")
+  || ["model_calls", "wall_clock_ms", "physical_sessions", "retries"].includes(field));
+
+// The subset of verdicts that mean the reviewer actually returned something.
+const RETURNED_VERDICTS = new Set(["GO", "CONDITIONAL-GO", "NO-GO"]);
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
@@ -36,51 +53,241 @@ function duplicates(values) {
   return values.filter((value) => seen.has(value) || !seen.add(value));
 }
 
-export function evaluateGateState(state) {
+// ---------------------------------------------------------------------------
+// Schema interpreter
+//
+// Keep this block byte-identical with the copy in every other skill that
+// validates an agent-authored record: `node scripts/assert-validator-helpers.mjs`
+// fails when they drift. It is duplicated rather than imported because
+// AGENTS.md requires each skill to stay independently distributable, and
+// install-skills.cjs links the skill directory alone — an import reaching
+// outside it resolves in this checkout and nowhere else.
+// ---------------------------------------------------------------------------
+
+// >>> shared-validator-helpers
+const SUPPORTED_KEYWORDS = new Set([
+  "title", "type", "enum", "const", "required", "properties", "additionalProperties",
+  "items", "oneOf", "minItems", "maxItems", "uniqueItems", "minLength", "maxLength",
+  "pattern", "minimum", "maximum", "visibleContent",
+]);
+
+// Expressed as code-point predicates rather than regex literals: U+2028 and
+// U+2029 are line terminators in JavaScript source, so a character class
+// carrying them ends mid-pattern and the file stops parsing. Predicates also
+// avoid the /g-with-.test() trap, where a shared regex keeps lastIndex between
+// calls and silently answers the second caller wrong.
+function isInvisibleCodePoint(code) {
+  return (code >= 0x09 && code <= 0x0d) || code === 0x20 || code === 0xa0 || code === 0xad
+    || (code >= 0x200b && code <= 0x200f) || (code >= 0x2028 && code <= 0x202e)
+    || (code >= 0x2060 && code <= 0x2064) || (code >= 0x206a && code <= 0x206f)
+    || code === 0x3000 || code === 0xfeff;
+}
+
+function isControlCodePoint(code) {
+  return code < 0x20 || code === 0x7f || (code >= 0x80 && code <= 0x9f);
+}
+
+function hasVisibleContent(value) {
+  if (typeof value !== "string") return false;
+  for (const character of value) {
+    if (!isInvisibleCodePoint(character.codePointAt(0))) return true;
+  }
+  return false;
+}
+
+// A record arrives from a delegated reviewer, and on a re-review from the
+// builder too: it is untrusted text. Control characters reaching a terminal
+// through a failure message are an escape-sequence injection, so they are
+// stripped here, at the one place every message passes through.
+function safeForMessage(value) {
+  let out = "";
+  for (const character of String(value)) {
+    out += isControlCodePoint(character.codePointAt(0)) ? " " : character;
+  }
+  return out.trim();
+}
+
+function quote(value, limit = 120) {
+  const clean = safeForMessage(typeof value === "string" ? value : JSON.stringify(value));
+  return clean.length > limit ? `${clean.slice(0, limit)}…` : clean;
+}
+
+function typeOf(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  if (Number.isInteger(value)) return "integer";
+  return typeof value;
+}
+
+function matchesType(value, expected) {
+  if (expected === "object") return typeOf(value) === "object";
+  if (expected === "integer") return typeOf(value) === "integer";
+  if (expected === "number") return typeof value === "number" && Number.isFinite(value);
+  return typeOf(value) === expected;
+}
+
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
+
+// A branch's discriminator is its first `const` property. Without it a failed
+// `oneOf` can only say "matched 0 of 4", which tells the reviewer nothing about
+// which branch it nearly satisfied.
+function discriminatorOf(schema) {
+  for (const [key, subSchema] of Object.entries(schema.properties ?? {})) {
+    if (subSchema && typeof subSchema === "object" && "const" in subSchema) {
+      return { key, value: subSchema.const };
+    }
+  }
+  return null;
+}
+
+function validateAgainstSchema(value, schema, label = "$") {
+  const errors = [];
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
+    return [`${label}: schema error: not a schema object`];
+  }
+  for (const keyword of Object.keys(schema)) {
+    if (!SUPPORTED_KEYWORDS.has(keyword)) {
+      // Silently ignoring an unknown keyword would let a future schema edit
+      // add a rule this interpreter never applies, and the record would pass
+      // for reasons nobody checked.
+      errors.push(`${label}: schema error: unsupported schema keyword "${keyword}"`);
+    }
+  }
+  if ("visibleContent" in schema && schema.type !== "string") {
+    errors.push(`${label}: schema error: visibleContent requires type "string"`);
+  }
+  if (errors.length > 0) return errors;
+
+  if ("type" in schema && !matchesType(value, schema.type)) {
+    return [`${label}: must be ${schema.type}, found ${typeOf(value)}`];
+  }
+  if ("const" in schema && canonical(value) !== canonical(schema.const)) {
+    return [`${label}: must be ${quote(schema.const)}`];
+  }
+  if ("enum" in schema && !schema.enum.some((option) => canonical(option) === canonical(value))) {
+    return [`${label}: must be one of ${schema.enum.join(" | ")}, found ${quote(value)}`];
+  }
+  if (schema.visibleContent === true && !hasVisibleContent(value)) {
+    errors.push(`${label}: has no visible content`);
+  }
+  if (typeof value === "string") {
+    const points = [...value];
+    if ("minLength" in schema && points.length < schema.minLength) {
+      errors.push(`${label}: must be at least ${schema.minLength} characters, found ${points.length}`);
+    }
+    if ("maxLength" in schema && points.length > schema.maxLength) {
+      errors.push(`${label}: must be at most ${schema.maxLength} characters, found ${points.length}`);
+    }
+    if ("pattern" in schema && !new RegExp(schema.pattern, "u").test(value)) {
+      errors.push(`${label}: must match ${schema.pattern}, found ${quote(value)}`);
+    }
+  }
+  if (typeof value === "number") {
+    if ("minimum" in schema && value < schema.minimum) errors.push(`${label}: must be at least ${schema.minimum}`);
+    if ("maximum" in schema && value > schema.maximum) errors.push(`${label}: must be at most ${schema.maximum}`);
+  }
+  if (Array.isArray(value)) {
+    if ("minItems" in schema && value.length < schema.minItems) {
+      errors.push(`${label}: needs at least ${schema.minItems} item(s)`);
+    }
+    if ("maxItems" in schema && value.length > schema.maxItems) {
+      errors.push(`${label}: allows at most ${schema.maxItems} item(s)`);
+    }
+    if (schema.uniqueItems === true) {
+      const seen = new Map();
+      value.forEach((item, index) => {
+        const key = canonical(item);
+        if (seen.has(key)) errors.push(`${label}[${index}]: duplicate of ${label}[${seen.get(key)}]`);
+        else seen.set(key, index);
+      });
+    }
+    if ("items" in schema) {
+      value.forEach((item, index) => {
+        errors.push(...validateAgainstSchema(item, schema.items, `${label}[${index}]`));
+      });
+    }
+  }
+  if (typeOf(value) === "object") {
+    for (const key of schema.required ?? []) {
+      if (!Object.hasOwn(value, key)) errors.push(`${label}: missing "${key}"`);
+    }
+    const properties = schema.properties ?? {};
+    if (schema.additionalProperties === false) {
+      for (const key of Object.keys(value)) {
+        if (!Object.hasOwn(properties, key)) {
+          errors.push(`${label}: unknown property "${safeForMessage(key)}"`);
+        }
+      }
+    }
+    for (const [key, subSchema] of Object.entries(properties)) {
+      if (!Object.hasOwn(value, key)) continue;
+      errors.push(...validateAgainstSchema(value[key], subSchema, `${label}.${key}`));
+    }
+  }
+  if ("oneOf" in schema) {
+    const results = schema.oneOf.map((branch) => validateAgainstSchema(value, branch, label));
+    const matched = results.filter((branchErrors) => branchErrors.length === 0).length;
+    if (matched !== 1) {
+      const named = schema.oneOf.map((branch, index) => ({ branch, index, discriminator: discriminatorOf(branch) }))
+        .find(({ discriminator }) => discriminator
+          && typeOf(value) === "object"
+          && canonical(value[discriminator.key]) === canonical(discriminator.value));
+      if (named && matched === 0) {
+        errors.push(...results[named.index]);
+      } else {
+        errors.push(`${label}: must match exactly one schema branch; matched ${matched}`);
+      }
+    }
+  }
+  return errors;
+}
+// <<< shared-validator-helpers
+
+function evaluateReviewLedger(ledger) {
   const failures = [];
-  if (!state || typeof state !== "object" || Array.isArray(state)) {
-    return { pass: false, failures: ["gate state must be a JSON object"] };
+  if (!ledger || typeof ledger !== "object" || Array.isArray(ledger)) {
+    return { pass: false, failures: ["review ledger must be a JSON object"] };
   }
 
-  const revision = state.current_revision;
-  if (!nonEmptyString(revision)) failures.push("current revision is missing");
-  if (!Array.isArray(state.required_rubric_dimensions) || state.required_rubric_dimensions.length === 0 ||
-      state.required_rubric_dimensions.some((item) => !nonEmptyString(item))) {
-    failures.push("required_rubric_dimensions must be a non-empty string array");
-  }
-  if (Array.isArray(state.required_rubric_dimensions) &&
-      new Set(state.required_rubric_dimensions).size !== state.required_rubric_dimensions.length) {
-    failures.push("required_rubric_dimensions must not contain duplicates");
-  }
-  const requiredRubric = Array.isArray(state.required_rubric_dimensions) ? [...state.required_rubric_dimensions].sort() : [];
+  // The schema owns structure; every check below reads fields it has already
+  // typed and vocabularies it has already closed. Running it first and
+  // returning on failure keeps one missing field from producing a page of
+  // downstream noise that buries its own cause.
+  const structural = validateAgainstSchema(ledger, SCHEMA, "$");
+  if (structural.length > 0) return { pass: false, failures: structural };
 
-  if (!Array.isArray(state.required_reviewers)) failures.push("required_reviewers must be an array");
-  const required = Array.isArray(state.required_reviewers) ? state.required_reviewers : [];
-  if (required.length === 0) failures.push("required reviewers are missing");
+  // The returned-verdict subset is a semantic distinction the schema cannot
+  // make, so it is written here — and pinned to the schema, because a verdict
+  // renamed there while this set kept the old spelling would silently stop
+  // matching any receipt and quietly skip every report check below.
+  for (const verdict of RETURNED_VERDICTS) {
+    if (!VALID_RECEIPT_VERDICTS.has(verdict)) {
+      failures.push(`schema drift: "${verdict}" is no longer a receipt verdict`);
+    }
+  }
+
+  const revision = ledger.current_revision;
+  const requiredRubric = [...ledger.required_rubric_dimensions].sort();
+
+  const required = ledger.required_reviewers;
   if (required.some((reviewer) => !identityString(reviewer))) {
     failures.push("every required reviewer needs a non-empty identity without surrounding whitespace");
   }
-  for (const reviewer of duplicates(required)) failures.push(`duplicate required reviewer: ${reviewer}`);
-  if (!identityString(state.author_identity)) {
+  if (!identityString(ledger.author_identity)) {
     failures.push("author_identity must be a non-empty identity without surrounding whitespace");
-  } else if (required.includes(state.author_identity)) {
+  } else if (required.includes(ledger.author_identity)) {
     failures.push("author identity cannot be a required reviewer");
   }
-  if (!VALID_REVIEW_DEPTHS.has(state.review_depth)) {
-    failures.push("review_depth must be shallow or full");
-  }
 
-  if (!Array.isArray(state.explicit_second_model_reviewers)) {
-    failures.push("explicit_second_model_reviewers must be an array");
-  }
-  const explicitSecondModel = Array.isArray(state.explicit_second_model_reviewers)
-    ? state.explicit_second_model_reviewers
-    : [];
+  const explicitSecondModel = ledger.explicit_second_model_reviewers;
   if (explicitSecondModel.some((reviewer) => !identityString(reviewer))) {
     failures.push("every explicit second-model reviewer needs a non-empty identity without surrounding whitespace");
-  }
-  for (const reviewer of duplicates(explicitSecondModel)) {
-    failures.push(`duplicate explicit second-model reviewer: ${reviewer}`);
   }
   for (const reviewer of explicitSecondModel) {
     if (!required.includes(reviewer)) {
@@ -88,8 +295,7 @@ export function evaluateGateState(state) {
     }
   }
 
-  if (!Array.isArray(state.final_reviewer_verdicts)) failures.push("final_reviewer_verdicts must be an array");
-  const verdicts = Array.isArray(state.final_reviewer_verdicts) ? state.final_reviewer_verdicts : [];
+  const verdicts = ledger.final_reviewer_verdicts;
   if (verdicts.length !== required.length) failures.push("final_reviewer_verdicts must contain exactly the required reviewers");
   if (verdicts.some((item) => !identityString(item?.reviewer))) {
     failures.push("every final reviewer verdict needs an identity without surrounding whitespace");
@@ -109,35 +315,20 @@ export function evaluateGateState(state) {
     }
   }
 
-  if (!Array.isArray(state.findings)) failures.push("findings must be an array");
-  const findings = Array.isArray(state.findings) ? state.findings : [];
-  const findingIds = findings.map((finding) => finding?.id).filter(nonEmptyString);
-  if (findingIds.length !== findings.length) failures.push("every finding needs a stable finding ID");
-  for (const id of duplicates(findingIds)) failures.push(`duplicate finding ID: ${id}`);
+  const findings = ledger.findings;
+  for (const id of duplicates(findings.map((finding) => finding.id))) {
+    failures.push(`duplicate finding ID: ${id}`);
+  }
 
   for (const finding of findings) {
-    const id = nonEmptyString(finding?.id) ? finding.id : "<missing-id>";
-    if (!VALID_SEVERITIES.has(finding?.severity)) failures.push(`${id} has invalid severity`);
-    if (!nonEmptyString(finding?.claim)) failures.push(`${id} has no reviewer claim`);
-    if (!nonEmptyString(finding?.evidence)) failures.push(`${id} has no reviewer evidence`);
-    if (!nonEmptyString(finding?.affected_section)) failures.push(`${id} has no affected section`);
+    const id = finding.id;
     if (finding?.severity === "verification_gap" && !nonEmptyString(finding?.missing_check)) {
       failures.push(`${id} verification gap has no missing check`);
-    }
-    if (!nonEmptyString(finding?.source_invocation_id)) failures.push(`${id} has no source invocation`);
-    if (!nonEmptyString(finding?.revision)) failures.push(`${id} has no reviewed revision`);
-    if (!nonEmptyString(finding?.owner)) failures.push(`${id} has no owner`);
-    if (!VALID_VALIDATIONS.has(finding?.validation)) failures.push(`${id} has no valid parent validation`);
-    if (!nonEmptyString(finding?.parent_evidence_and_reason)) {
-      failures.push(`${id} has no parent validation evidence and reason`);
     }
     if (finding?.parent_validation_disclosed !== true) {
       failures.push(`${id} parent validation was not disclosed`);
     }
     if (finding?.validation === "needs_evidence") failures.push(`${id} still needs evidence`);
-    if (finding?.disposition != null && !VALID_DISPOSITIONS.has(finding.disposition)) {
-      failures.push(`${id} has invalid disposition`);
-    }
     if (finding?.severity !== "verification_gap" &&
         finding?.validation === "confirmed" && finding?.disposition === "fix" &&
         finding?.closed === true && finding?.revision === revision) {
@@ -172,39 +363,14 @@ export function evaluateGateState(state) {
     }
   }
 
-  if (!Array.isArray(state.active_reviewer_invocations)) {
-    failures.push("active_reviewer_invocations must be an array");
-  }
-  const active = Array.isArray(state.active_reviewer_invocations)
-    ? state.active_reviewer_invocations
-    : [];
+  const active = ledger.active_reviewer_invocations;
   if (active.length > 0) failures.push(`active reviewer invocations remain: ${active.join(", ")}`);
-  if (state.material_change_after_go !== false) failures.push("material change happened after GO");
+  if (ledger.material_change_after_go !== false) failures.push("material change happened after GO");
 
-  const budget = state.resolved_budget;
-  if (!budget || typeof budget !== "object" || Array.isArray(budget)) {
-    failures.push("resolved_budget must be a frozen budget object");
-  } else if (!VALID_BUDGET_SOURCES.has(budget.source)) {
-    failures.push("resolved_budget has invalid source");
-  } else if (budget.source === "user-authorized-unbounded") {
-    if (budget.user_authorization !== true) {
-      failures.push("unbounded budget requires recorded user authorization");
-    }
-  } else {
-    if (!nonEmptyString(budget.unit)) failures.push("resolved_budget has no observable unit");
-    if (!Number.isSafeInteger(budget.threshold) || budget.threshold <= 0) {
-      failures.push("resolved_budget has no positive threshold");
-    }
-  }
-
-  if (!Array.isArray(state.attempted_invocations)) failures.push("attempted_invocations must be an array");
-  if (!Array.isArray(state.round_receipts)) failures.push("round_receipts must be an array");
-  if (!Array.isArray(state.round_reports)) failures.push("round_reports must be an array");
-  const attempts = Array.isArray(state.attempted_invocations) ? state.attempted_invocations : [];
-  const receipts = Array.isArray(state.round_receipts) ? state.round_receipts : [];
-  const reports = Array.isArray(state.round_reports) ? state.round_reports : [];
-  const receiptIds = receipts.map((receipt) => receipt?.invocation_id).filter(nonEmptyString);
-  if (attempts.some((id) => !nonEmptyString(id))) failures.push("every attempted invocation needs a non-empty ID");
+  const attempts = ledger.attempted_invocations;
+  const receipts = ledger.round_receipts;
+  const reports = ledger.round_reports;
+  const receiptIds = receipts.map((receipt) => receipt.invocation_id);
   for (const id of duplicates(attempts)) failures.push(`duplicate attempted invocation: ${id}`);
   for (const id of duplicates(receiptIds)) failures.push(`duplicate round receipt: ${id}`);
   for (const attempt of attempts) {
@@ -214,30 +380,12 @@ export function evaluateGateState(state) {
     if (!attempts.includes(receiptId)) failures.push(`round receipt ${receiptId} has no attempted invocation`);
   }
   for (const receipt of receipts) {
-    const id = nonEmptyString(receipt?.invocation_id) ? receipt.invocation_id : "<missing-invocation>";
-    if (!nonEmptyString(receipt?.round_id)) failures.push(`${id} receipt has no round ID`);
-    if (!nonEmptyString(receipt?.invocation_id)) failures.push("round receipt has no invocation ID");
-    if (!nonEmptyString(receipt?.revision_hash)) failures.push(`${id} receipt has no revision hash`);
-    if (!VALID_REVIEW_KINDS.has(receipt?.review_kind)) failures.push(`${id} has invalid review kind`);
-    if (!VALID_RECEIPT_VERDICTS.has(receipt?.verdict)) failures.push(`${id} has invalid receipt verdict`);
-    if (!nonEmptyString(receipt?.runtime)) failures.push(`${id} receipt has no runtime`);
-    if (!nonEmptyString(receipt?.provider)) failures.push(`${id} receipt has no provider`);
-    if (!nonEmptyString(receipt?.model)) failures.push(`${id} receipt has no model`);
+    const id = receipt.invocation_id;
     if (!identityString(receipt?.reviewer)) {
       failures.push(`${id} receipt reviewer needs an identity without surrounding whitespace`);
     }
-    if (!nonEmptyString(receipt?.effort)) failures.push(`${id} receipt has no effort`);
-    if (!nonEmptyString(receipt?.reviewer_session_id_or_opaque_handle)) {
-      failures.push(`${id} receipt has no reviewer session or handle`);
-    }
-    if (!VALID_REVIEWER_ROLES.has(receipt?.reviewer_role)) {
-      failures.push(`${id} receipt has invalid reviewer role`);
-    }
     if (receipt?.reviewer_role === "required" && !required.includes(receipt?.reviewer)) {
       failures.push(`${id} required reviewer receipt is not in the frozen required_reviewers`);
-    }
-    if (!VALID_INDEPENDENCE_LEVELS.has(receipt?.independence_level)) {
-      failures.push(`${id} receipt has invalid independence level`);
     }
     if (required.includes(receipt?.reviewer)) {
       const selectedSecondModel = explicitSecondModel.includes(receipt.reviewer);
@@ -266,19 +414,13 @@ export function evaluateGateState(state) {
         failures.push(`${id} diagnostic fallback must link to an earlier unavailable second-model invocation`);
       }
     }
-    if (!nonEmptyString(receipt?.measurement_source)) failures.push(`${id} receipt has no measurement source`);
-    if (!VALID_PRECISIONS.has(receipt?.measurement_precision)) failures.push(`${id} has invalid measurement precision`);
-    for (const field of COST_FIELDS) {
-      if (!(field in receipt)) failures.push(`${id} receipt omits ${field}`);
-      if (receipt[field] != null && (!Number.isSafeInteger(receipt[field]) || receipt[field] < 0)) {
-        failures.push(`${id} receipt has invalid ${field}`);
-      }
-      if (receipt[field] == null) {
-        failures.push(`${id} ${receipt.measurement_precision} measurement omits ${field}`);
-      }
-    }
-    if (VALID_RECEIPT_VERDICTS.has(receipt?.verdict) && ["GO", "CONDITIONAL-GO", "NO-GO"].includes(receipt.verdict)) {
-      for (const field of ["model_calls", "input_characters", "output_characters", "wall_clock_ms", "physical_sessions"]) {
+    // The schema admits zero for every cost field, because a cancelled or
+    // failed invocation legitimately spent nothing. A verdict the reviewer
+    // actually returned did not: zero there means the measurement is missing,
+    // not that the work was free. `retries` is the one field a real round may
+    // leave at zero.
+    if (RETURNED_VERDICTS.has(receipt.verdict)) {
+      for (const field of COST_FIELDS.filter((name) => name !== "retries")) {
         if (!(receipt[field] > 0)) failures.push(`${id} returned verdict requires positive ${field}`);
       }
     }
@@ -311,9 +453,8 @@ export function evaluateGateState(state) {
     }
   }
 
-  const returnedVerdicts = new Set(["GO", "CONDITIONAL-GO", "NO-GO"]);
   for (const receipt of receipts) {
-    if (!returnedVerdicts.has(receipt?.verdict)) continue;
+    if (!RETURNED_VERDICTS.has(receipt?.verdict)) continue;
     const matches = reports.filter((report) => report?.invocation_id === receipt.invocation_id);
     if (matches.length !== 1) {
       failures.push(`${receipt.invocation_id} needs exactly one returned round report`);
@@ -327,32 +468,18 @@ export function evaluateGateState(state) {
     if (report.reviewer_output_disclosed !== true) {
       failures.push(`${receipt.invocation_id} reviewer output was not disclosed`);
     }
-    if (!Array.isArray(report.finding_ids)) {
-      failures.push(`${receipt.invocation_id} round report finding_ids must be an array`);
-      continue;
-    }
-    if (report.finding_ids.some((id) => !nonEmptyString(id))) {
-      failures.push(`${receipt.invocation_id} round report has an invalid finding ID`);
-    }
     for (const id of duplicates(report.finding_ids)) {
       failures.push(`${receipt.invocation_id} round report has duplicate finding ID: ${id}`);
     }
     if (["NO-GO", "CONDITIONAL-GO"].includes(report.verdict) && report.finding_ids.length === 0) {
       failures.push(`${receipt.invocation_id} non-GO verdict requires at least one finding`);
     }
-    if (!Array.isArray(report.finding_payloads)) {
-      failures.push(`${receipt.invocation_id} round report finding_payloads must be an array`);
-    } else {
+    {
       const payloadIds = report.finding_payloads.map((finding) => finding?.id);
       if (JSON.stringify(payloadIds) !== JSON.stringify(report.finding_ids)) {
         failures.push(`${receipt.invocation_id} finding payload IDs do not match finding_ids`);
       }
       for (const payload of report.finding_payloads) {
-        if (!nonEmptyString(payload?.id) || !VALID_SEVERITIES.has(payload?.severity) ||
-            !nonEmptyString(payload?.claim) || !nonEmptyString(payload?.evidence) ||
-            !nonEmptyString(payload?.affected_section)) {
-          failures.push(`${receipt.invocation_id} has incomplete finding payload`);
-        }
         if (payload?.severity === "verification_gap" && !nonEmptyString(payload?.missing_check)) {
           failures.push(`${receipt.invocation_id} verification-gap payload has no missing check`);
         }
@@ -395,11 +522,10 @@ export function evaluateGateState(state) {
   }
   for (const report of reports) {
     const receipt = receipts.filter((item) => item?.invocation_id === report?.invocation_id);
-    if (receipt.length !== 1 || !returnedVerdicts.has(receipt[0]?.verdict)) {
+    if (receipt.length !== 1 || !RETURNED_VERDICTS.has(receipt[0]?.verdict)) {
       failures.push(`round report ${report?.invocation_id ?? "<missing-invocation>"} has no returned-verdict receipt`);
       continue;
     }
-    if (!Array.isArray(report.finding_ids)) continue;
     for (const id of report.finding_ids) {
       const matches = findings.filter((finding) => finding?.id === id && finding?.source_invocation_id === report.invocation_id);
       if (matches.length !== 1) failures.push(`${report.invocation_id} manifest finding ${id} must map to exactly one ledger finding`);
@@ -490,13 +616,13 @@ export function evaluateGateState(state) {
   // Depth must buy something. Full depth is chosen for irreversibility and blast
   // radius, so it may not close on a same-model reviewer while a second model was
   // available: that combination was silently passing before.
-  if (state.review_depth === "full") {
+  if (ledger.review_depth === "full") {
     const closesOnSecondModel = verdicts.some((verdict) => {
       const receipt = receipts.find((item) => item?.invocation_id === verdict?.invocation_id);
       return receipt?.independence_level === "second-model";
     });
     if (!closesOnSecondModel) {
-      const availability = state.second_model_availability;
+      const availability = ledger.second_model_availability;
       if (!availability || typeof availability !== "object" || Array.isArray(availability)) {
         failures.push("full depth closing without a second-model reviewer requires a recorded second_model_availability");
       } else if (availability.available !== false) {
@@ -529,10 +655,10 @@ function readInput(argv) {
   return fs.readFileSync(0, "utf8");
 }
 
-async function main() {
+function main() {
   try {
-    const state = JSON.parse(readInput(process.argv.slice(2)));
-    const result = evaluateGateState(state);
+    const ledger = JSON.parse(readInput(process.argv.slice(2)));
+    const result = evaluateReviewLedger(ledger);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     process.exitCode = result.pass ? 0 : 1;
   } catch (error) {
@@ -541,15 +667,12 @@ async function main() {
   }
 }
 
-const invokedPath = process.argv[1] ?? "";
-let entryHref = "";
-try {
-  entryHref = pathToFileURL(fs.realpathSync(invokedPath)).href;
-} catch {
-  try { entryHref = pathToFileURL(invokedPath).href; } catch { entryHref = ""; }
-}
-// Case/realpath-insensitive compare (Windows drive-letter casing and MSYS path
-// translation break exact-equality guards silently: main() never ran, exit 0).
-const isEntry = entryHref !== "" && import.meta.url.toLowerCase() === entryHref.toLowerCase();
-const looksLikeCli = invokedPath.replace(/\\/g, "/").toLowerCase().endsWith("/check-gate-state.mjs");
-if (isEntry || looksLikeCli) await main();
+// require.main is a module identity, not a path comparison, so it stays
+// correct when the skill is reached through the symlink or junction that
+// install-skills.cjs creates — and on Windows, where drive-letter casing and
+// MSYS path translation make any argv-versus-module-URL comparison unreliable.
+// Getting that wrong exits 0 having checked nothing, the worst failure a gate
+// has available.
+if (require.main === module) main();
+
+module.exports = { hasVisibleContent, safeForMessage, validateAgainstSchema, evaluateReviewLedger };

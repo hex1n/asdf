@@ -298,7 +298,7 @@ For version/environment applicability, use a compact gate table: `Gate | Evidenc
 
 A compressed Standard run in one domain — the same transactional service as the orientation example; adapt the receipts to your stack. What transfers is the decisions — what was skipped, what earned a second check, when it stopped — not the sequence; a real run follows uncertainty, not these paragraphs in order.
 
-Request: "为什么订单创建偶尔超时？" No reproduction or fix was asked, so this stays in deep-research; had the user said "帮我修一下", it would route to a diagnosis workflow instead.
+Request: "为什么这个接口偶尔超时？" No reproduction or fix was asked, so this stays in deep-research; had the user said "帮我修一下", it would route to a diagnosis workflow instead.
 
 Standard, not Deep: several components and a causal question, but no irreversible decision rides on the answer. No written plan either — the whole investigation hangs on one unknown, stated in one line: is event publishing inside the transaction boundary?
 

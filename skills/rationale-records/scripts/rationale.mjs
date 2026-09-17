@@ -155,7 +155,9 @@ function printHelp() {
 const RE_ANY_HEAD = /^#{1,6}\s/;
 const RE_FILE_TITLE = /^#\s+(.+?)\s*$/;
 const RE_TLDR = /^>\s*TL;DR[：:]\s*(.+?)\s*$/i;
-const RE_HEAD = /^##\s+(W-\d+)\s*·\s*(.+?)\s*$/;
+// An id is a name, not a position: any non-blank token after `W-`, so a record
+// can be called after the code it anchors instead of the order it was written in.
+const RE_HEAD = /^##\s+(W-[^\s·]+)\s*·\s*(.+?)\s*$/;
 const RE_SOURCE = /^- \*\*文件路径\*\*\s*`([^`]+)`\s*$/;
 const RE_SHAPE = /^- \*\*代码片段\*\*\s*`(.+)`\s*$/;
 const RE_EXPLANATION = /^- \*\*实现理由\*\*(?:\s+(.+?)\s*)?$/;
@@ -594,14 +596,14 @@ function runFind(options) {
   const repo = repositoryInfo(process.cwd(), options.root);
   const corpus = loadCorpus(repo, options, true);
   const target = sourceTarget(repo, corpus, query);
-  const exactId = /^W-\d+$/i.test(query) ? query.toUpperCase() : null;
+  const exactId = /^W-[^\s·]+$/i.test(query) ? query.toLowerCase() : null;
   const needle = query.toLowerCase();
   const matches = [];
   for (const entry of corpus.entries) {
     const anchors = entry.anchors.map((anchor) => ({ ...anchor, ...resolveAnchor(repo, anchor) }));
     const relevant = target ? anchors.filter((anchor) => path.resolve(repo.root, anchor.source) === target.file) : anchors;
     const searchable = [entry.id, entry.title, entry.explanation, ...entry.anchors.flatMap((anchor) => [anchor.source, anchor.shape])].join("\n").toLowerCase();
-    const textMatch = exactId ? entry.id === exactId : searchable.includes(needle);
+    const textMatch = exactId ? entry.id.toLowerCase() === exactId : searchable.includes(needle);
     if ((target && relevant.length > 0) || (!target && textMatch)) {
       const distance = target?.line ? Math.min(...relevant.map((anchor) => anchor.line ? Math.abs(anchor.line - target.line) : Number.MAX_SAFE_INTEGER)) : 0;
       matches.push({ entry, anchors: relevant, distance });

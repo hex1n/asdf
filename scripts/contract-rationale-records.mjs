@@ -141,6 +141,20 @@ try {
   expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "canonical record restored");
   stage("field label validation");
 
+  // An id names what the record anchors, so it is not always a number and not
+  // always ASCII; lookup compares it without folding a widened character set.
+  for (const [id, query] of [["W-\u8c03\u7528\u987a\u5e8f", "W-\u8c03\u7528\u987a\u5e8f"], ["W-Call-Order", "w-call-order"]]) {
+    fs.writeFileSync(rationale, activeRecord().replace("## W-001 \u00b7", `## ${id} \u00b7`), "utf8");
+    const named = JSON.parse(expect(run(["check", "--full", "--json"], repo, stateRoot), 0, `named id ${id}`));
+    assert.equal(named.failures.length, 0);
+    assert.equal(named.anchors, 2);
+    const found = expect(run(["find", query, "--full"], repo, stateRoot), 0, `find ${query}`);
+    assert.ok(found.includes(id), `find must resolve ${query} to ${id}`);
+  }
+  fs.writeFileSync(rationale, activeRecord(), "utf8");
+  expect(run(["check", "--full", "--json"], repo, stateRoot), 0, "numeric id restored");
+  stage("ids are names, not positions");
+
   fs.writeFileSync(alpha, [
     "class Alpha {",
     "    void preserveOrder() {",

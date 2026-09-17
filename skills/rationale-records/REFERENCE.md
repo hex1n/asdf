@@ -32,9 +32,18 @@ matching; strings, comments, and token boundaries are preserved. Anchor
 behavior-bearing code, not a comment, import, method signature, or movable
 trace.
 
-W-IDs are unique across all files under `docs/rationale`. Allocate after the
-repository-wide maximum. Active records carry no obsolete entries: update a
-still-current entry, or remove it when the current code no longer needs it.
+A W-ID is a name, unique across all files under `docs/rationale`, and never a
+position: it says which record this is, not where it sits or when it was written.
+Name it after what the record anchors — `W-调用顺序`, in the language the
+records are written in — so a reference elsewhere reads without a lookup; a plain
+number stays a valid name for records that already carry one. The heading's title
+then states the claim about that anchor, and can be rewritten as the explanation
+sharpens while the id stays put.
+
+Records inside a file are ordered by the code's own flow, not by id; ids of
+neighbouring records have no relation, and a higher one is not newer or better.
+Active records carry no obsolete entries: update a still-current entry, or remove
+it when the current code no longer needs it.
 
 The title and `实现理由` contain no dates, tests, assertions, mutation results,
 proof/evidence, samples, incidents, or review history. `实现理由` talks a maintainer
@@ -92,7 +101,7 @@ It is navigation only, not an AST claim that an anchor belongs to that member.
 
 An optional unnumbered note can be free-form but should contain only candidate
 current code explanations and code locations. Keep it under `.scratch`, for example
-`.scratch/rationale-handoff.md`; do not allocate W-IDs in the linked worktree.
+`.scratch/rationale-handoff.md`; do not name new W-IDs in the linked worktree.
 
 ```bash
 node "$HOME/.agents/skills/rationale-records/scripts/rationale.mjs" handoff-create \

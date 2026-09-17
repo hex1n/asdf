@@ -15,13 +15,13 @@ the full effective contract, actual evidence, authority and lifecycle.
 
 ```markdown
 <!-- e2e-reader: report/v1 -->
-# 交易确认验证报告
+# 提交处理验证报告
 
-确认记录缺失，业务验证未通过。问题及下一步见 [F01](#issue-F01)。
+结果记录缺失，业务验证未通过。问题及下一步见 [F01](#issue-F01)。
 
-## E01 [failed] 确认交易
+## E01 [failed] 提交一次处理请求
 
-任务已完成，但预期确认记录未生成。[F01](#issue-F01) 待修复决定。
+任务已完成，但预期结果记录未生成。[F01](#issue-F01) 待修复决定。
 
 ### 预期与实际
 
@@ -32,9 +32,9 @@ the full effective contract, actual evidence, authority and lifecycle.
 完整输入、独立期望及证据写在本例；共享环境见 [运行上下文](#shared-context)。
 资料来源：[消费计划](plan-snapshot.md)、[原始响应](attachments/response.json)。
 
-## issue:F01 [OPEN] 确认记录未生成
+## issue:F01 [OPEN] 结果记录未生成
 
-任务完成但未写确认表，影响对账。记录：[F01](issues/F01-missing-record.md)
+任务报告成功但未写结果表，下游读不到。记录：[F01](issues/F01-missing-record.md)
 
 ## shared:context 运行上下文与保留现场
 

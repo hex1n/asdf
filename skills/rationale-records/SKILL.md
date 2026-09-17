@@ -34,8 +34,9 @@ one current owner.
    files `<NN>-<topic>.md` so their reading order is visible. Start every file
    with a topic and one-line `TL;DR` saying what it records. Split large domains
    by stable subdomain or code ownership, never by requirement.
-4. Use the repository-wide next W-ID and the exact schema in
-   [REFERENCE.md](REFERENCE.md#active-entry-schema). IDs are globally unique.
+4. Name the record after what it anchors and use the exact schema in
+   [REFERENCE.md](REFERENCE.md#active-entry-schema). IDs are globally unique names,
+   never positions.
 5. Write a self-contained code explanation. Assume the reader has not seen the
    surrounding code, use plain but technically precise language, and define
    local terms before relying on them. Explain what the snippet does, where its

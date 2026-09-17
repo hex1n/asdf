@@ -9,6 +9,8 @@
  * definition per selector, so a rule that needs changing is changed once.
  */
 
+/* shared-report-styles:begin — pinned byte-identical with reader-shell.html
+ * by scripts/assert-report-styles.mjs. Edit here; the shell copy follows. */
 /* ---- tokens ----------------------------------------------------------- */
 :root{
   --paper:#fff;      /* page and card surface */
@@ -151,3 +153,4 @@ pre code{background:none;padding:0}
   .counts div{border-bottom:1px solid var(--line)}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+/* shared-report-styles:end */

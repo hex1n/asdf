@@ -94,12 +94,6 @@ a report may link, so that its targets keep existing, is REPORTING.md's rule. Re
 are retained without network verification. Cross-file fragment contents and issue
 semantics remain the executor's checks. Local images remain evidence attachments.
 
-For a legacy report, adapt a separately named Markdown copy: add explicit case
-headings from its recorded verdicts, preserve all effective case facts and shared
-applicability, and rebase relative links. Keep the historical source and its hash.
-An unknown verdict or ambiguous ownership is a source-resolution task, not a
-renderer inference. Do not silently retrofit an old report in place.
-
 On failure, inspect the concise error and fix the affected input or helper. A
 validation failure leaves an existing HTML untouched; it is stale, not a valid
 view of the failed input. If the contract cannot represent the source faithfully,

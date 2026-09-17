@@ -46,8 +46,9 @@ and earlier runs of the same feature. Identify anything outside it — an artifa
 another checkout or worktree, another feature's run, an external document — by path
 text, plus the recorded hash when the run consumed it. Those paths move as worktrees
 are removed and checkouts renamed, and a render-time existence check then refuses a
-report that was correct the day it was written; a historical report already rotted
-this way is adapted through report/v1's legacy path, never edited in place.
+report that was correct the day it was written. A historical report already rotted
+this way keeps its Markdown and simply has no view; it is history, not a defect to
+repair in place.
 
 A verdict row should explain the expected/actual difference without joining multiple
 documents. Link its detail directly. Source and deployment facts need one home; reuse

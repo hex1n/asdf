@@ -70,13 +70,14 @@ preserve the token. Each stable scenario ID has a purpose and these effective fa
 |---|---|
 | Preconditions | Concrete starting state and inputs, or deterministic construction/selection rules; predecessor scenario IDs only where genuinely required. |
 | Actions | Ordered business actions through a source-backed entry or adapter, naming the stable operation and its inputs. |
-| Observes | Final contractual observation and completion predicate. Record an approved product time threshold, or `business threshold: none specified`. Name the probe when the observation reaches past the entry under test, so execution can tell which scenarios its capabilities can judge. |
+| Observes | Final contractual observation and completion predicate. Record an approved product time threshold, or `business threshold: none specified`. |
 | State Footprint | Resources read, written, and external effects; `none` for an empty class. Every writable/external target names provenance or ownership and allowed lifecycle: `retain`, `restore`, or `delete`. |
+| Capabilities | What judging this scenario needs beyond the entry under test — the probes its observations read and the access they require; `entry only` when the response settles it. Execution selects against this, so a session lacking one blocks that scenario by name instead of discovering it mid-run. |
 | Expected Results | Concrete values, errors, or invariants that distinguish correct from incorrect behavior. |
 | Oracle / Expected Authority | `specified` for approved expected values, or `derived` for an independent reference/relation; name the governing source, revision, and calculation. |
 | Implementation Evidence | Locators supporting the entry, state, observation, and footprint; these establish mechanics, not business correctness. |
 
-The first four facts are the execution anchors. Resolve business facts here; the
+The first five facts are the execution anchors. Resolve business facts here; the
 execution stage resolves live targets, credentials, commands, safety wait bounds, owner
 markers, and cleanup implementations. Keep a known project command when it is the
 stable entry interface. Missing business decisions stay `NEEDS-DECISION`; missing

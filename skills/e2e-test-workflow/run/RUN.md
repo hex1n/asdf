@@ -15,22 +15,22 @@ intended audience.
 ## 1. Select and pin the run
 
 Read the upstream plan or report and the latest user constraints before touching the
-system. For a continuation, a legacy plan format, or inherited scenario fields, read
+system. For a continuation or inherited scenario fields, read
 [INTAKE.md](INTAKE.md). A straightforward plan can proceed from this
 entrypoint.
 
 Select explicit user-named scenarios first; otherwise the plan's First Test Slice,
-then an explicit legacy default slice/set, then all ready scenarios by priority.
+then all ready scenarios by priority.
 Record selected IDs and exclusions before execution. Lower-layer test mappings and
 unimplemented follow-ups are coverage context, not extra E2E scenario nodes. Selecting
 a subset preserves its shared prerequisites and safety gates.
 
-An observation reaching past the entry under test depends on a capability this session
-may not have. Establish those while the selection is still open, so a scenario that
-cannot be judged is blocked on a named capability before its trigger runs rather than
-after. When part of an expectation remains establishable from what is reachable,
-narrow that scenario's claim to it and keep the rest a gap; a narrowed claim is not a
-pass for the whole.
+Establish each selected scenario's Capabilities while the selection is still open, so
+a scenario this session cannot judge is blocked on a named capability before its
+trigger runs rather than after; a plan that does not carry the anchor has them read
+off its observations instead. When part of an expectation remains establishable from
+what is reachable, narrow that scenario's claim to it and keep the rest a gap; a
+narrowed claim is not a pass for the whole.
 
 Resolve each selected scenario's starting inputs/state, legitimate trigger, final
 observation/completion predicate, expected result and authority, and resources it

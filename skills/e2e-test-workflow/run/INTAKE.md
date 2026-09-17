@@ -1,7 +1,7 @@
 # Intake of an existing artifact
 
-Read the section the run needs: inherited scenario fields, a legacy plan shape, or a
-continuation of a prior run. Selection, expected authority, source pinning, and
+Read the section the run needs: inherited scenario fields, or a continuation of a
+prior run. Selection, expected authority, source pinning, and
 run-directory rules live in `RUN.md`.
 
 ## Scenario-tree inheritance
@@ -9,7 +9,7 @@ run-directory rules live in `RUN.md`.
 For `execution-anchors/v1`, resolve shared fields from root to leaf: an omitted child
 field inherits the nearest complete parent value; a defined child field replaces the
 whole value. Partial append/delete inside an inherited field is invalid. Preserve
-all four anchors and the approved verdict facts. Priority, business-step IDs,
+all five anchors and the approved verdict facts. Priority, business-step IDs,
 requirement links, layer-allocation tables, and a formal ledger are optional unless
 an existing consumer explicitly requires them. Missing such annotations alone is
 not a plan defect.
@@ -19,19 +19,6 @@ from Observes, inputs/dependencies from Preconditions, and ownership/lifecycle f
 State Footprint. Mark derived mechanics in the report; a separate `plan-snapshot.md`
 is useful only when their volume or reuse warrants it. Missing or contradictory
 marked anchors remain plan gaps instead of being silently repaired from current code.
-
-## Older plans
-
-For a tree without the handoff marker, preserve existing scenario definitions,
-Agent Execution Contracts, DAG/safety edges, gates, defaults, and slices. Derive only
-absent anchors/mechanics, mark them `legacy-derived`, and keep existing scheduling
-and safety facts even when they are not produced-value dependencies.
-
-For `Contract: e2e-plan/v2`, read Scenario Contracts, Gates (`GT-*`), Gaps (`G-*`),
-Coverage Obligations, and Flow and Impact Edges as its canonical records. Resolve
-order from Depends on, Consumes, Produces, Slice, and Priority. This format has no
-separate Execution DAG/Order or handoff index; conflicting duplicates require
-reconciliation rather than ignoring either safety constraint.
 
 ## Continue a prior run
 
@@ -50,8 +37,8 @@ the user requires it. A subset never waives shared prerequisites or safety gates
 
 Re-derive only mechanics invalidated by changed code, environment, or evidence. Keep
 unchanged business expectations pinned to their approved authority, recording any
-approved expectation changes separately. Resolve never-executed dependents under
-[Older plans](#older-plans); preserve existing safety edges and legacy facts.
+approved expectation changes separately. Resolve a never-executed dependent from the
+same anchors as any other scenario, preserving the safety edges its plan records.
 
 Prove the fix is loaded in the actual command/process before judging it. Use the
 expected version, loaded source/build identity, or a discriminating behavioral

@@ -47,6 +47,44 @@ self-description is not confirmation, and model selection alone proves no measur
 cost saving. Host references: [Claude Code subagents](https://code.claude.com/docs/en/sub-agents)
 and [Codex subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
 
+## Brief page
+
+A brief is one page about a finished execution report, for a reader who was not in
+the run: the outcome, the evidence that decides it, and the next action. Each report
+has a different story, so the design tier authors it; the deterministic renderer does
+not produce one.
+
+The report remains the deliverable. A brief accompanies it under these rules:
+
+- **Every value comes from the report.** Each number, identifier, status word and
+  date on the page appears verbatim in the canonical Markdown. The brief computes
+  nothing — no totals, no re-rounding, no unit conversion — and states no fact the
+  report lacks.
+- **Every claim carries its anchor.** A scenario result links `#ID` and a finding
+  links `#issue-ID` in the report's HTML view, so a reader who doubts a line is one
+  click from its evidence.
+- **It inherits verdicts.** Statuses, dispositions and counts are the report's. A
+  brief that reads as passing while the report carries a failed scenario or an open
+  finding is a defect in the brief.
+- **It never travels alone.** The hand-off delivers report and brief together, and
+  the brief's first screen links the report. A brief delivered by itself is an
+  incomplete hand-off rather than a short one.
+- **What it omits, it points at.** Run context, evidence inventories, rerun commands
+  and lifecycle obligations stay in the report; the brief names where they live.
+- **It is regenerated, not patched.** When the report changes, regenerate the brief
+  from the new revision or remove it; a brief kept against an older revision names
+  that revision.
+
+Before delivery, in addition to the [visual and interaction
+checks](#checks-before-delivery):
+
+1. **Value trace**: locate every number and identifier on the page in the report's
+   Markdown by exact search, and report what was searched rather than a claim that
+   it matches.
+2. **Anchor resolution**: every `#ID` the brief links resolves in the report's HTML.
+3. **Verdict agreement**: the brief's headline outcome and the report's opening
+   conclusion name the same result.
+
 ## Page contract
 
 One HTML file contains its basic layout, typography, and status styles. Use

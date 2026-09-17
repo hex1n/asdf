@@ -6,10 +6,11 @@ description: >
   the plan's scenarios against a local or test environment, and render desktop
   HTML views of the plan and the execution report. Use for any E2E / 端到端 /
   全链路 / 验收 ask — planning scenarios or coverage, 跑 / 执行 / 重跑 a plan or
-  report, or turning an existing E2E plan or execution report into HTML. A unit
-  or focused test run uses the repository's own test commands; a plain RPC or
-  facade call with no acceptance scenario is an ordinary call.
-argument-hint: "[plan | run | render] [feature, plan, or report]"
+  report, turning an existing E2E plan or execution report into HTML, or a
+  摘要 / 一页纸 brief of a finished report. A unit or focused test run uses the
+  repository's own test commands; a plain RPC or facade call with no acceptance
+  scenario is an ordinary call.
+argument-hint: "[plan | run | render | brief] [feature, plan, or report]"
 ---
 
 # E2E Test Workflow
@@ -22,7 +23,7 @@ requests another language.
 
 ## Pick the mode
 
-An unquoted `plan`, `run`, or `render` standing first after an explicit invocation
+An unquoted `plan`, `run`, `render`, or `brief` standing first after an explicit invocation
 (`/e2e-test-workflow run …` in Claude Code, `$e2e-test-workflow run …` in Codex)
 selects the mode and outranks conflicting prose; quoted feature names and paths are
 operands. Without one, infer the mode from the whole ask:
@@ -32,9 +33,10 @@ operands. Without one, infer the mode from the whole ask:
 | plan | Plan → render, no execution | `plan`, or 计划 / 场景 / 覆盖 without an ask to run |
 | run | Execute → render; when no plan exists, plan → render first | `run`, or an ask to 跑 / 执行 / 重跑 |
 | render | Render an existing plan or report, nothing else | `render`, or an ask for the HTML view of an existing artifact |
+| brief | A one-page brief of an existing report, delivered with it | `brief`, or an ask for a 摘要 / 一页纸 / 汇报页 of a finished report |
 
-For run and render, the artifact is the plan (`*-e2e-test-plan.md`) or execution
-report (`*-e2e-test-report.md`) the ask names, otherwise the newest one under
+For run, render, and brief, the artifact is the plan (`*-e2e-test-plan.md`) or
+execution report (`*-e2e-test-report.md`) the ask names, otherwise the newest one under
 `.scratch/{feature}/e2e/` — plans there, reports under its `runs/`. Resolve the feature
 from the ask, then from the task the conversation is already about; only when neither
 names one, take the newest across `.scratch/*/e2e/`, say which feature that was, and
@@ -53,6 +55,9 @@ rules.
   file's closing hand-off section, which carries execution on.
 - **render**: read [READER-VIEW.md](READER-VIEW.md). Routine execution reports use
   the bundled renderer; that file routes plans and requested redesigns separately.
+- **brief**: read [READER-VIEW.md](READER-VIEW.md). A brief summarizes a finished
+  execution report, so it resolves to a report; with only a plan on disk, say so and
+  offer run mode.
 
 Deliver with the HTML view first when it exists, then the canonical Markdown, and the
 summary the stage file specifies.

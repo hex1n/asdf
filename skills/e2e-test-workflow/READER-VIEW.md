@@ -28,6 +28,15 @@ the full [visual/interaction check](references/READER-DESIGN.md#checks-before-de
 checks; reuse still-valid evidence for unchanged parts. Record check results
 outside the reader-facing page.
 
+## Brief
+
+A one-page brief of a finished report, for a reader who was not in the run, follows
+[the brief contract](references/READER-DESIGN.md#brief-page): design-tier authored,
+every value traced to the report, delivered together with it. The renderer does not
+produce one, and a brief never stands in for the report.
+
+## Other views
+
 Plans, other interface languages, and an explicitly requested new layout use
 the [design hand-off](references/READER-DESIGN.md). A rendering error follows report/v1's failure path;
 it does not automatically start a new model-author loop.

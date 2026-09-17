@@ -105,6 +105,10 @@ or behavioral validation selected by the official `skill-creator`.
 For tool or installer changes, run the affected tool's documented contract
 checks and relevant maintenance tests.
 
+A new mechanical gate or refusal is exercised once on a real artifact before it
+ships. Its synthetic cases are written by whoever wrote the rule and inherit that
+author's blind spot; the first true consumer is what finds the rule's edge.
+
 A portability claim names the platforms actually executed; source-level path
 tests do not establish runtime execution on another platform.
 

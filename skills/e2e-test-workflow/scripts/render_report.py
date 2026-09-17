@@ -214,15 +214,20 @@ class Structure(HTMLParser):
             self.ids.append(attrs['id'])
 
 
-def issue_file(target):
-    # An issue record is a file under an issues/ directory of the run.
+def issue_file(target, home):
+    # This run's own issue records: a file under an issues/ directory beside the
+    # report. Another run's issue, cited as context, is not this report's to list.
     parts = urlsplit(target)
-    return parts.scheme == 'file' and 'issues' in unquote(parts.path).split('/')[:-1]
+    if parts.scheme != 'file':
+        return False
+    path = unquote(parts.path)
+    return 'issues' in path.split('/')[:-1] and path.startswith(home)
 
 
 def render(source, text):
     overview, cases, shared, issues = parse(text)
     md = Markdown(source)
+    home = unquote(urlsplit(source.parent.as_uri()).path).rstrip('/') + '/'
     counts = Counter(c.status for c in cases)
     asset = Path(__file__).resolve().parent.parent / 'references' / 'report.css'
     css = asset.read_text(encoding='utf-8')
@@ -245,14 +250,14 @@ def render(source, text):
     for issue in issues:
         mark = len(md.links)
         body = md.blocks(issue.text)
-        covered.update(t for t in md.links[mark:] if issue_file(t))
+        covered.update(t for t in md.links[mark:] if issue_file(t, home))
         ident = issue.id[len('issue-'):]
         affected = [c.id for c in cases if issue.id in cited[c.id]]
         links = '、'.join(f'<a href="#{c}">{c}</a>' for c in affected) or '—'
         issue_rows.append(f'<tr><td><a href="#{issue.id}">{ident}</a></td><td class="disposition" data-disposition="{issue.disposition}">{issue.disposition}</td><td>{html.escape(issue.title)}</td><td>{links}</td></tr>')
         opened = ' open' if issue.disposition == 'OPEN' else ''
         issue_bodies.append(f'<details class="issue-card" data-disposition="{issue.disposition}" id="{issue.id}"{opened}><summary><span class="summary-line"><span>{ident} · {html.escape(issue.title)}</span><span class="disposition">{issue.disposition}</span></span></summary><div class="case-content">{body}</div></details>')
-    orphans = sorted({t for t in md.links if issue_file(t)} - covered)
+    orphans = sorted({t for t in md.links if issue_file(t, home)} - covered)
     if orphans:
         raise InvalidReport('Issue record linked without its own issue section: ' + ', '.join(orphans))
     issue_link, issues_section = '', ''

@@ -70,7 +70,7 @@ preserve the token. Each stable scenario ID has a purpose and these effective fa
 |---|---|
 | Preconditions | Concrete starting state and inputs, or deterministic construction/selection rules; predecessor scenario IDs only where genuinely required. |
 | Actions | Ordered business actions through a source-backed entry or adapter, naming the stable operation and its inputs. |
-| Observes | Final contractual observation and completion predicate. Record an approved product time threshold, or `business threshold: none specified`. |
+| Observes | Final contractual observation and completion predicate. Record an approved product time threshold, or `business threshold: none specified`. Name the probe when the observation reaches past the entry under test, so execution can tell which scenarios its capabilities can judge. |
 | State Footprint | Resources read, written, and external effects; `none` for an empty class. Every writable/external target names provenance or ownership and allowed lifecycle: `retain`, `restore`, or `delete`. |
 | Expected Results | Concrete values, errors, or invariants that distinguish correct from incorrect behavior. |
 | Oracle / Expected Authority | `specified` for approved expected values, or `derived` for an independent reference/relation; name the governing source, revision, and calculation. |

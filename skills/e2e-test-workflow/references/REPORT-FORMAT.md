@@ -51,9 +51,11 @@ Its heading owns the ID and one disposition from
 impact and the link to the record. The renderer builds the issue list from these
 headings and fills each row's affected scenarios from the `#issue-ID` links the cases
 already make, so a case states its own exposure once. A report that links a file under
-`issues/` with no such section is rejected. One issue can affect several cases; case
-counts are not issue counts. The renderer checks syntax and references, not issue
-correctness or whether the introduction agrees with the evidence.
+its own run's `issues/` with no such section is rejected; an issue record belonging to
+another run is cited as context and listed by that run, so linking it needs no section
+here. One issue can affect several cases; case counts are not issue counts. The
+renderer checks syntax and references, not issue correctness or whether the
+introduction agrees with the evidence.
 
 Shared sections use `## shared:ID Title` and live inside the first case's
 disclosures. Each inheriting case explicitly links `#shared-ID` and states its

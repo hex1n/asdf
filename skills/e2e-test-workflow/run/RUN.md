@@ -25,6 +25,13 @@ Record selected IDs and exclusions before execution. Lower-layer test mappings a
 unimplemented follow-ups are coverage context, not extra E2E scenario nodes. Selecting
 a subset preserves its shared prerequisites and safety gates.
 
+An observation reaching past the entry under test depends on a capability this session
+may not have. Establish those while the selection is still open, so a scenario that
+cannot be judged is blocked on a named capability before its trigger runs rather than
+after. When part of an expectation remains establishable from what is reachable,
+narrow that scenario's claim to it and keep the rest a gap; a narrowed claim is not a
+pass for the whole.
+
 Resolve each selected scenario's starting inputs/state, legitimate trigger, final
 observation/completion predicate, expected result and authority, and resources it
 reads or changes. `execution-anchors/v1` plans supply these as Preconditions, Actions,

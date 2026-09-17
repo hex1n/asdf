@@ -9,7 +9,7 @@ API documentation is a caller contract: write only what a caller needs to invoke
 
 This skill has three parts: the protocol-neutral **spine** in this file, protocol **adapters** in `adapters/{RPC|HTTP}.md`, and the project **profile** at `docs/api-doc-profile.md`. The adapter explains how to discover facts for a protocol; the profile records what was discovered for the current project.
 
-Before writing, build the interface inventory. Design documents may define scope and business meaning, but code is the source of truth for structure and fields.
+Before writing, build the interface inventory.
 
 ## Commands
 
@@ -97,7 +97,14 @@ Common decisions:
 
 ## Contract Rules
 
-**Target contract**: describe the intended external contract, not current bugs or internal implementation.
+**Target contract**: state the intended external contract. The header names the
+two sources it rests on. **Contract authority** is what the interface owes: an
+approved contract, design, or published schema; when none applies, the code
+revision designated as the contract, or `unknown`. **Implementation evidence**
+is the source revision or snapshot actually inspected. The authority decides
+what the interface promises; the implementation evidence decides the structure,
+wire names, and types it is documented with. Where the two disagree, document
+what the authority promises and treat the difference as a known defect.
 
 **Field expansion**: use `field.sub`, `field[].sub`, and `data.field` paths. Expand acyclic fields in place; use explicit type links for cycles and polymorphic alternatives. Requiredness distinguishes missing, null, empty, and conditionally required values; absence of a discovered constraint is not proof that a field is optional.
 

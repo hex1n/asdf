@@ -1,23 +1,25 @@
 ---
 name: rationale-records
 description: >
-  Maintain personal docs/rationale records that explain why a code snippet has
-  its exact shape. Use when a change touches code an existing W-record anchors
+  Maintain personal docs/rationale records that explain why code is implemented
+  this way. Use when a change touches code an existing W-record anchors
   or the callers, producers, or configuration that record depends on, when a
   change leaves a constraint a natural-looking rewrite would break, when the
   user asks to record or query such a reason, or during worktree handoff of
   rationale notes.
 ---
 
-# Rationale Records
+# 代码实现理由记录
 
-Rationale is a personal reverse index from a current source snippet to the reason
-it has that exact shape. It is not project documentation, requirement history,
+Rationale is a personal reverse index from a current code snippet to the reason
+it is implemented this way. Each record names the file path (文件路径), code
+snippet (代码片段), and implementation rationale (实现理由).
+It is not project documentation, requirement history,
 evidence, or a second test plan.
 
 Ask only:
 
-> If someone rewrites this code into the obvious more natural shape, can real
+> If someone rewrites this code in the obvious more natural way, can real
 > behavior become wrong?
 
 If no, do not create a record. If yes, search before writing so one invariant has
@@ -57,7 +59,7 @@ In linked worktrees, put this correction in the handoff note instead of editing
 active records.
 
 The checker proves only mechanics: ordered files, exact schema, unique W-IDs,
-existing source paths, and file-unique token snippets. Shape matching ignores
+existing source paths, and file-unique token snippets. Snippet matching ignores
 whitespace, indentation, and line breaks but preserves strings, comments, and
 token boundaries. It cannot decide what prose
 means. Do not replace the semantic boundary with a keyword blacklist. Before
@@ -83,5 +85,5 @@ changes since the main checker's last successful HEAD and writes a user-local
 receipt. Run `worktree-finish` immediately; its exact receipt is required before
 the linked worktree and optional branch can be removed.
 
-Read [REFERENCE.md](REFERENCE.md) for commands, record shape, note shape, and
+Read [REFERENCE.md](REFERENCE.md) for commands, record format, note format, and
 failure semantics.

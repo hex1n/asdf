@@ -15,15 +15,20 @@ docs/rationale/<stable-domain>/01-<topic>.md
 Continue with entries in this schema:
 
 ```markdown
-## W-001 · 一句话点明这段代码在解释什么
+## W-001 · 一句话点明这段代码为什么这样实现
 
-- **源码** `relative/path/File.ext`
-- **形状** `one behavior-bearing token sequence unique inside that file`
-- **解释** 先说明这段代码做什么，再沿数据或控制流解释为什么这样写，以及简化后会改变什么
+- **文件路径** `relative/path/File.ext`
+- **代码片段** `one behavior-bearing token sequence unique inside that file`
+- **实现理由** 先说明这段代码做什么，再沿数据或控制流解释为什么这样写，以及简化后会改变什么
 ```
 
-Repeat the `源码`/`形状` pair when one invariant depends on more than one real
-declaration or call. Use repository-relative paths. A shape must occur exactly
+Use these labels for new or revised entries. The checker also accepts the old
+labels `源码`/`形状`/`解释`, including mixed labels during gradual migration;
+existing records do not require a bulk rewrite. Both sets use the same field
+order, pairing, and uniqueness rules.
+
+Repeat the `文件路径`/`代码片段` pair when one invariant depends on more than one real
+declaration or call. Use repository-relative paths. A snippet must occur exactly
 once in its file. Whitespace, indentation, and line breaks are ignored when
 matching; strings, comments, and token boundaries are preserved. Anchor
 behavior-bearing code, not a comment, import, method signature, or movable
@@ -33,15 +38,15 @@ W-IDs are unique across all files under `docs/rationale`. Allocate after the
 repository-wide maximum. Active records carry no obsolete entries: update a
 still-current entry, or remove it when the current code no longer needs it.
 
-The title and `解释` contain no dates, tests, assertions, mutation results,
-proof/evidence, samples, incidents, or review history. `解释` talks a maintainer
+The title and `实现理由` contain no dates, tests, assertions, mutation results,
+proof/evidence, samples, incidents, or review history. `实现理由` talks a maintainer
 through the anchored code; it is not a decision log or a generic invariant
 slogan. Retain current state distinctions, value flow, ownership, and the causal
 chain. Remove how the explanation was proven, not the mechanism that makes it
 true.
 
 This is a semantic writing rule, not a deterministic checker claim. The CLI
-validates the record shape and its connection to source code; it deliberately
+validates the record format and its connection to source code; it deliberately
 does not enumerate forbidden words or pretend to classify prose. The agent that
 changes an explanation must reread that explanation before handoff and remove
 every sentence that is unnecessary for understanding the current code.
@@ -50,7 +55,7 @@ When prose hides an important order or ownership boundary, continue the list
 item with the smallest useful text sketch. It is optional, not boilerplate:
 
 ````markdown
-- **解释** 先选择规则，再保留原值，最后计算派生值。
+- **实现理由** 先选择规则，再保留原值，最后计算派生值。
   ```text
   input
     select rule

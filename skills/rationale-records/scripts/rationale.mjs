@@ -156,9 +156,9 @@ const RE_ANY_HEAD = /^#{1,6}\s/;
 const RE_FILE_TITLE = /^#\s+(.+?)\s*$/;
 const RE_TLDR = /^>\s*TL;DR[：:]\s*(.+?)\s*$/i;
 const RE_HEAD = /^##\s+(W-\d+)\s*·\s*(.+?)\s*$/;
-const RE_SOURCE = /^- \*\*源码\*\*\s*`([^`]+)`\s*$/;
-const RE_SHAPE = /^- \*\*形状\*\*\s*`(.+)`\s*$/;
-const RE_EXPLANATION = /^- \*\*解释\*\*(?:\s+(.+?)\s*)?$/;
+const RE_SOURCE = /^- \*\*(?:文件路径|源码)\*\*\s*`([^`]+)`\s*$/;
+const RE_SHAPE = /^- \*\*(?:代码片段|形状)\*\*\s*`(.+)`\s*$/;
+const RE_EXPLANATION = /^- \*\*(?:实现理由|解释)\*\*(?:\s+(.+?)\s*)?$/;
 
 function parseRecords(text, rationaleFile, rationaleRel, fileErrors) {
   const entries = [];
@@ -201,20 +201,20 @@ function parseRecords(text, rationaleFile, rationaleRel, fileErrors) {
     }
     let match = RE_SOURCE.exec(line);
     if (match) {
-      if (current.explaining) current.errors.push(`line ${lineNumber}: **源码** must precede **解释**`);
+      if (current.explaining) current.errors.push(`line ${lineNumber}: **文件路径** must precede **实现理由**`);
       current.anchors.push({ source: match[1].trim().replaceAll("\\", "/"), shape: "", sourceLine: lineNumber });
       continue;
     }
     match = RE_SHAPE.exec(line);
     if (match) {
       const anchor = current.anchors.at(-1);
-      if (!anchor || anchor.shape) current.errors.push(`line ${lineNumber}: **形状** must follow one unmatched **源码**`);
+      if (!anchor || anchor.shape) current.errors.push(`line ${lineNumber}: **代码片段** must follow one unmatched **文件路径**`);
       else anchor.shape = match[1];
       continue;
     }
     match = RE_EXPLANATION.exec(line);
     if (match) {
-      if (current.explaining) current.errors.push(`line ${lineNumber}: duplicate **解释**`);
+      if (current.explaining) current.errors.push(`line ${lineNumber}: duplicate **实现理由**`);
       current.explaining = true;
       current.explanation = (match[1] || "").trim();
       continue;
@@ -222,11 +222,11 @@ function parseRecords(text, rationaleFile, rationaleRel, fileErrors) {
     current.errors.push(`line ${lineNumber}: unsupported active-record content`);
   }
   for (const entry of entries) {
-    if (entry.anchors.length === 0) entry.errors.push("missing **源码**/**形状** anchor");
+    if (entry.anchors.length === 0) entry.errors.push("missing **文件路径**/**代码片段** anchor");
     for (const anchor of entry.anchors) {
-      if (!anchor.shape) entry.errors.push(`line ${anchor.sourceLine}: missing **形状** after **源码**`);
+      if (!anchor.shape) entry.errors.push(`line ${anchor.sourceLine}: missing **代码片段** after **文件路径**`);
     }
-    if (!entry.explanation) entry.errors.push("missing **解释**");
+    if (!entry.explanation) entry.errors.push("missing **实现理由**");
     entry.raw = entry.rawLines.join("\n").trimEnd();
     entry.hash = sha256(`${entry.rationaleRel}\0${entry.raw}`);
   }
@@ -401,7 +401,7 @@ function validateEntries(repo, entries, selectedIds = null, fileErrors = []) {
       const occurrences = matches.length;
       if (occurrences !== 1) {
         anchorFailures += 1;
-        failures.push({ id: entry.id, title: entry.title, detail: `shape occurs ${occurrences} times in ${anchor.source}; expected exactly 1` });
+        failures.push({ id: entry.id, title: entry.title, detail: `code snippet occurs ${occurrences} times in ${anchor.source}; expected exactly 1` });
         continue;
       }
       resolved.set(`${entry.id}\0${anchor.source}\0${anchor.shape}`, {
@@ -571,7 +571,7 @@ function resolveAnchor(repo, anchor) {
   const text = fs.readFileSync(file, "utf8");
   const matches = findAnchorMatches(text, anchor.shape);
   return matches.length === 1 ? { source: anchor.source, line: lineOfOffset(text, matches[0]) }
-    : { error: `shape occurrences=${matches.length}`, source: anchor.source, line: null };
+    : { error: `code snippet occurrences=${matches.length}`, source: anchor.source, line: null };
 }
 
 function sourceTarget(repo, corpus, query) {
@@ -618,7 +618,7 @@ function runFind(options) {
     process.stdout.write(`${match.entry.rationaleRel}:${match.entry.headingLine}  ${match.entry.id} · ${match.entry.title}\n`);
     for (const anchor of match.anchors) process.stdout.write(`  ${anchor.source}:${anchor.line ?? "?"}${anchor.error ? ` [${anchor.error}]` : ""}\n`);
     if (target?.proximity) process.stdout.write("  [近邻导航：不表示语法级成员归属]\n");
-    if (options.full) process.stdout.write(`  解释 ${match.entry.explanation.replaceAll("\n", "\n       ")}\n`);
+    if (options.full) process.stdout.write(`  实现理由 ${match.entry.explanation.replaceAll("\n", "\n           ")}\n`);
     process.stdout.write("\n");
   }
   process.stdout.write(`命中 ${matches.length} 条。\n`);

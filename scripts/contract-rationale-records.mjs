@@ -48,18 +48,19 @@ function initRepo(repo) {
   fs.writeFileSync(path.join(repo, ".gitignore"), "docs/rationale/\n.scratch/\n", "utf8");
 }
 
-function activeRecord(shape = "apply(first, second);") {
+function activeRecord(shape = "apply(first, second);", labels = ["文件路径", "代码片段", "实现理由"]) {
+  const [sourceLabel, snippetLabel, rationaleLabel] = labels;
   return [
     "# Execution ordering",
     "> TL;DR：Records call-order invariants shared by the execution path.",
     "",
     "## W-001 · 调用顺序保持先一后二",
     "",
-    "- **源码** `src/main/java/sample/Alpha.java`",
-    `- **形状** \`${shape}\``,
-    "- **源码** `src/main/java/sample/Beta.java`",
-    "- **形状** `alpha.preserveOrder();`",
-    "- **解释** 第一行先建立状态，第二行再读取它。流程是 first → state → second；交换顺序会读到未初始化值。",
+    `- **${sourceLabel}** \`src/main/java/sample/Alpha.java\``,
+    `- **${snippetLabel}** \`${shape}\``,
+    `- **${sourceLabel}** \`src/main/java/sample/Beta.java\``,
+    `- **${snippetLabel}** \`alpha.preserveOrder();\``,
+    `- **${rationaleLabel}** 第一行先建立状态，第二行再读取它。流程是 first → state → second；交换顺序会读到未初始化值。`,
     "",
   ].join("\n");
 }
@@ -121,6 +122,40 @@ try {
   assert.ok(stateFile, "incremental check must create user-local state");
   stage("incremental state");
 
+  // Existing records and partial label migrations keep the same parsed meaning.
+  const labelChoices = [["文件路径", "源码"], ["代码片段", "形状"], ["实现理由", "解释"]];
+  for (let mask = 1; mask < 8; mask += 1) {
+    const labels = labelChoices.map((choices, index) => choices[(mask >> index) & 1]);
+    fs.writeFileSync(rationale, activeRecord(undefined, labels), "utf8");
+    const migrated = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, `labels ${labels}`));
+    assert.equal(migrated.failures.length, 0);
+    assert.equal(migrated.anchors, 2);
+    assert.deepEqual(migrated.selectedIds, ["W-001"], "renaming ignored record fields must trigger revalidation");
+  }
+  const legacyLookup = expect(run(["find", "W-001", "--full"], repo, stateRoot), 0, "legacy record lookup");
+  assert.match(legacyLookup, /实现理由 第一行先建立状态/);
+
+  const mixedPairs = activeRecord().replace("**文件路径** `src/main/java/sample/Beta.java`", "**源码** `src/main/java/sample/Beta.java`")
+    .replace("**代码片段** `alpha.preserveOrder();`", "**形状** `alpha.preserveOrder();`");
+  fs.writeFileSync(rationale, mixedPairs, "utf8");
+  expect(run(["check", "--full", "--json"], repo, stateRoot), 0, "mixed anchor pairs");
+
+  for (const [label, content, error] of [
+    ["duplicate rationale alias", activeRecord() + "- **解释** 第二份理由\n", /duplicate \*\*实现理由\*\*/],
+    ["duplicate snippet alias", activeRecord().replace("- **文件路径** `src/main/java/sample/Beta.java`",
+      "- **形状** `apply(first, second);`\n- **文件路径** `src/main/java/sample/Beta.java`"), /\*\*代码片段\*\* must follow/],
+    ["missing snippet", activeRecord().replace("- **代码片段** `apply(first, second);`\n", ""), /missing \*\*代码片段\*\*/],
+    ["source after rationale", activeRecord() + "- **源码** `src/main/java/sample/Beta.java`\n- **形状** `alpha.preserveOrder();`\n",
+      /\*\*文件路径\*\* must precede \*\*实现理由\*\*/],
+  ]) {
+    fs.writeFileSync(rationale, content, "utf8");
+    const rejected = JSON.parse(expect(run(["check", "--full", "--json"], repo, stateRoot), 1, label));
+    assert.match(JSON.stringify(rejected.failures), error);
+  }
+  fs.writeFileSync(rationale, activeRecord(), "utf8");
+  expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "canonical labels restored");
+  stage("field label compatibility and validation");
+
   fs.writeFileSync(alpha, [
     "class Alpha {",
     "    void preserveOrder() {",
@@ -139,7 +174,7 @@ try {
 
   fs.writeFileSync(alpha, "class Alpha { void preserveOrder() { apply(firstsecond); } }\n", "utf8");
   const tokenBoundaryFailure = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 1, "token boundary mutation"));
-  assert.match(JSON.stringify(tokenBoundaryFailure.failures), /shape occurs 0/,
+  assert.match(JSON.stringify(tokenBoundaryFailure.failures), /code snippet occurs 0/,
     "different tokens must not match merely because whitespace is ignored");
   fs.writeFileSync(alpha, "class Alpha { void preserveOrder() { apply(first, second); } }\n", "utf8");
   expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "token boundary repair");
@@ -196,9 +231,9 @@ try {
     "",
     "## W-001 · 当前版本值保持一致",
     "",
-    "- **源码** `src/main/java/sample/Version.java`",
-    "- **形状** `return 1;`",
-    "- **解释** 该常量是持久化版本的唯一当前值，返回其他值会让调用方按错误版本解码。",
+    "- **文件路径** `src/main/java/sample/Version.java`",
+    "- **代码片段** `return 1;`",
+    "- **实现理由** 该常量是持久化版本的唯一当前值，返回其他值会让调用方按错误版本解码。",
     "",
   ].join("\n"), "utf8");
   git(handoffRepo, ["add", "."]);

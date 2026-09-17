@@ -57,7 +57,9 @@ Reconcile findings with the local files required by
 [Defect Handoffs](REFERENCE.md#defect-handoffs). Link each issue from the report's
 finding summary and affected scenario results; each issue links back to its source
 run and evidence. Keep the report's business conclusion and expected/actual summary
-readable without opening the issue file. Finding counts and scenario counts differ.
+readable without opening the issue file. In report/v1 that summary is the issue's own
+`## issue:ID [DISPOSITION]` section and affected results link `#issue-ID`; the renderer
+builds the reader's issue list from them. Finding counts and scenario counts differ.
 
 ## Additional artifacts
 

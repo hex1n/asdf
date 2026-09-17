@@ -17,11 +17,11 @@ the full effective contract, actual evidence, authority and lifecycle.
 <!-- e2e-reader: report/v1 -->
 # 交易确认验证报告
 
-确认记录缺失，业务验证未通过。问题及下一步见 [F01](issues/F01.md)。
+确认记录缺失，业务验证未通过。问题及下一步见 [F01](#issue-F01)。
 
 ## E01 [failed] 确认交易
 
-任务已完成，但预期确认记录未生成。[F01](issues/F01.md) 待修复决定。
+任务已完成，但预期确认记录未生成。[F01](#issue-F01) 待修复决定。
 
 ### 预期与实际
 
@@ -32,6 +32,10 @@ the full effective contract, actual evidence, authority and lifecycle.
 完整输入、独立期望及证据写在本例；共享环境见 [运行上下文](#shared-context)。
 资料来源：[消费计划](plan-snapshot.md)、[原始响应](attachments/response.json)。
 
+## issue:F01 [OPEN] 确认记录未生成
+
+任务完成但未写确认表，影响对账。记录：[F01](issues/F01-missing-record.md)
+
 ## shared:context 运行上下文与保留现场
 
 本段适用于 E01；记录实际环境、版本、权限、保留状态及继续方式。
@@ -39,18 +43,25 @@ the full effective contract, actual evidence, authority and lifecycle.
 
 Use `passed`, `failed`, `blocked`, `unverified`, or `skipped` exactly as assigned
 under RUN.md. The heading owns that verdict; counts and the comparison table are
-computed from these headings. Keep issue dispositions in their records and linked
-business summaries. One issue can affect several cases; case counts are not issue
-counts. The renderer checks syntax and references, not issue correctness or whether
-the introduction agrees with the evidence.
+computed from these headings.
+
+Each referenced issue record gets one `## issue:ID [DISPOSITION] title` section.
+Its heading owns the ID and one disposition from
+[Defect Handoffs](../run/REFERENCE.md#defect-handoffs); its body carries the business
+impact and the link to the record. The renderer builds the issue list from these
+headings and fills each row's affected scenarios from the `#issue-ID` links the cases
+already make, so a case states its own exposure once. A report that links a file under
+`issues/` with no such section is rejected. One issue can affect several cases; case
+counts are not issue counts. The renderer checks syntax and references, not issue
+correctness or whether the introduction agrees with the evidence.
 
 Shared sections use `## shared:ID Title` and live inside the first case's
 disclosures. Each inheriting case explicitly links `#shared-ID` and states its
 applicability. This placement does not make every shared fact apply to every case.
 IDs are ASCII letters followed by letters, digits, underscores or hyphens. IDs
-must be unique, including generated `CASE-record`, `shared-ID`, `overview` and
-`cases`. Other level-two headings are rejected. Level-three through level-six
-headings organize a case's body.
+must be unique, including generated `CASE-record`, `shared-ID`, `issue-ID`,
+`overview`, `cases` and `issues`. Other level-two headings are rejected.
+Level-three through level-six headings organize a case's body.
 
 ## Render and validate
 
@@ -62,8 +73,8 @@ python <skill>/scripts/render_report.py <report.md> --output <report.html>
 
 Python 3.10+ and its standard library suffice. Output defaults to the same-stem
 HTML; source Markdown is never overwritten. A successful call returns the source
-hash, selected IDs, computed counts and checked-link count. It does not certify
-business correctness or browser appearance.
+hash, selected IDs, issue IDs, computed counts and checked-link count. It does
+not certify business correctness or browser appearance.
 
 The supported Markdown subset is paragraphs, flat `-` lists, headings, fenced
 code with triple backticks, pipe tables with outer pipes, inline code, `**bold**`,

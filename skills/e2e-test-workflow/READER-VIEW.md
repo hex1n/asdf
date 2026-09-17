@@ -17,8 +17,8 @@ For a Chinese report using the accepted layout, follow
 [report/v1](references/REPORT-FORMAT.md) and run
 [render_report.py](scripts/render_report.py). It uses the bundled
 [report.css](references/report.css), preserves the Markdown body and computes
-the scenario inventory. The executor writes the business facts once; no HTML
-author is needed. Legacy reports are adapted in a separate copy with their
+the scenario and issue inventories. The executor writes the business facts once;
+no HTML author is needed. Legacy reports are adapted in a separate copy with their
 facts and provenance preserved. Rendering alone never changes a test verdict.
 
 Run automated structure/link checks each time. Review business expectations and

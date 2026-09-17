@@ -1,7 +1,9 @@
 # {Interface or Feature} API Documentation
 
 > Scope: {interfaces or business chain covered}.
-> Baseline: branch `{branch}` compared with `{base}`. Protocol: `{rpc|http}`. Contract source: code.
+> Baseline: branch `{branch}` compared with `{base}`. Protocol: `{rpc|http}`.
+> Contract authority: {applicable approved contract/design or designated code revision, or unknown}.
+> Implementation evidence: {inspected source revision or snapshot}.
 > Change legend: added / modified / deleted / unchanged.
 
 ---

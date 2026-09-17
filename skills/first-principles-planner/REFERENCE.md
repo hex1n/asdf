@@ -11,7 +11,7 @@ short process in `SKILL.md` is not enough.
 - Solution Reconstruction: option categories, independent context, independent option tournament, inversion test, recommendation chain
 - Bestness Check: fit criteria, closest alternative, stop point
 - Plan Synthesis: scope table, decision pricing, decision-first structure
-- Evidence Conventions: verified vs unverified claims
+- Evidence Conventions: verified evidence, derived conclusions, and unverified premises
 - Artifact Location: default path rules for saved Markdown plans
 - Plan File Output: saved plan output shape
 
@@ -365,7 +365,8 @@ reasoning in both.
 ## Evidence Conventions
 
 - `verified`: source evidence whose identity and relevant version/environment have been established, including still-applicable prior receipts.
-- `? unverified`: recalled, inferred, or not checked.
+- `derived`: a conclusion supported by identified premises and an explicit reasoning chain; retain any uncertainty in those premises.
+- `? unverified`: a recalled claim, assumption, or premise whose support has not been checked.
 - Quantify feasibility, scale, and effort where possible.
 - Present tradeoffs honestly. Do not force a pick when constraints do not
   support one.

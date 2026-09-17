@@ -117,7 +117,7 @@ If the roles do not actually conflict, do not record consensus yet; run this con
 1. Name the strongest opposing position actually held by a substantial expert community — a strawman you can dismiss does not count.
 2. Test whether a chosen role holds that position: a role holds it only if its stated stance prescribes it, not merely describes or borders it. If a chosen role holds it, the agreement is genuine.
 3. If no chosen role holds it but the position is real, the agreement is an artifact of homogeneous role selection — add a role that holds the position and re-run before trusting the finding.
-4. Only once a chosen role covers that opposition, or no credible opposition exists, record `no direct conflict`, note that you ran this check, and treat the cross-stance agreement as a high-confidence finding — do not manufacture a dispute to fill the map, nor invent one to dodge this check.
+4. Once a chosen role covers the credible opposition, or none is found within the checked scope, record `no direct conflict` as the scan result. Establish confidence from the supporting evidence, its independence and applicability, and the unresolved counterevidence.
 
 ### Discipline
 

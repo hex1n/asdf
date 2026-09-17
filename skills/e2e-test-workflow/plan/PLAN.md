@@ -24,6 +24,14 @@ contracts through shared writers, readers, callers, and subscribers to other bus
 outcomes. Inspect alternate entries and asynchronous or recovery paths the change
 can reach; retain unresolved impact as a gap instead of silently narrowing scope.
 
+Check combined preconditions against the chosen entry's actual inputs and environment,
+including supported test controls. If that route rejects the sample, retain the
+rejection case and inspect legitimate alternate entries or controls that can exercise
+the required positive behavior. Preserve the requested test boundary and state what
+each route exercises; lower-layer execution establishes only that layer's coverage.
+Mark a coverage gap after checking these routes, naming the missing data or capability
+and retaining the original coverage obligation.
+
 ## 2. Identify coverage and choose its layer
 
 Account for the requested rules, accepted and rejected input partitions, boundaries,

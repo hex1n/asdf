@@ -41,6 +41,14 @@ details instead of filling empty schemas.
 | Evidence and findings | Per-scenario proof from `RUN.md`, raw output or its attachment, and each root cause once with affected IDs, disposition, and next step. Shared command output is retained once and referenced by assertion. |
 | Continuation and state | Exact rerun command or recorded adapter sequence, next actionable work, and actual cleanup/retention state. A read-only run can state that no business data changed; writes name owner, retained IDs/TTL, recovery/cleanup invocation, and observed cleanup receipt. |
 
+Link what the feature's own `e2e/` tree holds: the consumed plan, this run's files,
+and earlier runs of the same feature. Identify anything outside it — an artifact in
+another checkout or worktree, another feature's run, an external document — by path
+text, plus the recorded hash when the run consumed it. Those paths move as worktrees
+are removed and checkouts renamed, and a render-time existence check then refuses a
+report that was correct the day it was written; a historical report already rotted
+this way is adapted through report/v1's legacy path, never edited in place.
+
 A verdict row should explain the expected/actual difference without joining multiple
 documents. Link its detail directly. Source and deployment facts need one home; reuse
 that record for provenance and state resumption instead of copying it into several

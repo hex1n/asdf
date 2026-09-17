@@ -89,7 +89,8 @@ dropping it. Underscores remain literal, including field identifiers.
 
 Local links are resolved against the Markdown and emitted as absolute file URLs,
 so the HTML can be placed elsewhere on the same machine. It is not a bundled
-export. Local targets must exist; same-page fragments must resolve. Remote links
+export. Local targets must exist; same-page fragments must resolve. Which artifacts
+a report may link, so that its targets keep existing, is REPORTING.md's rule. Remote links
 are retained without network verification. Cross-file fragment contents and issue
 semantics remain the executor's checks. Local images remain evidence attachments.
 

@@ -43,6 +43,25 @@ matching; strings, comments, and token boundaries are preserved. Anchor
 behavior-bearing code, not a comment, import, method signature, or movable
 trace.
 
+Anchor where a breaking rewrite would land, which is the title's own test applied
+to each pair: change this line the obvious way, and does the consequence in the
+title follow? A formula, a constant, a chosen type, an ordering, a write all pass
+it. A line that only forwards the value to the next call does not — changing it
+produces nothing, and a reader who arrives there finds no reason to stay.
+
+A snippet quotes the code; locating it is what the quotation buys, not the other
+way round, and that is why the anchor is text rather than a line number a single
+edit would move. So take a whole condition or statement, and when one is not
+unique in its file, quote further — the matcher ignores line breaks, so two or
+three lines are one snippet — rather than trimming inward until only a fragment
+like `.accepts(value)) {` is left, which is unique and still unreadable because
+it starts in the middle of an expression.
+
+Past two anchors, the explanation says what each site contributes — an indented
+`text` block listing file and role does it in a few lines. A reader who arrived
+from the fourth anchor is looking for the sentence that tells them why that line
+is in this record, and a single paragraph about the invariant does not have one.
+
 A W-ID is a name, unique across all files under `docs/rationale`, and never a
 position: it says which record this is, not where it sits or when it was written.
 Name it after what the record anchors — `W-调用顺序`, in the language the

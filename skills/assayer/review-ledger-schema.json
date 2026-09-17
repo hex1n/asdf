@@ -1,5 +1,5 @@
 {
-  "title": "Assayer gate state",
+  "title": "Assayer review ledger",
   "type": "object",
   "required": [
     "current_revision",

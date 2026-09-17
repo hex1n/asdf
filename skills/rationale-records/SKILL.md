@@ -41,16 +41,17 @@ is precisely what a rewrite reaches for.
    files `<NN>-<topic>.md` so their reading order is visible. Start every file
    with a topic and one-line `TL;DR` saying what it records. Split large domains
    by stable subdomain or code ownership, never by requirement.
-4. Name the record after what it anchors and use the exact schema in
+4. Name the record after what it anchors and title it with what a natural rewrite
+   would break; use the exact schema in
    [REFERENCE.md](REFERENCE.md#active-entry-schema). IDs are globally unique names,
    never positions.
 5. Write a self-contained code explanation. Assume the reader has not seen the
    surrounding code, use plain but technically precise language, and define
    local terms before relying on them. Explain what the snippet does, where its
    input comes from and output goes, why this order/value/owner is necessary,
-   and what behavior changes if it is simplified. Use plain language. When order
-   or ownership is hard to see, add only the smallest useful text flow, call
-   tree, or pseudocode under the explanation. This instruction is complete in
+   and what behavior changes if it is simplified. Use plain language. When order,
+   scale, or parallel paths are hard to see, add only the smallest useful text
+   flow, call tree, or pseudocode under the explanation. This instruction is complete in
    itself and does not depend on any other installed skill. Preserve the
    mechanism; remove only tests, proof, dates, incidents, review rounds,
    samples, and history.

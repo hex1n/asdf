@@ -15,7 +15,7 @@ docs/rationale/<stable-domain>/01-<topic>.md
 Continue with entries in this schema:
 
 ```markdown
-## W-001 · 一句话点明这段代码为什么这样实现
+## W-001 · 一句话点明改成自然写法后哪个行为会变错
 
 - **文件路径** `relative/path/File.ext`
 - **代码片段** `one behavior-bearing token sequence unique inside that file`
@@ -23,7 +23,18 @@ Continue with entries in this schema:
 ```
 
 These three labels are the record's only field names; any other line in a record
-body is rejected.
+body is rejected. A continuation line indented by two spaces belongs to the field
+above it; reach for an indented `text` block when order, scale, or two parallel
+paths are what the reader must see — prose describing a rounding chain is harder
+to check than four aligned lines.
+
+A record is an interruption, not a description. Its reader arrives mid-edit
+because they touched the anchored snippet, so the anchor has already answered
+whether it applies to them and the title is free to answer why they should stop:
+name what a natural rewrite breaks. The id names what the record anchors and
+`实现理由` carries the reasoning, so a title spent restating the mechanism says
+nothing the record does not already say twice. A record whose title cannot name a
+consequence is one that failed the entry question and should not exist.
 
 Repeat the `文件路径`/`代码片段` pair when one invariant depends on more than one real
 declaration or call. Use repository-relative paths. A snippet must occur exactly

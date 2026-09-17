@@ -22,10 +22,8 @@ Continue with entries in this schema:
 - **实现理由** 先说明这段代码做什么，再沿数据或控制流解释为什么这样写，以及简化后会改变什么
 ```
 
-Use these labels for new or revised entries. The checker also accepts the old
-labels `源码`/`形状`/`解释`, including mixed labels during gradual migration;
-existing records do not require a bulk rewrite. Both sets use the same field
-order, pairing, and uniqueness rules.
+These three labels are the record's only field names; any other line in a record
+body is rejected.
 
 Repeat the `文件路径`/`代码片段` pair when one invariant depends on more than one real
 declaration or call. Use repository-relative paths. A snippet must occur exactly

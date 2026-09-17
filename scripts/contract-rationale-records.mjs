@@ -48,19 +48,18 @@ function initRepo(repo) {
   fs.writeFileSync(path.join(repo, ".gitignore"), "docs/rationale/\n.scratch/\n", "utf8");
 }
 
-function activeRecord(shape = "apply(first, second);", labels = ["文件路径", "代码片段", "实现理由"]) {
-  const [sourceLabel, snippetLabel, rationaleLabel] = labels;
+function activeRecord(shape = "apply(first, second);") {
   return [
     "# Execution ordering",
     "> TL;DR：Records call-order invariants shared by the execution path.",
     "",
     "## W-001 · 调用顺序保持先一后二",
     "",
-    `- **${sourceLabel}** \`src/main/java/sample/Alpha.java\``,
-    `- **${snippetLabel}** \`${shape}\``,
-    `- **${sourceLabel}** \`src/main/java/sample/Beta.java\``,
-    `- **${snippetLabel}** \`alpha.preserveOrder();\``,
-    `- **${rationaleLabel}** 第一行先建立状态，第二行再读取它。流程是 first → state → second；交换顺序会读到未初始化值。`,
+    "- **文件路径** `src/main/java/sample/Alpha.java`",
+    `- **代码片段** \`${shape}\``,
+    "- **文件路径** `src/main/java/sample/Beta.java`",
+    "- **代码片段** `alpha.preserveOrder();`",
+    "- **实现理由** 第一行先建立状态，第二行再读取它。流程是 first → state → second；交换顺序会读到未初始化值。",
     "",
   ].join("\n");
 }
@@ -122,30 +121,16 @@ try {
   assert.ok(stateFile, "incremental check must create user-local state");
   stage("incremental state");
 
-  // Existing records and partial label migrations keep the same parsed meaning.
-  const labelChoices = [["文件路径", "源码"], ["代码片段", "形状"], ["实现理由", "解释"]];
-  for (let mask = 1; mask < 8; mask += 1) {
-    const labels = labelChoices.map((choices, index) => choices[(mask >> index) & 1]);
-    fs.writeFileSync(rationale, activeRecord(undefined, labels), "utf8");
-    const migrated = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, `labels ${labels}`));
-    assert.equal(migrated.failures.length, 0);
-    assert.equal(migrated.anchors, 2);
-    assert.deepEqual(migrated.selectedIds, ["W-001"], "renaming ignored record fields must trigger revalidation");
-  }
-  const legacyLookup = expect(run(["find", "W-001", "--full"], repo, stateRoot), 0, "legacy record lookup");
-  assert.match(legacyLookup, /实现理由 第一行先建立状态/);
-
-  const mixedPairs = activeRecord().replace("**文件路径** `src/main/java/sample/Beta.java`", "**源码** `src/main/java/sample/Beta.java`")
-    .replace("**代码片段** `alpha.preserveOrder();`", "**形状** `alpha.preserveOrder();`");
-  fs.writeFileSync(rationale, mixedPairs, "utf8");
-  expect(run(["check", "--full", "--json"], repo, stateRoot), 0, "mixed anchor pairs");
+  const lookup = expect(run(["find", "W-001", "--full"], repo, stateRoot), 0, "record lookup");
+  assert.match(lookup, /实现理由 第一行先建立状态/);
 
   for (const [label, content, error] of [
-    ["duplicate rationale alias", activeRecord() + "- **解释** 第二份理由\n", /duplicate \*\*实现理由\*\*/],
-    ["duplicate snippet alias", activeRecord().replace("- **文件路径** `src/main/java/sample/Beta.java`",
-      "- **形状** `apply(first, second);`\n- **文件路径** `src/main/java/sample/Beta.java`"), /\*\*代码片段\*\* must follow/],
+    ["retired label is not a field", activeRecord() + "- **解释** 第二份理由\n", /unsupported active-record content/],
+    ["duplicate rationale", activeRecord() + "- **实现理由** 第二份理由\n", /duplicate \*\*实现理由\*\*/],
+    ["snippet without its own path", activeRecord().replace("- **文件路径** `src/main/java/sample/Beta.java`",
+      "- **代码片段** `apply(first, second);`\n- **文件路径** `src/main/java/sample/Beta.java`"), /\*\*代码片段\*\* must follow/],
     ["missing snippet", activeRecord().replace("- **代码片段** `apply(first, second);`\n", ""), /missing \*\*代码片段\*\*/],
-    ["source after rationale", activeRecord() + "- **源码** `src/main/java/sample/Beta.java`\n- **形状** `alpha.preserveOrder();`\n",
+    ["path after rationale", activeRecord() + "- **文件路径** `src/main/java/sample/Beta.java`\n- **代码片段** `alpha.preserveOrder();`\n",
       /\*\*文件路径\*\* must precede \*\*实现理由\*\*/],
   ]) {
     fs.writeFileSync(rationale, content, "utf8");
@@ -153,8 +138,8 @@ try {
     assert.match(JSON.stringify(rejected.failures), error);
   }
   fs.writeFileSync(rationale, activeRecord(), "utf8");
-  expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "canonical labels restored");
-  stage("field label compatibility and validation");
+  expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "canonical record restored");
+  stage("field label validation");
 
   fs.writeFileSync(alpha, [
     "class Alpha {",

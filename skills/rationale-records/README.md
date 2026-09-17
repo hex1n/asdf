@@ -37,8 +37,8 @@ docs/rationale/
 一个理由涉及多处代码时，可以重复“文件路径／代码片段”对。W-ID 在仓库内唯一。
 需要说明复杂顺序时，可在实现理由下补一小段缩进流程或伪代码。
 
-新建和修订记录使用新字段；旧字段 `源码／形状／解释` 仍可读取，也允许逐步改名时混用，
-无须批量重写现有记录。完整格式与内容要求见 [REFERENCE.md](REFERENCE.md#active-entry-schema)。
+三个字段名是记录正文里仅有的字段，其他写法一律拒绝。
+完整格式与内容要求见 [REFERENCE.md](REFERENCE.md#active-entry-schema)。
 
 ## 查找与校验
 

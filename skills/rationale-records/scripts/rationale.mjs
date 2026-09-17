@@ -156,9 +156,9 @@ const RE_ANY_HEAD = /^#{1,6}\s/;
 const RE_FILE_TITLE = /^#\s+(.+?)\s*$/;
 const RE_TLDR = /^>\s*TL;DR[：:]\s*(.+?)\s*$/i;
 const RE_HEAD = /^##\s+(W-\d+)\s*·\s*(.+?)\s*$/;
-const RE_SOURCE = /^- \*\*(?:文件路径|源码)\*\*\s*`([^`]+)`\s*$/;
-const RE_SHAPE = /^- \*\*(?:代码片段|形状)\*\*\s*`(.+)`\s*$/;
-const RE_EXPLANATION = /^- \*\*(?:实现理由|解释)\*\*(?:\s+(.+?)\s*)?$/;
+const RE_SOURCE = /^- \*\*文件路径\*\*\s*`([^`]+)`\s*$/;
+const RE_SHAPE = /^- \*\*代码片段\*\*\s*`(.+)`\s*$/;
+const RE_EXPLANATION = /^- \*\*实现理由\*\*(?:\s+(.+?)\s*)?$/;
 
 function parseRecords(text, rationaleFile, rationaleRel, fileErrors) {
   const entries = [];

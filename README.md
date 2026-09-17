@@ -23,8 +23,7 @@ for the distribution vocabulary.
 | [`scrutineer`](skills/scrutineer/) | review | Review code and changes through evidence-backed counterexamples; separate defects, unverified risks, decision items, and optional improvements without editing the candidate. |
 | [`e2e-test-workflow`](skills/e2e-test-workflow/) | verify | Plan, execute, and present end-to-end tests: source-backed scenario trees, evidence-backed execution reports that hand defects back for separately authorized fixes, with a capped iterate-until-green loop on explicit request, and HTML reader views. Typed first, `plan`, `run`, or `render` selects the mode: plan and render it; run, planning first when no plan exists, and render; or render an existing artifact. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts, for one interface, one requirement's backend API, or a branch's API changes. |
-| [`generating-test-scope`](skills/generating-test-scope/) | verify | Generate QA test-scope documents from branch diffs and traced change impact. |
-| [`rationale-records`](skills/rationale-records/) | navigate | Maintain and query Git-ignored personal current-code rationale, with strict source anchors and worktree handoff. |
+| [`rationale-records`](skills/rationale-records/) | navigate | Record why current code is implemented this way and find the reason by file path or code snippet; keep records personal and Git-ignored, with worktree handoff. |
 
 ## Methods behind the skills
 
@@ -92,17 +91,11 @@ look when extending it.
 - **Design by contract (Meyer) and information hiding (Parnas):** document the caller contract, never the implementation.
 - **Target contract:** the intended external contract, never a current defect.
 
-### `generating-test-scope`
-
-- **Change impact analysis (Bohner & Arnold):** from the diff, trace the impact graph through callers, dependencies, state reads and writes, and cross-process contracts.
-- **Risk-based testing (Amland):** tier by failure consequence, reachable exposure, and recovery difficulty.
-- **Evidence-mapped recommendations:** every recommendation names its evidence.
-
 ### `rationale-records`
 
-- **Chesterton's fence:** record why the code has its exact shape before a natural-looking rewrite removes it.
+- **Chesterton's fence:** record why code is implemented this way and what behavior a seemingly simpler rewrite would break.
 - **DRY in its original sense (Hunt & Thomas):** one invariant, one current owner.
-- **Anchored reverse index:** from source to reason, each anchor matching exactly once in its file.
+- **Code-to-reason lookup:** each record pairs a file path with a code snippet that matches exactly once in that file, so a maintainer can find the implementation rationale from the code.
 
 ## Lifecycle placement
 
@@ -110,7 +103,7 @@ look when extending it.
 plan         first-principles-planner → assayer       ← decide the plan, then falsify it
 implement    arborist                                 ← trace the roots, then shape the smallest safe change
 review-code  scrutineer                            ← challenge the code and the findings; report without editing
-verify       e2e-test-workflow (plan → run → render) · generating-test-scope · generating-api-docs
+verify       e2e-test-workflow (plan → run → render) · generating-api-docs
 investigate  deep-research                            ← answer questions from evidence
               ↑ discovered unknowns feed the next plan
 ```

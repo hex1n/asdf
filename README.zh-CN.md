@@ -21,8 +21,7 @@
 | [`scrutineer`](skills/scrutineer/) | 审查 | 用有证据的反例审查代码与变更，区分缺陷、未验证风险、待决事项和可选改进；只读报告，不代替实施修复。 |
 | [`e2e-test-workflow`](skills/e2e-test-workflow/) | 验证 | 规划、执行并呈现端到端测试：可溯源的业务场景树、把缺陷交回调用方另行授权修复的证据化执行报告，明确要求时才做有上限的直至全绿循环，以及 HTML 阅读视图。开头带 `plan`、`run` 或 `render` 时选定模式：plan 出计划并渲染；run 执行并渲染，无计划时先规划；render 只渲染已有产物。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档，范围可为单个接口、一个需求的后端 API 或一个分支的 API 变更。 |
-| [`generating-test-scope`](skills/generating-test-scope/) | 验证 | 基于分支 diff 与影响追踪生成 QA 测试范围文档。 |
-| [`rationale-records`](skills/rationale-records/) | 导航 | 维护和反查 Git 忽略的个人当前代码理由，并提供严格源码锚点与 worktree 交接。 |
+| [`rationale-records`](skills/rationale-records/) | 导航 | 记录当前代码为什么这样实现，按文件路径或代码片段查找对应的实现理由；记录由个人维护、Git 忽略，支持工作树交接。 |
 
 ## 各 skill 背后的方法论
 
@@ -88,17 +87,11 @@
 - **契约式设计（Meyer）与信息隐藏（Parnas）**：只写调用方契约，不写实现。
 - **目标契约**：写意图中的外部契约，不写当前缺陷。
 
-### `generating-test-scope`
-
-- **变更影响分析（Bohner & Arnold）**：从 diff 出发沿调用方、依赖、状态读写和跨进程契约追踪影响图。
-- **风险驱动测试（Amland）**：按失败后果、可达暴露面和恢复难度分级。
-- **建议映射到证据**：每条建议都指明它依据的证据。
-
 ### `rationale-records`
 
-- **切斯特顿的栅栏**：在看似自然的重写抹掉它之前，先记下代码为什么是这个精确形状。
+- **切斯特顿的栅栏**：记下代码为什么这样实现，以及看似更简单的改写会破坏什么行为。
 - **DRY 的原义（Hunt & Thomas）**：一条不变量只有一个当前所有者。
-- **锚定反查索引**：从源码片段反查到理由，每个锚点在文件内唯一命中。
+- **从代码查理由**：每条记录用文件路径和在文件内唯一匹配的代码片段定位实现，便于修改者找到对应理由。
 
 ## 生命周期定位
 
@@ -106,7 +99,7 @@
 规划   first-principles-planner → assayer       ← 先定方案，再证伪
 实现   arborist                                 ← 先追根系，再做最小安全改造
 审查   scrutineer                            ← 证伪实现，也核实发现；只读报告
-验证   e2e-test-workflow（plan → run → render）· generating-test-scope · generating-api-docs
+验证   e2e-test-workflow（plan → run → render）· generating-api-docs
 调研   deep-research                            ← 按需求证
         ↑ 新发现的未知回馈下一轮规划
 ```

@@ -62,6 +62,24 @@ Past two anchors, the explanation says what each site contributes — an indente
 from the fourth anchor is looking for the sentence that tells them why that line
 is in this record, and a single paragraph about the invariant does not have one.
 
+Anchors that answer to different consequences are different records: the per-pair
+test is also the splitting test, because a different consequence is a different
+title.
+
+The count of anchors under one consequence is not a size, it is how many places
+must remember the rule on their own. A single anchor usually means the reason
+cannot be carried by the code at all — a chosen constant, a rounding direction,
+an order that nothing in the type or the name implies — and the record is where
+that knowledge belongs. Several anchors mean the rule is enforced by repetition,
+so any one site can be changed alone and break it.
+
+Read the second kind as a refactor already scoped: the record names every site,
+so giving the rule one owner is a bounded change, after which the record keeps one
+anchor or stops being needed because the shape can no longer be got wrong. Some
+rules cannot be centralized — the two ends of a protocol, layers that would take a
+worse dependency on each other, a framework contract each implementation must
+satisfy on its own — and there the record is the owner, which is not debt.
+
 A W-ID is a name, unique across all files under `docs/rationale`, and never a
 position: it says which record this is, not where it sits or when it was written.
 Name it after what the record anchors — `W-调用顺序`, in the language the

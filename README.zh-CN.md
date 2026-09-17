@@ -19,7 +19,7 @@
 | [`deep-research`](skills/deep-research/) | 调研 | 以证据为支撑的调研，交付书面结论而非修复：判断事实真相、行为成因、证据支持哪个选项。 |
 | [`arborist`](skills/arborist/) | 实现 | 在已有调用方、存储数据或测试需要继续工作的代码上实现、修复、重构或迁移，或落地已裁决的方案；交付改动并附上受影响契约仍成立的证据，按要求改善结构，按风险选择验证。 |
 | [`scrutineer`](skills/scrutineer/) | 审查 | 用有证据的反例审查代码与变更，区分缺陷、未验证风险、待决事项和可选改进；只读报告，不代替实施修复。 |
-| [`e2e-test-workflow`](skills/e2e-test-workflow/) | 验证 | 规划、执行并呈现端到端测试：可溯源的业务场景树、把缺陷交回调用方另行授权修复的证据化执行报告，明确要求时才做有上限的直至全绿循环，以及 HTML 阅读视图。开头带 `plan`、`run` 或 `render` 时选定模式：plan 出计划并渲染；run 执行并渲染，无计划时先规划；render 只渲染已有产物。 |
+| [`e2e-test-workflow`](skills/e2e-test-workflow/) | 验证 | 规划、执行并呈现端到端测试：可溯源的业务场景树、把缺陷交回调用方另行授权修复的证据化执行报告，明确要求时才做有上限的直至全绿循环，以及 HTML 阅读视图。开头带 `plan`、`run`、`render` 或 `brief` 时选定模式：plan 出计划并渲染；run 执行并渲染，无计划时先规划；render 只渲染已有产物；brief 为已完成的报告出一页纸摘要，与报告一起交付。 |
 | [`generating-api-docs`](skills/generating-api-docs/) | 落地/验证 | 基于代码契约生成跨 RPC 与 HTTP 协议的后端 API 文档，范围可为单个接口、一个需求的后端 API 或一个分支的 API 变更。 |
 | [`rationale-records`](skills/rationale-records/) | 导航 | 记录当前代码为什么这样实现，按文件路径或代码片段查找对应的实现理由；记录由个人维护、Git 忽略，支持工作树交接。 |
 
@@ -81,6 +81,7 @@
   - **显式的 SUT 边界**：声明每个真实依赖与替身。
 - 呈现
   - **单一事实来源**：Markdown 为正本，HTML 是经核对的投影。
+  - **派生视图只复述、不计算**：摘要页只能出现正本已陈述的数值，且每条结论链回确立它的场景或问题。
 
 ### `generating-api-docs`
 
@@ -93,6 +94,7 @@
 - **切斯特顿的栅栏**：记下代码为什么这样实现，以及看似更简单的改写会破坏什么行为。
 - **DRY 的原义（Hunt & Thomas）**：一条不变量只有一个当前所有者。
 - **从代码查理由**：每条记录用文件路径和在文件内唯一匹配的代码片段定位实现，便于修改者找到对应理由。
+- **记录是一次中断**：标题写"改成更自然的写法会破坏什么"——读者是在改代码的当口到达的，适不适用已由锚点回答。
 
 ## 生命周期定位
 
@@ -100,7 +102,7 @@
 规划   first-principles-planner → assayer       ← 先定方案，再证伪
 实现   arborist                                 ← 先追根系，再做最小安全改造
 审查   scrutineer                            ← 证伪实现，也核实发现；只读报告
-验证   e2e-test-workflow（plan → run → render）· generating-api-docs
+验证   e2e-test-workflow（plan → run → render · brief）· generating-api-docs
 调研   deep-research                            ← 按需求证
         ↑ 新发现的未知回馈下一轮规划
 ```
@@ -115,8 +117,8 @@
 agent 能力，second-model reviewer 使用 runtime 提供的只读第二模型能力，可用性在冻结时
 一次判定并记录；reviewer 始终只读。
 
-`e2e-test-workflow` 在两个宿主中都由模型自动触发；手动输入时开头的 `plan`、`run`
-或 `render` 选定模式：Claude Code 用 `/e2e-test-workflow plan …`，Codex 用
+`e2e-test-workflow` 在两个宿主中都由模型自动触发；手动输入时开头的 `plan`、`run`、
+`render` 或 `brief` 选定模式：Claude Code 用 `/e2e-test-workflow plan …`，Codex 用
 `$e2e-test-workflow plan …`。它取代已退役的 `e2e-test-planner` 与 `e2e-test-executor`；
 装过这两个名字的机器，只删除链接目标写着本仓库 `skills/` 目录的那两条安装链接（目标已不存在，
 看链接本身记录的路径），保留真实目录和指向别处的链接，然后重新运行安装器。

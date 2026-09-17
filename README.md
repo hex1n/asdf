@@ -21,7 +21,7 @@ for the distribution vocabulary.
 | [`deep-research`](skills/deep-research/) | investigate | Evidence-backed investigation whose deliverable is written findings, not a fix: what is true, why behavior occurs, which option the evidence supports. |
 | [`arborist`](skills/arborist/) | implement | Implement, fix, refactor, or migrate code that already has callers, stored data, or tests to keep working, or land an adjudicated plan; delivers the change with evidence that affected contracts hold, structural improvement when requested, and verification matched to risk. |
 | [`scrutineer`](skills/scrutineer/) | review | Review code and changes through evidence-backed counterexamples; separate defects, unverified risks, decision items, and optional improvements without editing the candidate. |
-| [`e2e-test-workflow`](skills/e2e-test-workflow/) | verify | Plan, execute, and present end-to-end tests: source-backed scenario trees, evidence-backed execution reports that hand defects back for separately authorized fixes, with a capped iterate-until-green loop on explicit request, and HTML reader views. Typed first, `plan`, `run`, or `render` selects the mode: plan and render it; run, planning first when no plan exists, and render; or render an existing artifact. |
+| [`e2e-test-workflow`](skills/e2e-test-workflow/) | verify | Plan, execute, and present end-to-end tests: source-backed scenario trees, evidence-backed execution reports that hand defects back for separately authorized fixes, with a capped iterate-until-green loop on explicit request, and HTML reader views. Typed first, `plan`, `run`, `render`, or `brief` selects the mode: plan and render it; run, planning first when no plan exists, and render; render an existing artifact; or brief a finished report for readers outside the run, delivered with it. |
 | [`generating-api-docs`](skills/generating-api-docs/) | land/verify | Generate backend API docs across RPC and HTTP protocols from code-backed contracts, for one interface, one requirement's backend API, or a branch's API changes. |
 | [`rationale-records`](skills/rationale-records/) | navigate | Record why current code is implemented this way and find the reason by file path or code snippet; keep records personal and Git-ignored, with worktree handoff. |
 
@@ -85,6 +85,7 @@ look when extending it.
   - **Explicit SUT boundary:** every real dependency and double is declared.
 - Presentation
   - **Single source of truth:** Markdown is canonical; HTML is a checked projection of it.
+  - **A derived view restates, never computes:** a brief carries only values the canonical report already states, each linked back to the case or finding that established it.
 
 ### `generating-api-docs`
 
@@ -97,6 +98,7 @@ look when extending it.
 - **Chesterton's fence:** record why code is implemented this way and what behavior a seemingly simpler rewrite would break.
 - **DRY in its original sense (Hunt & Thomas):** one invariant, one current owner.
 - **Code-to-reason lookup:** each record pairs a file path with a code snippet that matches exactly once in that file, so a maintainer can find the implementation rationale from the code.
+- **A record is an interruption:** its title names what a natural rewrite would break, because the reader arrives mid-edit and the anchor has already answered whether the record applies to them.
 
 ## Lifecycle placement
 
@@ -104,7 +106,7 @@ look when extending it.
 plan         first-principles-planner → assayer       ← decide the plan, then falsify it
 implement    arborist                                 ← trace the roots, then shape the smallest safe change
 review-code  scrutineer                            ← challenge the code and the findings; report without editing
-verify       e2e-test-workflow (plan → run → render) · generating-api-docs
+verify       e2e-test-workflow (plan → run → render · brief) · generating-api-docs
 investigate  deep-research                            ← answer questions from evidence
               ↑ discovered unknowns feed the next plan
 ```
@@ -123,7 +125,7 @@ second-model reviewer uses the read-only second-model capability the runtime
 offers, and availability is resolved and recorded once at freeze time.
 
 `e2e-test-workflow` is model-invoked in both hosts; typed by hand, a leading `plan`,
-`run`, or `render` selects the mode: `/e2e-test-workflow plan …` in Claude Code,
+`run`, `render`, or `brief` selects the mode: `/e2e-test-workflow plan …` in Claude Code,
 `$e2e-test-workflow plan …` in Codex. It replaces the retired `e2e-test-planner` and
 `e2e-test-executor`; on a machine that installed those, remove only the install
 entries for those two names whose stored link target points into this repository's

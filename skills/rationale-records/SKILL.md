@@ -4,9 +4,10 @@ description: >
   Maintain personal docs/rationale records that explain why code is implemented
   this way. Use when a change touches code an existing W-record anchors
   or the callers, producers, or configuration that record depends on, when a
-  change leaves a constraint a natural-looking rewrite would break, when the
-  user asks to record or query such a reason, or during worktree handoff of
-  rationale notes.
+  change leaves a constraint a natural-looking rewrite would break, when
+  answering a question took reconstructing a rule from source that no record
+  states, when the user asks to record or query such a reason, or during
+  worktree handoff of rationale notes.
 ---
 
 # 代码实现理由记录
@@ -24,6 +25,12 @@ Ask only:
 
 If no, do not create a record. If yes, search before writing so one invariant has
 one current owner.
+
+Reconstruction asks it too. Deriving a rule from source — to write an independent
+expectation, to judge a change, to explain a value — is the cost this index exists
+to remove, so pay it once and record the answer. Code that has not changed in a
+long time never reaches this skill through a change, and stable load-bearing code
+is precisely what a rewrite reaches for.
 
 ## Main-checkout workflow
 

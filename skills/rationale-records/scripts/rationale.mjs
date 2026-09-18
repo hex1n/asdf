@@ -157,7 +157,9 @@ const RE_FILE_TITLE = /^#\s+(.+?)\s*$/;
 const RE_TLDR = /^>\s*TL;DR[：:]\s*(.+?)\s*$/i;
 // An id is a name, not a position: any non-blank token after `W-`, so a record
 // can be called after the code it anchors instead of the order it was written in.
-const RE_HEAD = /^##\s+(W-[^\s·]+)\s*·\s*(.+?)\s*$/;
+// The separator is a `·` with blank space before it, so a name may itself hold a
+// `·` (W-马克·吐温规则) and is never cut short at one.
+const RE_HEAD = /^##\s+(W-\S+?)\s+·\s*(.+?)\s*$/;
 const RE_SOURCE = /^- \*\*文件路径\*\*\s*`([^`]+)`\s*$/;
 const RE_SHAPE = /^- \*\*代码片段\*\*\s*`(.+)`\s*$/;
 const RE_EXPLANATION = /^- \*\*实现理由\*\*(?:\s+(.+?)\s*)?$/;
@@ -368,15 +370,18 @@ function lineOf(text, needle) {
 
 function validateEntries(repo, entries, selectedIds = null, fileErrors = []) {
   const failures = [...fileErrors];
+  // One id equality for uniqueness and for find: find resolves an id without
+  // regard to case, so two ids differing only in case are one id.
   const idOwners = new Map();
   for (const entry of entries) {
-    const owners = idOwners.get(entry.id) || [];
+    const key = entry.id.toLowerCase();
+    const owners = idOwners.get(key) || [];
     owners.push(entry);
-    idOwners.set(entry.id, owners);
+    idOwners.set(key, owners);
   }
-  for (const [id, owners] of idOwners) {
-    if (owners.length > 1 && (!selectedIds || selectedIds.has(id))) {
-      failures.push({ id, title: owners[0].title, detail: `W-ID is duplicated across ${owners.map((entry) => entry.rationaleRel).join(", ")}` });
+  for (const owners of idOwners.values()) {
+    if (owners.length > 1 && (!selectedIds || owners.some((entry) => selectedIds.has(entry.id)))) {
+      failures.push({ id: owners[0].id, title: owners[0].title, detail: `W-ID is duplicated across ${owners.map((entry) => `${entry.id} in ${entry.rationaleRel}`).join(", ")}` });
     }
   }
   let anchors = 0;
@@ -596,7 +601,7 @@ function runFind(options) {
   const repo = repositoryInfo(process.cwd(), options.root);
   const corpus = loadCorpus(repo, options, true);
   const target = sourceTarget(repo, corpus, query);
-  const exactId = /^W-[^\s·]+$/i.test(query) ? query.toLowerCase() : null;
+  const exactId = /^W-\S+$/i.test(query) ? query.toLowerCase() : null;
   const needle = query.toLowerCase();
   const matches = [];
   for (const entry of corpus.entries) {

@@ -23,8 +23,9 @@ Continue with entries in this schema:
 ```
 
 These three labels are the record's only field names; any other line in a record
-body is rejected. A continuation line indented by two spaces belongs to the field
-above it; reach for an indented `text` block when order, scale, or two parallel
+body is rejected. Keep each `文件路径` and `代码片段` field on one physical line.
+Only `实现理由` accepts continuation lines indented by two spaces; reach for an
+indented `text` block when order, scale, or two parallel
 paths are what the reader must see — prose describing a rounding chain is harder
 to check than four aligned lines.
 
@@ -52,8 +53,9 @@ produces nothing, and a reader who arrives there finds no reason to stay.
 A snippet quotes the code; locating it is what the quotation buys, not the other
 way round, and that is why the anchor is text rather than a line number a single
 edit would move. So take a whole condition or statement, and when one is not
-unique in its file, quote further — the matcher ignores line breaks, so two or
-three lines are one snippet — rather than trimming inward until only a fragment
+unique in its file, quote further — write two or three source lines as one
+space-separated snippet on a single physical line; matching ignores source line
+breaks — rather than trimming inward until only a fragment
 like `.accepts(value)) {` is left, which is unique and still unreadable because
 it starts in the middle of an expression.
 
@@ -80,8 +82,10 @@ rules cannot be centralized — the two ends of a protocol, layers that would ta
 worse dependency on each other, a framework contract each implementation must
 satisfy on its own — and there the record is the owner, which is not debt.
 
-A W-ID is a name, unique across all files under `docs/rationale`, and never a
-position: it says which record this is, not where it sits or when it was written.
+A W-ID is a name, unique across all files under `docs/rationale` without regard
+to case, and never a position: it says which record this is, not where it sits or
+when it was written. The heading separates it from the title with a `·` that
+follows blank space, so the name itself may contain `·`.
 Name it after what the record anchors — `W-调用顺序`, in the language the
 records are written in — so a reference elsewhere reads without a lookup; a plain
 number stays a valid name for records that already carry one. The heading's title

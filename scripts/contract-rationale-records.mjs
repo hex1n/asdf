@@ -142,8 +142,10 @@ try {
   stage("field label validation");
 
   // An id names what the record anchors, so it is not always a number and not
-  // always ASCII; lookup compares it without folding a widened character set.
-  for (const [id, query] of [["W-\u8c03\u7528\u987a\u5e8f", "W-\u8c03\u7528\u987a\u5e8f"], ["W-Call-Order", "w-call-order"]]) {
+  // always ASCII; lookup matches it without regard to case, and a name may hold
+  // a `\u00b7` because the separator is the `\u00b7` that follows blank space.
+  for (const [id, query] of [["W-\u8c03\u7528\u987a\u5e8f", "W-\u8c03\u7528\u987a\u5e8f"], ["W-Call-Order", "w-call-order"],
+    ["W-\u9a6c\u514b\u00b7\u5410\u6e29\u89c4\u5219", "W-\u9a6c\u514b\u00b7\u5410\u6e29\u89c4\u5219"]]) {
     fs.writeFileSync(rationale, activeRecord().replace("## W-001 \u00b7", `## ${id} \u00b7`), "utf8");
     const named = JSON.parse(expect(run(["check", "--full", "--json"], repo, stateRoot), 0, `named id ${id}`));
     assert.equal(named.failures.length, 0);
@@ -151,6 +153,19 @@ try {
     const found = expect(run(["find", query, "--full"], repo, stateRoot), 0, `find ${query}`);
     assert.ok(found.includes(id), `find must resolve ${query} to ${id}`);
   }
+  // Without blank space before it the `·` belongs to the name, so the heading has
+  // no separator and is refused rather than silently split.
+  fs.writeFileSync(rationale, activeRecord().replace("## W-001 · ", "## W-001·"), "utf8");
+  const unseparated = JSON.parse(expect(run(["check", "--full", "--json"], repo, stateRoot), 1, "heading without a separator"));
+  assert.match(JSON.stringify(unseparated.failures), /unsupported heading/);
+  // Uniqueness and find share one id equality: two ids differing only in case
+  // are the same id, since find would return both.
+  const caseVariant = path.join(rationaleDir, "02-case-variant.md");
+  fs.writeFileSync(rationale, activeRecord().replace("## W-001 ·", "## W-Call-Order ·"), "utf8");
+  fs.writeFileSync(caseVariant, activeRecord().replace("## W-001 ·", "## W-call-order ·"), "utf8");
+  const caseDuplicate = JSON.parse(expect(run(["check", "--full", "--json"], repo, stateRoot), 1, "case-variant duplicate"));
+  assert.match(JSON.stringify(caseDuplicate.failures), /duplicated across W-Call-Order in .*W-call-order in /);
+  fs.rmSync(caseVariant);
   fs.writeFileSync(rationale, activeRecord(), "utf8");
   expect(run(["check", "--full", "--json"], repo, stateRoot), 0, "numeric id restored");
   stage("ids are names, not positions");
@@ -170,6 +185,16 @@ try {
   assert.equal(whitespaceOnly.failures.length, 0, "line wrapping must not invalidate a code anchor");
   assert.match(expect(run(["find", "W-001"], repo, stateRoot), 0, "find formatted anchor"), /Alpha\.java:3/);
   stage("whitespace-insensitive anchor");
+
+  const explanationFlow = "first -> state -> second";
+  fs.writeFileSync(rationale, activeRecord() + `  \`\`\`text\n  ${explanationFlow}\n  \`\`\`\n`, "utf8");
+  const continued = JSON.parse(expect(run(["check", "--full", "--json"], repo, stateRoot), 0,
+    "single-line snippet with multiline source and explanation"));
+  assert.equal(continued.anchors, 2);
+  assert.ok(expect(run(["find", "W-001", "--full"], repo, stateRoot), 0,
+    "find continued explanation").includes(explanationFlow), "navigation must preserve explanation continuation");
+  fs.writeFileSync(rationale, activeRecord(), "utf8");
+  stage("explanation continuation with single-line snippet");
 
   fs.writeFileSync(alpha, "class Alpha { void preserveOrder() { apply(firstsecond); } }\n", "utf8");
   const tokenBoundaryFailure = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 1, "token boundary mutation"));

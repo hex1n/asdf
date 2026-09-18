@@ -7,6 +7,7 @@ import hashlib
 import html
 from html.parser import HTMLParser
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -40,7 +41,7 @@ class Section:
 def parse(text):
     lines = text.splitlines()
     if not lines or lines[0] != MARKER:
-        raise InvalidReport('Missing report/v1 marker; adapt a copy of legacy Markdown first.')
+        raise InvalidReport('Missing report/v1 marker; only report/v1 Markdown has a view, and a report without it keeps its Markdown as written.')
     if len(lines) < 3 or not lines[1].startswith('# '):
         raise InvalidReport('Expected a single # report title immediately after marker.')
     title = lines[1][2:].strip()
@@ -101,12 +102,7 @@ class Markdown:
             if parts.scheme in ('https', 'http', 'mailto'):
                 result = target
             elif parts.scheme == 'file':
-                name = unquote(parts.path)
-                if sys.platform == 'win32' and re.match(r'^/[A-Za-z]:/', name):
-                    name = name[1:]
-                if parts.netloc:
-                    name = '//' + parts.netloc + name
-                if not Path(name).exists():
+                if not local_file(target).exists():
                     raise InvalidReport('Missing file link: ' + target)
                 result = target
             elif parts.scheme:
@@ -214,20 +210,43 @@ class Structure(HTMLParser):
             self.ids.append(attrs['id'])
 
 
-def issue_file(target, home):
-    # This run's own issue records: a file under an issues/ directory beside the
-    # report. Another run's issue, cited as context, is not this report's to list.
+def local_file(target):
+    # The filesystem path a file: link names. Query and fragment only select a
+    # view of the file, so they are not part of it.
     parts = urlsplit(target)
     if parts.scheme != 'file':
-        return False
-    path = unquote(parts.path)
-    return 'issues' in path.split('/')[:-1] and path.startswith(home)
+        return None
+    name = unquote(parts.path)
+    if sys.platform == 'win32' and re.match(r'^/[A-Za-z]:/', name):
+        name = name[1:]
+    if parts.netloc:
+        name = '//' + parts.netloc + name
+    return Path(name)
+
+
+def issue_file(target, run_dir):
+    # This run's own issue records: files under the issues/ directory beside the
+    # report. The test is made on the path relative to the report's directory, so
+    # an ancestor or a nested folder that happens to be called issues is not one;
+    # and on resolved, case-normalised paths, so how a link is spelled (drive-letter
+    # case, a fragment or query) cannot decide it. Another run's issue, cited as
+    # context, lies outside run_dir and is not this report's to list.
+    path = local_file(target)
+    if path is None:
+        return None
+    key = os.path.normcase(os.path.realpath(path))
+    try:
+        relative = Path(key).relative_to(os.path.normcase(os.path.realpath(run_dir)))
+    except ValueError:
+        return None
+    if len(relative.parts) > 1 and relative.parts[0] == os.path.normcase('issues'):
+        return key
+    return None
 
 
 def render(source, text):
     overview, cases, shared, issues = parse(text)
     md = Markdown(source)
-    home = unquote(urlsplit(source.parent.as_uri()).path).rstrip('/') + '/'
     counts = Counter(c.status for c in cases)
     asset = Path(__file__).resolve().parent.parent / 'references' / 'report.css'
     css = asset.read_text(encoding='utf-8')
@@ -239,7 +258,7 @@ def render(source, text):
         mark = len(md.links)
         content = md.blocks(case.text)
         # Which issues a case is affected by is read off the case's own links.
-        cited[case.id] = {t[1:] for t in md.links[mark:] if t.startswith('#')}
+        cited[case.id] = {unquote(t[1:]) for t in md.links[mark:] if t.startswith('#')}
         rows.append(f'<tr><td><a href="#{case.id}">{case.id}</a></td><td>{html.escape(case.title)}</td><td class="status {case.status}">{LABELS[case.status]}</td><td>{summary}</td></tr>')
         inherited = ''
         if index == 0:
@@ -250,16 +269,20 @@ def render(source, text):
     for issue in issues:
         mark = len(md.links)
         body = md.blocks(issue.text)
-        covered.update(t for t in md.links[mark:] if issue_file(t, home))
+        covered.update(f for t in md.links[mark:] if (f := issue_file(t, source.parent)))
         ident = issue.id[len('issue-'):]
         affected = [c.id for c in cases if issue.id in cited[c.id]]
         links = '、'.join(f'<a href="#{c}">{c}</a>' for c in affected) or '—'
         issue_rows.append(f'<tr><td><a href="#{issue.id}">{ident}</a></td><td class="disposition" data-disposition="{issue.disposition}">{issue.disposition}</td><td>{html.escape(issue.title)}</td><td>{links}</td></tr>')
         opened = ' open' if issue.disposition == 'OPEN' else ''
         issue_bodies.append(f'<details class="issue-card" data-disposition="{issue.disposition}" id="{issue.id}"{opened}><summary><span class="summary-line"><span>{ident} · {html.escape(issue.title)}</span><span class="disposition">{issue.disposition}</span></span></summary><div class="case-content">{body}</div></details>')
-    orphans = sorted({t for t in md.links if issue_file(t, home)} - covered)
+    linked = {}
+    for target in md.links:
+        if (key := issue_file(target, source.parent)):
+            linked.setdefault(key, target)
+    orphans = sorted(key for key in linked if key not in covered)
     if orphans:
-        raise InvalidReport('Issue record linked without its own issue section: ' + ', '.join(orphans))
+        raise InvalidReport('Issue record linked without its own issue section: ' + ', '.join(linked[key] for key in orphans))
     issue_link, issues_section = '', ''
     if issues:
         tally = Counter(i.disposition for i in issues)

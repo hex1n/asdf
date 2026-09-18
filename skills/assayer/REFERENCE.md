@@ -1,7 +1,8 @@
 # Plan Review Reference
 
-Load only the branch reached by the current review: entry states, compact
-transfer, runtime/invocation handling, focused recheck, or round receipts.
+Load only the branch reached by the current review: entry states, artifact
+retention, compact transfer, runtime/invocation handling, focused recheck,
+or round receipts.
 
 ## Decision Envelope And Entry States
 
@@ -39,6 +40,41 @@ Non-pass outcomes:
 None grants technical GO or implementation authorization. A cost or scope
 change invalidates the frozen envelope only as an authorization gate; a
 correctness-only review can continue with the new assumptions explicitly stated.
+
+## Review Artifacts
+
+For a short review needing no saved output or later continuation, keep the
+ledger in-band and disclose the complete results in chat. All receipt, cost,
+finding-validation, and Exact Gate obligations still apply; the ledger checker
+accepts stdin when no input path is supplied.
+
+Save when requested, needed for later repair/re-review, or needed to disclose
+a complete report too long for chat. Use the user's output path; otherwise use
+`.scratch/review-YYYYMMDD-topic/` under the target repository, with the review
+start date and a short subject. Choose an unused name for a new series and
+reuse it for subsequent rounds. Keep existing audit directories and links intact.
+
+The parent maintains `review-ledger.json` as the authoritative machine record
+of receipts, reviewer payloads, validations, dispositions, and gate state.
+`review.md` presents the current two-track outcome and complete findings with
+parent validations, linking the ledger rather than embedding its JSON. Before
+a later round replaces that report, preserve the completed round as
+`review-r1.md`, `review-r2.md`, and so on. Keep original reviewer claims and
+parent judgments distinguishable, including challenges and later resolutions;
+retain prior receipt and report payloads in the cumulative ledger. Report
+archives preserve what was disclosed, rather than becoming separately edited
+copies of current finding state. An early archived reviewer report is linked
+before remediation and then supplemented with the parent's validations.
+
+Create `evidence/` only for material needed to verify claims, reproduce checks,
+or resume the review. Prefer existing durable references; retain candidate and
+authority snapshots when a path or hash cannot recover the reviewed version.
+Create `diagnostics/` only for launch failures, troubleshooting, or requested
+replay. Startup scripts, full transcripts, and execution logs are not routine
+deliverables: use the existing receipt fields for invocation and cost facts,
+retaining a minimal host-evidence excerpt when those facts otherwise cannot be
+verified. A failed invocation still needs its receipt. Never discard the only
+reproduction evidence as diagnostics or delete existing files to tidy a run.
 
 ## Compact Review Packet
 

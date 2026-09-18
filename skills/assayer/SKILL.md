@@ -143,6 +143,9 @@ revision and invalidates every prior GO. Pin the versions or snapshots of
 authority sources used for material claims too; changes to those sources
 invalidate affected conclusions even when the candidate hash is unchanged. A post-GO translation or reformat is
 `derived-unreviewed` unless byte-identical.
+Choose in-band or saved delivery using
+[Review artifacts](REFERENCE.md#review-artifacts); saving records does not
+authorize editing the candidate.
 
 For long or remote transfer, read
 [REFERENCE.md](REFERENCE.md#compact-review-packet).
@@ -223,8 +226,8 @@ unavailable, never zero.
 Before remediation, show the user the reviewer's complete verdict and every
 finding: stable ID, severity, claim, evidence, affected section, and missing
 check where applicable. Never replace this round output with counts or a
-summary. If chat length is impractical, archive the complete report and link it
-before continuing.
+summary. If chat length is impractical, archive the complete report under the
+[artifact rules](REFERENCE.md#review-artifacts) and link it before continuing.
 
 Then the parent validates every finding independently, validating the whole
 round in one evidence pass against the frozen candidate, rubric, and authority

@@ -66,7 +66,7 @@ grep -rE "\b{method}\b" {source-root} --include="{profile file pattern}"
 ### 3. Align Only Unknown Decisions
 - Use code and design context when they determine the value; do not ask about facts that can be read.
 - Ask once, with the inventory attached, only for unresolved decisions.
-- Completion criterion: user-owned decisions needed to proceed are resolved; factual unknowns carry their missing source and impact. Use code-declared wire types and the default expansion below unless the user requests another presentation.
+- Completion criterion: user-owned decisions needed to proceed are resolved; factual unknowns carry their missing source and impact. Use code-declared wire types where the contract authority does not fix them, and the default expansion below unless the user requests another presentation.
 
 Common decisions:
 - Scope: whole feature / single interface
@@ -102,9 +102,12 @@ two sources it rests on. **Contract authority** is what the interface owes: an
 approved contract, design, or published schema; when none applies, the code
 revision designated as the contract, or `unknown`. **Implementation evidence**
 is the source revision or snapshot actually inspected. The authority decides
-what the interface promises; the implementation evidence decides the structure,
-wire names, and types it is documented with. Where the two disagree, document
-what the authority promises and treat the difference as a known defect.
+what the interface promises, including any structure, wire name, or type it
+states; the implementation evidence supplies what the authority leaves open.
+Where the authority states something the code contradicts, document the
+authority's version and treat the difference as a known defect. With authority
+`unknown`, the implementation evidence is the documented contract and no
+difference is called a defect.
 
 **Field expansion**: use `field.sub`, `field[].sub`, and `data.field` paths. Expand acyclic fields in place; use explicit type links for cycles and polymorphic alternatives. Requiredness distinguishes missing, null, empty, and conditionally required values; absence of a discovered constraint is not proof that a field is optional.
 

@@ -91,7 +91,7 @@ look when extending it.
 
 - **Design by contract (Meyer) and information hiding (Parnas):** document the caller contract, never the implementation.
 - **Target contract:** the intended external contract, never a current defect.
-- **Authority separated from evidence:** the approved contract decides what the interface promises, the inspected revision decides the structure it is documented with, and a disagreement between them is reported as a defect.
+- **Authority separated from evidence:** the approved contract decides what the interface promises, the inspected revision fills in what the contract leaves open, and a disagreement between them is reported as a defect.
 
 ### `rationale-records`
 

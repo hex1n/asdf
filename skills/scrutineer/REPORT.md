@@ -10,15 +10,49 @@ inverts the dependency, and the two drift on the first correction. Neither
 artifact may carry a verdict, severity, evidence class, or limit the other does
 not.
 
+## Delivery and retention
+
+Return the record and prose in-band for a review that needs no saved output or
+later continuation. When saving is requested or needed for repair/re-review,
+use the user's output path; otherwise use `.scratch/review-YYYYMMDD-topic/`
+under the target repository, with the review start date and a short subject.
+Choose an unused name for a new series; reuse the directory for re-review.
+Keep existing audit directories and their references intact.
+
+Save `review-record.json` and `review.md`. The prose links the JSON rather than
+embedding another copy. On later rounds, preserve the previous pair and write
+`review-record-r2.json` and `review-r2.md` (and so on); link the prior record for
+id reconciliation. The record remains the authority for every round. When the
+delivered record differs from the one the reviewer returned, keep the returned
+one unchanged as `evidence/returned-record.json`, so the difference stays
+checkable under [Delivered record](#delivered-record).
+
+Create `evidence/` only for material needed to substantiate findings, reproduce
+checks, or continue the review. Capture the exact relevant input, command,
+revision, and observation; retain source/input snapshots when a path or hash
+alone cannot recover them. A compact task brief belongs here when needed for
+continuation. Existing durable evidence can be linked without copying it.
+
+Create `diagnostics/` only for launch failures, troubleshooting, or requested
+execution replay. Startup logs, launch scripts, and full transcripts are not
+routine deliverables. Put sufficient observed launch facts in
+`mode.host_evidence`; retain the necessary receipt excerpt if a reference will
+not remain available. Evidence essential to a finding is retained evidence,
+even if it was first captured during troubleshooting. Do not delete existing
+files or break report links to achieve a smaller directory.
+
 ## Record
 
 Return the record in-band unless the handoff names an output path. Its fields
 are the schema's; these are the four whose meaning the schema cannot carry:
 
-- `mode.host_evidence` — the launch configuration that shows the context is
-  fresh, not a role label and not the reviewer's own claim. Without it
-  `fresh-context` is the assertion this skill spends four paragraphs refusing
-  to accept.
+- `mode.host_evidence` — the caller-verified launch facts bound to the returned
+  session: mechanism, inheritance and read-only settings, session reference,
+  brief identity, and the state of each automatic context source the host
+  offers (memory, project instructions, a resumed transcript). The caller
+  resolves any pending verification under
+  [HANDOFF.md](HANDOFF.md#host-mechanisms) before delivery; a role label or
+  intended launch command is insufficient.
 - `location` and `line_text` — the file and line at the reviewed revision, plus
   the triggering line quoted verbatim, so the reference survives the builder's
   edits and a re-review matches on content rather than line numbers. A concern
@@ -33,6 +67,39 @@ The two lens lists partition [references/LENSES.md](references/LENSES.md):
 every section of that file appears once, under `lenses_applied` or under
 `lenses_excluded` with the fact that excludes it, spelled as that file spells
 it.
+
+## Delivered record
+
+The reviewer returns the record; the caller delivers it, and the caller is
+usually the builder the record judges. Three changes are the caller's on the
+way: replacing `mode.host_evidence` with the verified launch facts, never
+leaving it marked pending; appending its own `checks_run` rows, each command
+prefixed `caller:`; and, when isolation cannot be established, setting
+`verdict` and `mode.context` to `blocked` with the gap appended to
+`coverage.limits`, whatever verdict the reviewer returned. Every other difference,
+a limit dropped, a severity moved, an entry reworded, is a new round with the
+changed material as its input. The prose is rendered from the delivered
+record, so it changes only where the record did. Check the pair with
+`node <skill-dir>/scripts/validate-review-record.cjs <delivered.json> --returned <returned.json>`.
+
+## Independent reads
+
+Each read is delivered and checked as its own record under its own
+`review_series` and kept as `read-N/review-record.json`, with its returned copy
+beside it. The series record is then built from the delivered reads:
+
+`node <skill-dir>/scripts/merge-review-records.cjs --series <series> --out review-record.json --map merge-map.json read-1=<file> read-2=<file>`
+
+It keeps every entry and renumbers it, places entries on one quoted line next
+to each other and marks them `co_located` in the map together with the read and
+id each came from, keeps each coverage surface at its deepest depth with every
+read's account, and derives the verdict from the merged entries. It merges
+first-round reads of one candidate, refuses a read whose host evidence is still
+pending, and writes nothing unless the result validates. Co-located entries may
+be one defect or several, since two distinct defects on one line do occur, so
+the builder verifies each before treating two as one. The prose renders from
+the merged record and names the read behind each entry from the map; a
+re-review answers the merged ids.
 
 ## Prose report
 
@@ -90,7 +157,8 @@ reviewed: <candidate> against <base>; <scope>
 - `verdict` is `needs-attention` when any confirmed finding exists or a credible
   high-impact risk stays unverified; `accept-scoped` when neither exists in the
   inspected scope; `blocked` when the review could not be established or
-  completed, with the blocking limit in `coverage.limits`. A coverage limit
+  completed, including when the caller cannot verify host isolation, with the
+  blocking limit in `coverage.limits`. A coverage limit
   never turns `needs-attention` into `accept-scoped`. Only findings and risks
   move the verdict: a decision item is reported for the user's decision and
   leaves it where those two put it, confirmed label and all.
@@ -142,5 +210,6 @@ reviewed: <candidate> against <base>; <scope>
   verdict against the entries, id stability across rounds, coverage against
   every located entry, the lens partition — and names each violation. A
   reviewer working from an inlined brief has no such directory; then the caller
-  runs it on receipt. It cannot judge evidence: a passing record is
-  well-formed, not correct.
+  runs it on receipt, and adds `--returned <returned.json>` to check its own
+  delivery. It cannot judge evidence: a passing record is well-formed, not
+  correct.

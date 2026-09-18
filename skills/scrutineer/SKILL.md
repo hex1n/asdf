@@ -23,18 +23,31 @@ mechanism with parent conversation inheritance disabled. A different model is
 optional, not a substitute for context separation. A fork that copies the
 builder's history, or an advisor that reads it, is not a fresh review context.
 
+One read is the default. Use two or three independent reads when a missed
+defect costs more than another read: the review gates acceptance of the
+change, or its coverage plan reads more than one surface in depth. Independent
+reads of one change find different defects, so each read is its own fresh
+reviewer with its own brief and `review_series` `<series>.read-N`. Vary the
+entry where the caller can: one brief carries the builder's navigation in
+`target` while another leaves `target` to what the request and diff establish,
+or a read runs on another host or model. Deliver each read as its own record,
+then merge them as [REPORT.md](REPORT.md#independent-reads) describes. A
+finding stands on its own read's evidence: agreement between reads adds
+nothing to it, and a read that missed it takes nothing from it.
+
 The caller, whichever session invokes this skill, first checks the review
 lifecycle: a completed review that covers the same candidate content, scope,
 and supporting inputs is reused; an active review that applies is awaited
-rather than duplicated. For a new review the caller reads
-[HANDOFF.md](HANDOFF.md), fills every field from the request, the repository
-rules, the Git state, and the diff the lens selection reads, checks the brief
-against that file's exclusion list, launches the reviewer through the host
-mechanism the file names as soon as the diff is reviewable, continues the
-remaining checks while the review runs, and returns the reviewer's report —
-mechanically checked as [REPORT.md](REPORT.md) requires when the reviewer
-could not run that check itself — rather than performing the review first.
-Only an explicit user decision changes a user-owned review requirement.
+rather than duplicated. For a new review the caller writes the brief
+[HANDOFF.md](HANDOFF.md) defines from the request, the repository rules, the
+Git state, and the diff the lens selection reads, checks it with that file's
+validator, launches the reviewer through the host mechanism the file names as
+soon as the diff is reviewable, continues the remaining checks while the
+review runs, and delivers the reviewer's report — mechanically checked as
+[REPORT.md](REPORT.md) requires when the reviewer could not run that check
+itself, and changed only as its delivered-record rule allows — rather than
+performing the review first. Only an explicit user decision changes a
+user-owned review requirement.
 
 When acting on a report, the builder verifies each finding before changing
 code. Repair confirmed in-scope defects and rerun affected checks; carry
@@ -43,22 +56,31 @@ their evidence and attribution intact. Report every finding and sub-item,
 including those not repaired, using [REPORT.md](REPORT.md)'s disposition rules.
 
 If the host already placed this request in a fresh reviewer session, accept
-the brief before reviewing: read [HANDOFF.md](HANDOFF.md) for the fields and
-the exclusion list, then check every field present, no excluded content,
-every referenced file readable, launch evidence showing no inherited builder
-context. A brief that fails this check returns `blocked` naming the gap; a
-context that has read the builder's conclusions is not restored by ignoring
-them, so the corrected brief starts a new reviewer. Then perform the review
-below directly. The handoff marks the delegated reviewer role so the reviewer
-performs the review itself; the only nested dispatch it may start is the
-bounded falsification check in
+the brief before reviewing: run the check
+[HANDOFF.md](HANDOFF.md#check-and-dispatch) names, or read for the same
+things when the validator is out of reach, and open each reference at the
+revision the brief states. The caller verifies host isolation; the reviewer
+need not locate its own process or startup log. A brief that fails this
+check, or whose request reads as the builder's task description rather than
+the user's words, returns `blocked` naming the gap; a context that has read
+builder material is not restored by ignoring it, so the corrected brief
+starts a new reviewer. Then perform the review below directly. The handoff
+marks the delegated reviewer role so the reviewer performs the review itself;
+the only nested dispatch it may start is the bounded falsification check in
 [Test the failure hypothesis](#test-the-failure-hypothesis).
 
-Use host launch/configuration evidence to establish the new session and its
-context mode; a role label or the reviewer's claim is not sufficient. Record the
-reviewer/session reference, handoff, and inheritance settings or documented host
-behavior. Keep task-specific builder memory out of automatic context loading.
-Context separation does not grant filesystem isolation or extra permissions.
+The caller verifies actual launch/configuration evidence and binds it to the
+returned reviewer/session reference before delivering an independent verdict.
+A role label, intended command, or reviewer's claim alone is insufficient.
+Record the observed mechanism, inheritance and read-only settings, session
+reference, brief identity, and the state of each automatic context source the
+host offers in `mode.host_evidence`; retain a receipt excerpt when those facts
+otherwise cannot be checked. Follow
+[HANDOFF.md](HANDOFF.md#host-mechanisms) when the receipt arrives after
+dispatch, and deliver the returned record changed only as
+[REPORT.md](REPORT.md#delivered-record) allows. Keep task-specific builder
+memory out of automatic context loading. Context separation does not grant
+filesystem isolation or extra permissions.
 
 If fresh execution is unavailable, fails, or its context isolation cannot be
 established, report independent review as blocked with the observed cause; do
@@ -108,9 +130,10 @@ handoff, not by this Markdown file; keep limitations visible.
 
 ## Derive the checks independently
 
-Start from the requirements, diff, and raw source before consulting the builder's
-conclusions or suggested findings. Then use existing test results to focus work
-and avoid redundant checks.
+Start from the requirements, diff, and raw source. Read the builder-held
+material the brief carries — target navigation, prior evidence, and on a
+re-review the builder's responses — after the checks are derived, to focus
+work and avoid redundant checks.
 
 Review the changed behavior and required structural outcomes, including omissions
 from the request, not only claims the author chose to make. Follow relevant entry

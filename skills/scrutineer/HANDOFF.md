@@ -1,106 +1,153 @@
 # Reviewer Handoff
 
-The caller fills this template and passes it as the reviewer's whole brief.
-A neutral handoff is checkable: every field below is present, and nothing
-from the excluded list is. Keep the builder's conversation, conclusions,
-suggested findings, and task-specific memory out of it.
+The caller writes the brief as JSON against [handoff-schema.json](handoff-schema.json)
+and passes it as the reviewer's whole task. The caller is usually the builder
+of the candidate, so the brief's neutrality is a property of its form rather
+than of the caller's intent: every field has a shape a script checks, and
+material with no field has nowhere to go. Keep the builder's conversation,
+reasoning, advisor output, checklists, mutation results, suggested findings,
+and task-specific memory out of it.
 
-## Template
+## Brief
 
-```text
-role: delegated-reviewer          # perform the review; do not delegate it again
-skill: <path to scrutineer/SKILL.md, or its contents; "none" without one>
-language: <report language>
-review: initial | re-review
-review_series: <stable id shared by every round on this candidate>
-
-request:
-  original: <the user's request, verbatim or faithfully summarized>
-  confirmed_corrections: <user corrections made during the work, with dates>
-  discovered_requirements: <requirements found during implementation, each with its source>
-
-authority:
-  contract_sources: <specs, interface docs, target implementation for parity work>
-  repository_rules: <AGENTS.md / CLAUDE.md / CONTRIBUTING and the rules that apply>
-  review_checklists: <repository-owned review lists, or "none found">
-
-lenses:
-  selected: <each references/LENSES.md section the change triggers, its text copied in verbatim>
-  excluded: <section name — the fact in this change that excludes it>
-
-scope:
-  candidate: <commit, branch tip, or "working tree at <HEAD sha>" plus a content identity (patch, snapshot, or per-file digest) for the uncommitted files in scope and for the supporting inputs the review evidence depends on>
-  base: <merge-base sha, parent sha, or HEAD for working-tree review>
-  uncommitted: <included paths, staged/unstaged/untracked, or "none">
-  before_state: <snapshot, patch, or list of what existed before moves/deletions, or "not needed">
-  coverage_plan: <for a large change: in depth / sampled / left out; otherwise "full">
-
-target:
-  contracts: <the obligations the change touches, each with its authority source>
-  entry_points: <paths or symbols that reach them, producers and consumers included>
-  unresolved_paths: <what the builder's trace left unobserved; "unknown" where that is the truth>
-
-access:
-  read_only_mechanism: <host mechanism from the table below, as configured>
-  check_entry_points: <test/lint/build commands and what each covers>
-  isolated_copy: <path for authorized experiments, or "not authorized">
-
-prior_evidence: <link to test results or CI runs; consult after deriving checks>
-report: <path to scrutineer/REPORT.md and scrutineer/review-record-schema.json, or their contents>
-record_output: <path to write the review record, or "inline">
-
-re_review:                        # re-review only
-  previous_report: <path to the prior report>
-  responses: <path to the builder's per-id answers (action, evidence, open items, owner when deferred); read after deriving checks>
+```json
+{
+  "role": "delegated-reviewer",
+  "skill": { "path": "<scrutineer/SKILL.md>", "revision": "<commit or content hash>" },
+  "language": "<report language>",
+  "review": "initial | re-review",
+  "review_series": "<stable id shared by every round on this candidate>",
+  "request": {
+    "original": [{ "date": "<YYYY-MM-DD>", "text": "<the user's message, verbatim>" }],
+    "confirmed_corrections": [{ "date": "<YYYY-MM-DD>", "text": "<the user's correction, verbatim>" }],
+    "discovered_requirements": [{ "requirement": "<found during implementation>", "source": "<where it comes from>" }]
+  },
+  "authority": {
+    "contract_sources": [{ "path": "<spec, interface doc, approved plan, or parity target>", "revision": "<...>" }],
+    "repository_rules": [{ "path": "<AGENTS.md / CLAUDE.md / CONTRIBUTING>", "revision": "<...>" }],
+    "review_checklists": [{ "path": "<repository-owned review list>", "revision": "<...>" }]
+  },
+  "lenses": {
+    "selected": [{ "heading": "<LENSES.md section the change triggers>", "reference": { "path": "<references/LENSES.md>", "revision": "<...>" } }],
+    "excluded": [{ "heading": "<section>", "reason": "<the fact in this change that excludes it>" }]
+  },
+  "scope": {
+    "candidate": {
+      "revision": "<commit, branch tip, or working tree at <HEAD sha>>",
+      "content_identity": [{ "path": "<uncommitted file or supporting input>", "identity": "<digest>" }]
+    },
+    "base": "<merge-base sha, parent sha, or HEAD for working-tree review>",
+    "uncommitted": [{ "path": "<included path>", "state": "staged | unstaged | untracked" }],
+    "before_state": "<snapshot, patch, or list of what existed before moves or deletions, or \"not needed\">",
+    "coverage_plan": [{ "surface": "<path, module, or contract>", "depth": "in-depth | sampled | skipped" }]
+  },
+  "target": {
+    "contracts": [{ "contract": "<obligation the change touches>", "source": "<its authority>" }],
+    "entry_points": ["<path or symbol that reaches it, producers and consumers included>"],
+    "unresolved_paths": ["<what the builder's trace left unobserved; \"unknown\" where that is the truth>"]
+  },
+  "access": {
+    "read_only_mechanism": "<host mechanism from the table below, as configured>",
+    "check_entry_points": [{ "command": "<test, lint, or build command>", "covers": "<what it covers>" }],
+    "isolated_copy": "<path for authorized experiments, or \"not authorized\">"
+  },
+  "prior_evidence": [{ "path": "<test results or CI run>", "revision": "<...>" }],
+  "report": {
+    "rules": { "path": "<scrutineer/REPORT.md>", "revision": "<...>" },
+    "record_schema": { "title": "<review-record-schema.json, inlined as the object itself>" }
+  },
+  "record_output": "<path to write the review record, or \"inline\">",
+  "re_review": {
+    "previous_report": { "path": "<the prior record>", "revision": "<...>" },
+    "responses": { "path": "<the builder's per-id answers>", "revision": "<...>" }
+  }
+}
 ```
 
-Carry text, not names, for every field that points at this skill's own files:
-`skill`, `lenses`, and `report`. A reviewer reaches its own filesystem, not
-the caller's context, and several launch modes hand it neither — the host
-table below records that `Explore` and `Plan` skip CLAUDE.md, and a reviewer
-launched without the skill directory has no path to `LENSES.md`, `REPORT.md`,
-or `review-record-schema.json` at all. A named-but-unreadable section is a check
-nobody runs; a named-but-unreadable schema is a record the validator then
-rejects for fields the reviewer was never told about. Before dispatch,
-establish which of the three the reviewer can read and inline the rest —
-`review-record-schema.json` verbatim, because the contract that validates the record
-has to be the contract the reviewer was given.
+The schema fixes the shape; these are the fields whose meaning it cannot carry.
 
-The caller selects the lenses, because selection reads the diff and the
-reviewer has not seen it yet: take each section of
-[references/LENSES.md](references/LENSES.md) whose trigger the change meets,
-copy its text into `selected`, and name the rest in `excluded` with the fact
-that excludes each. The two fields partition that file: every section appears
-once, on one side or the other. A brief that leaves sections unaccounted for
-shows the selection was never made, and the reviewer treats it as it treats a
-missing field.
+- `request.original` and `confirmed_corrections` hold the user's messages, one
+  item per message with its date, verbatim. A plan, design, or spec the user
+  approved is a contract source by path and revision; restated here it puts
+  the builder's words where the user's belong, and the reviewer then reviews
+  the builder's framing of the request.
+- A **reference** (`skill`, the `authority` lists, `lenses.selected[].reference`,
+  `prior_evidence`, `report.rules`, `re_review`) is a `path` plus the `revision`
+  the reviewer reads it at: a Git object name for a committed file, or
+  `sha256 <hex>` of the file as it is now for an uncommitted or untracked one.
+  The reviewer reads that exact version, `git show <revision>:<path>` or the
+  hash checked, because the caller keeps working while the review runs; the
+  validator verifies the same two roads. `text` carries the content only where
+  the reviewer's filesystem cannot reach the file. `report.record_schema` is
+  always the schema object itself: the contract the record is validated
+  against is the contract the reviewer was given.
+- `lenses` is the caller's selection, because selection reads the diff and the
+  reviewer has not seen it yet: each section of
+  [references/LENSES.md](references/LENSES.md) whose trigger the change meets
+  goes under `selected` with its heading, the rest under `excluded` with the
+  fact that excludes each. The two lists partition that file, every section
+  once, on one side or the other.
+- `scope.candidate.content_identity` pins the uncommitted files in scope and
+  the supporting inputs the review evidence depends on. `coverage_plan` uses
+  the record's `in-depth | sampled | skipped` vocabulary, one row per surface,
+  so the record's `coverage.surfaces` reports the plan and its outcome instead
+  of reconstructing them afterward.
+- `target`, `prior_evidence`, and `re_review.responses` are builder-held
+  navigation: facts and unknowns, never conclusions. An entry point is
+  navigation; "this path is safe" is a finding. The reviewer derives its
+  checks from the request, the diff, and the authority sources first and
+  reads these after, so they focus the work without steering it.
 
-Excluded from the handoff: the builder's transcript, reasoning, advisor
-output, checklist, mutation results, suggested findings, and memory files
-written for the task. Prior test evidence is linked, not summarized, so the
-reviewer derives its own checks first. `target` carries facts and unknowns the
-builder holds, never conclusions about them: an entry point is navigation,
-"this path is safe" is a finding. On a re-review the prior report is input;
-the builder's responses are read after the reviewer derives its checks from
-the prior findings and the new code.
+## Check and dispatch
 
-The brief is inline or a file the launch message names; a file brief is read
-by the reviewer before the review, and the launch message carries location,
-permissions, and execution notes only. Without a review-method skill the
-reviewer still derives its checks from the requirements and the diff before
-reading builder material, and reports in REPORT.md's skeleton. A length cap
-set by the caller bounds the summary, never the required sections. A brief
-missing any field or carrying excluded content comes back as `blocked`.
+`node <skill-dir>/scripts/validate-handoff.cjs <brief.json>` applies the
+schema and the rules it cannot express: every reference readable at its
+revision or carrying its text, the lens lists partitioning LENSES.md, the
+inlined record schema identical to the skill's file, a re-review carrying
+its prior round. The caller runs it before dispatch; the reviewer runs it on
+acceptance whenever Node and the skill directory are reachable, and reads for
+the same things otherwise. It cannot tell a quote from a paraphrase: a
+`request.original` item that reads as a task description rather than a
+message is the reviewer's to report.
+
+The brief is a file the launch message names, or inline. The launch message
+carries the brief's location and the permissions the reviewer runs under;
+anything else the reviewer needs to know is a brief field, so it is checked
+like one. A brief that fails
+the check comes back `blocked` naming the gap, and the corrected brief starts
+a new reviewer, because a context that has read builder material is not
+restored by ignoring it. Without a review-method skill the reviewer still
+derives its checks from the requirements and the diff before reading builder
+material, and reports in REPORT.md's skeleton. A length cap set by the caller
+bounds the summary, never the required sections.
 
 ## Host mechanisms
 
-Record the mechanism actually used and its launch evidence in the report's
-execution mode line. A role label or the reviewer's own claim is not evidence.
+The caller owns host verification. Check the actual launch configuration and
+host receipt for context inheritance and read-only enforcement, bind the
+returned result to that reviewer/session, and record those facts in
+`mode.host_evidence`, naming each automatic context source the host offers
+for the session (memory, project instructions, a resumed transcript) and
+showing it off or empty. A role label or planned command is not execution
+evidence.
+
+When a session receipt is available only after dispatch, the reviewer may
+return its source review with `mode.host_evidence` marked pending caller
+verification. It need not discover its own process or read its startup log.
+Before delivery the caller replaces that pending value with observed evidence,
+checks the record, and renders the report. If isolation cannot be established,
+retain the findings and limits but set the overall verdict and `mode.context`
+to `blocked`, add the isolation gap to `coverage.limits`, and validate again;
+no independent acceptance claim may escape this check. Those are the only
+changes a delivery makes to the returned record, and
+[REPORT.md](REPORT.md#delivered-record) checks them. Detected
+builder-context contamination still requires a new reviewer. Missing receipt
+visibility alone does not.
 
 | Host | Fresh context | Read-only enforcement |
 |---|---|---|
-| Claude Code | The Agent tool with a non-fork subagent type starts an isolated context without the parent transcript. A fork inherits the conversation and does not qualify. | Recommended: a project agent definition under `.claude/agents/` with `disallowedTools: Write, Edit` and `permissionMode: plan`. The built-in `Explore` and `Plan` types also deny Write and Edit but skip CLAUDE.md and the parent's git status, so the handoff's `repository_rules` and `scope` must carry everything they need. |
-| Codex | `codex exec --sandbox read-only "<handoff>"` starts a new session that carries this brief. `codex review --uncommitted`, `--base <branch>`, or `--commit <sha>` runs Codex's own review prompt without this skill; use it only when the user asks for Codex's own opinion, and report it as that. | The `read-only` sandbox policy on the run. |
+| Claude Code | The Agent tool with a non-fork subagent type starts an isolated context without the parent transcript. A fork inherits the conversation and does not qualify. | Recommended: a project agent definition under `.claude/agents/` with `disallowedTools: Write, Edit` and `permissionMode: plan`. The built-in `Explore` and `Plan` types also deny Write and Edit but skip CLAUDE.md and the parent's git status, so the brief's `repository_rules` and `scope` must carry everything they need. |
+| Codex | `codex exec --sandbox read-only "<launch message>"` starts a new session that reads this brief. `codex review --uncommitted`, `--base <branch>`, or `--commit <sha>` runs Codex's own review prompt without this skill; use it only when the user asks for Codex's own opinion, and report it as that. | The `read-only` sandbox policy on the run. |
 | Other | Any launch whose configuration shows no transcript inheritance. | The host's tool allowlist or sandbox policy, named in the report. |
 
 When no row applies and the host offers no equivalent, the review is blocked

@@ -71,6 +71,7 @@ look when extending it.
 - **Consequence-based severity:** kept separate from evidence strength.
 - **Findings and remedies validated separately:** a confirmed defect does not show that a fix preserves the contracts.
 - **Revision-bound evidence:** every finding is reproducible at the reviewed revision.
+- **Independent reads over one deeper read:** a review that gates acceptance runs two or three fresh reads with different entries and merges them without dropping or voting; each finding stands on its own evidence.
 
 ### `e2e-test-workflow`
 

@@ -1,0 +1,304 @@
+{
+  "title": "Scrutineer reviewer handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role", "skill", "language", "review", "review_series", "request", "authority", "lenses", "scope", "target", "access", "prior_evidence", "report", "record_output"],
+  "properties": {
+    "role": { "const": "delegated-reviewer" },
+    "skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "visibleContent": true },
+        "revision": { "type": "string", "visibleContent": true },
+        "text": { "type": "string", "visibleContent": true }
+      }
+    },
+    "language": { "type": "string", "visibleContent": true },
+    "review": { "enum": ["initial", "re-review"] },
+    "review_series": { "type": "string", "visibleContent": true, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@+-]*$" },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["original", "confirmed_corrections", "discovered_requirements"],
+      "properties": {
+        "original": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "text"],
+            "properties": {
+              "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+              "text": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "confirmed_corrections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["date", "text"],
+            "properties": {
+              "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+              "text": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "discovered_requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["requirement", "source"],
+            "properties": {
+              "requirement": { "type": "string", "visibleContent": true },
+              "source": { "type": "string", "visibleContent": true }
+            }
+          }
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_sources", "repository_rules", "review_checklists"],
+      "properties": {
+        "contract_sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "visibleContent": true },
+              "revision": { "type": "string", "visibleContent": true },
+              "text": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "repository_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "visibleContent": true },
+              "revision": { "type": "string", "visibleContent": true },
+              "text": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "review_checklists": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "visibleContent": true },
+              "revision": { "type": "string", "visibleContent": true },
+              "text": { "type": "string", "visibleContent": true }
+            }
+          }
+        }
+      }
+    },
+    "lenses": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "excluded"],
+      "properties": {
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["heading", "reference"],
+            "properties": {
+              "heading": { "type": "string", "visibleContent": true },
+              "reference": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "path": { "type": "string", "visibleContent": true },
+                  "revision": { "type": "string", "visibleContent": true },
+                  "text": { "type": "string", "visibleContent": true }
+                }
+              }
+            }
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["heading", "reason"],
+            "properties": {
+              "heading": { "type": "string", "visibleContent": true },
+              "reason": { "type": "string", "visibleContent": true }
+            }
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["candidate", "base", "uncommitted", "before_state", "coverage_plan"],
+      "properties": {
+        "candidate": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["revision"],
+          "properties": {
+            "revision": { "type": "string", "visibleContent": true },
+            "content_identity": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "identity"],
+                "properties": {
+                  "path": { "type": "string", "visibleContent": true },
+                  "identity": { "type": "string", "visibleContent": true }
+                }
+              }
+            }
+          }
+        },
+        "base": { "type": "string", "visibleContent": true },
+        "uncommitted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "state"],
+            "properties": {
+              "path": { "type": "string", "visibleContent": true },
+              "state": { "enum": ["staged", "unstaged", "untracked"] }
+            }
+          }
+        },
+        "before_state": { "type": "string", "visibleContent": true },
+        "coverage_plan": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["surface", "depth"],
+            "properties": {
+              "surface": { "type": "string", "visibleContent": true },
+              "depth": { "enum": ["in-depth", "sampled", "skipped"] }
+            }
+          }
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contracts", "entry_points", "unresolved_paths"],
+      "properties": {
+        "contracts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["contract", "source"],
+            "properties": {
+              "contract": { "type": "string", "visibleContent": true },
+              "source": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "entry_points": {
+          "type": "array",
+          "items": { "type": "string", "visibleContent": true }
+        },
+        "unresolved_paths": {
+          "type": "array",
+          "items": { "type": "string", "visibleContent": true }
+        }
+      }
+    },
+    "access": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_only_mechanism", "check_entry_points", "isolated_copy"],
+      "properties": {
+        "read_only_mechanism": { "type": "string", "visibleContent": true },
+        "check_entry_points": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["command", "covers"],
+            "properties": {
+              "command": { "type": "string", "visibleContent": true },
+              "covers": { "type": "string", "visibleContent": true }
+            }
+          }
+        },
+        "isolated_copy": { "type": "string", "visibleContent": true }
+      }
+    },
+    "prior_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string", "visibleContent": true },
+          "revision": { "type": "string", "visibleContent": true },
+          "text": { "type": "string", "visibleContent": true }
+        }
+      }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules", "record_schema"],
+      "properties": {
+        "rules": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": { "type": "string", "visibleContent": true },
+            "revision": { "type": "string", "visibleContent": true },
+            "text": { "type": "string", "visibleContent": true }
+          }
+        },
+        "record_schema": { "type": "object" }
+      }
+    },
+    "record_output": { "type": "string", "visibleContent": true },
+    "re_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previous_report", "responses"],
+      "properties": {
+        "previous_report": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": { "type": "string", "visibleContent": true },
+            "revision": { "type": "string", "visibleContent": true },
+            "text": { "type": "string", "visibleContent": true }
+          }
+        },
+        "responses": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path": { "type": "string", "visibleContent": true },
+            "revision": { "type": "string", "visibleContent": true },
+            "text": { "type": "string", "visibleContent": true }
+          }
+        }
+      }
+    }
+  }
+}

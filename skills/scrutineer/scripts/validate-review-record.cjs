@@ -19,7 +19,9 @@
 // and no empty list needs a magic word.
 //
 // What it cannot do is judge evidence. A passing record is well-formed, which
-// is the precondition for review, not the review.
+// is the precondition for review, not the review. With `--returned` it also
+// compares the record the caller delivers against the one the reviewer
+// returned, since the caller is usually the builder the record judges.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -470,6 +472,92 @@ function evaluateRecord(record, options = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Delivered record
+//
+// The reviewer returns a record; the caller, usually the builder whose work
+// it judges, delivers one. REPORT.md lets the caller change three things on
+// the way: replace `mode.host_evidence` with the verified launch facts,
+// append its own `checks_run` rows under a `caller:` prefix, and set verdict
+// and `mode.context` to `blocked` with the isolation gap appended to
+// `limits`. A limit removed or a sentence softened is a fourth change nobody
+// sanctioned, and it is invisible unless the returned record is kept and
+// compared.
+// ---------------------------------------------------------------------------
+
+const CALLER_PREFIX = /^caller:/iu;
+const PENDING = /^\s*pending\b/iu;
+
+function deliveryProblems(delivered, returned) {
+  const failures = [];
+  const fail = (message) => failures.push(message);
+  const same = (left, right) => canonical(left) === canonical(right);
+  const isObject = (value) => value && typeof value === "object" && !Array.isArray(value);
+  if (!isObject(delivered) || !isObject(returned)) return ["$: both the delivered and the returned record must be objects"];
+
+  // What licenses the isolation change is the delivered record's state, not
+  // the returned one's: a reviewer that already returned `blocked` for its
+  // own reason can still be delivered with the caller's isolation gap added.
+  const blocking = delivered.verdict === "blocked";
+  if (delivered.verdict !== returned.verdict && !blocking) {
+    fail(`$.verdict: ${quote(returned.verdict)} became ${quote(delivered.verdict)}; the caller may only demote a verdict to "blocked"`);
+  }
+
+  for (const key of new Set([...Object.keys(delivered), ...Object.keys(returned)])) {
+    if (key === "verdict" || key === "mode" || key === "coverage") continue;
+    if (!same(delivered[key], returned[key])) fail(`$.${key}: differs from the returned record`);
+  }
+
+  const deliveredMode = isObject(delivered.mode) ? delivered.mode : {};
+  const returnedMode = isObject(returned.mode) ? returned.mode : {};
+  const contextBlocked = blocking && deliveredMode.context === "blocked";
+  for (const key of new Set([...Object.keys(deliveredMode), ...Object.keys(returnedMode)])) {
+    if (key === "host_evidence") continue;
+    if (key === "context" && contextBlocked) continue;
+    if (!same(deliveredMode[key], returnedMode[key])) fail(`$.mode.${key}: differs from the returned record`);
+  }
+  if (blocking && returned.verdict !== "blocked" && deliveredMode.context !== "blocked") {
+    fail('$.mode.context: a verdict demoted to "blocked" carries mode.context "blocked"');
+  }
+  // HANDOFF.md lets a reviewer return this marker when the host receipt
+  // arrives after dispatch; delivering it unreplaced is the caller skipping
+  // the isolation check the marker exists to hand over.
+  if (PENDING.test(String(deliveredMode.host_evidence ?? ""))) {
+    fail("$.mode.host_evidence: still pending caller verification; replace it with what the caller observed, a missing receipt included");
+  }
+
+  const deliveredCoverage = isObject(delivered.coverage) ? delivered.coverage : {};
+  const returnedCoverage = isObject(returned.coverage) ? returned.coverage : {};
+  for (const key of new Set([...Object.keys(deliveredCoverage), ...Object.keys(returnedCoverage)])) {
+    if (key === "checks_run" || key === "limits") continue;
+    if (!same(deliveredCoverage[key], returnedCoverage[key])) fail(`$.coverage.${key}: differs from the returned record`);
+  }
+
+  const appendedOnly = (key, allowAppend, describe) => {
+    const before = Array.isArray(returnedCoverage[key]) ? returnedCoverage[key] : [];
+    const after = Array.isArray(deliveredCoverage[key]) ? deliveredCoverage[key] : [];
+    // The returned rows are a prefix of the delivered ones. A removed row
+    // shifts everything after it, so the first mismatch is the finding and
+    // the rest of the array is reported no further.
+    const mismatch = before.findIndex((item, index) => !same(after[index], item));
+    if (mismatch !== -1) {
+      fail(`$.coverage.${key}[${mismatch}]: the returned ${describe} was changed or removed`);
+      return;
+    }
+    after.slice(before.length).forEach((item, offset) => {
+      const problem = allowAppend(item);
+      if (problem) fail(`$.coverage.${key}[${before.length + offset}]: ${problem}`);
+    });
+  };
+  appendedOnly("checks_run", (row) => (CALLER_PREFIX.test(String(row?.command ?? "")) ? null : 'an appended row is the caller\'s and says so: its command starts with "caller:"'), "row");
+  appendedOnly("limits", () => (contextBlocked ? null : 'a limit is appended only with verdict and mode.context "blocked", naming the isolation gap'), "limit");
+  const moved = delivered.verdict !== returned.verdict || deliveredMode.context !== returnedMode.context;
+  if (moved && (deliveredCoverage.limits ?? []).length <= (returnedCoverage.limits ?? []).length) {
+    fail('$.coverage.limits: a verdict or mode.context moved to "blocked" appends the isolation gap that blocked it');
+  }
+  return failures;
+}
+
+// ---------------------------------------------------------------------------
 // CLI
 // ---------------------------------------------------------------------------
 
@@ -531,11 +619,18 @@ function readFileBounded(target) {
   return fs.readFileSync(target, "utf8");
 }
 
-const USAGE = 'usage: node validate-review-record.cjs <report.json> [<previous-report.json>]  ("-" reads the record from stdin)';
+const USAGE = 'usage: node validate-review-record.cjs <report.json> [<previous-report.json>] [--returned <returned-report.json>]  ("-" reads the record from stdin; --returned compares a delivered record with the one the reviewer returned)';
 
 function main(argv) {
-  const [target, previousTarget] = argv;
-  if (!target) {
+  const args = [...argv];
+  let returnedTarget = null;
+  const returnedAt = args.indexOf("--returned");
+  if (returnedAt !== -1) {
+    returnedTarget = args[returnedAt + 1];
+    args.splice(returnedAt, 2);
+  }
+  const [target, previousTarget] = args;
+  if (!target || (returnedAt !== -1 && !returnedTarget)) {
     process.stderr.write(`${USAGE}\n`);
     process.exitCode = 2;
     return;
@@ -544,11 +639,17 @@ function main(argv) {
     const skillDir = path.join(__dirname, "..");
     const schema = JSON.parse(readFileBounded(path.join(skillDir, "review-record-schema.json")));
     const lensPath = process.env.SCRUTINEER_LENSES ?? path.join(skillDir, "references", "LENSES.md");
-    const result = evaluateRecord(readRecord(target), {
+    const record = readRecord(target);
+    const result = evaluateRecord(record, {
       schema,
       previous: previousTarget ? readRecord(previousTarget) : null,
       lensHeadings: readLensHeadings(lensPath),
     });
+    if (returnedTarget) {
+      const delivery = deliveryProblems(record, readRecord(returnedTarget));
+      result.failures.push(...delivery);
+      result.pass = result.failures.length === 0;
+    }
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     process.exitCode = result.pass ? 0 : 1;
   } catch (error) {
@@ -565,4 +666,4 @@ function main(argv) {
 // has available.
 if (require.main === module) main(process.argv.slice(2));
 
-module.exports = { hasVisibleContent, safeForMessage, validateAgainstSchema, readLensHeadings, normalizePath, pathProblem, evaluateRecord, textLimitProblem };
+module.exports = { hasVisibleContent, safeForMessage, validateAgainstSchema, readLensHeadings, normalizePath, pathProblem, evaluateRecord, deliveryProblems, textLimitProblem };

@@ -422,6 +422,18 @@ function evaluateRecord(record, options = {}) {
       }
     }
 
+    // Only a bare full commit label asserts the same thing as a git: identity.
+    // Prose labels and retained SHA-256 snapshots remain separate representations.
+    for (const field of ["candidate", "base"]) {
+      const label = record.reviewed[field];
+      const identity = record.reviewed[`${field}_identity`];
+      if (/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu.test(label)
+        && typeof identity === "string" && identity.startsWith("git:")
+        && label.toLowerCase() !== identity.slice(4).toLowerCase()) {
+        fail(`$.reviewed.${field}_identity: contradicts the full commit in reviewed.${field}`);
+      }
+    }
+
     const reReview = record.re_review ?? [];
     if (record.round > 1 && !previous) {
       fail("$: a re-review needs the previous record to check prior ids and open obligations");
@@ -497,16 +509,11 @@ function evaluateRecord(record, options = {}) {
           fail(`$.re_review: prior ${entry.id} has no row; the builder answers every identifier`);
         }
       }
-      // Reuse is only detectable through the title: an id carrying a different
-      // title in the new record, with no re-review row tying it to the prior
-      // entry, is a new concern wearing an old id. A renamed-but-answered
-      // entry keeps its row and is not reported here.
-      const currentTitles = new Map(entries.map((entry) => [entry.id, entry.title]));
-      for (const entry of previousEntries) {
-        const currentTitle = currentTitles.get(entry.id);
-        if (currentTitle === undefined) continue;
-        if (currentTitle !== entry.title && !reReviewIds.has(entry.id)) {
-          fail(`$.entries: ${entry.id} reuses a prior id for a different entry; a new entry takes a new id`);
+      // Closed ids remain historical ids even after leaving the active list.
+      // Reusing one needs a disposition; a new concern takes a fresh id.
+      for (const entry of entries) {
+        if (priorIds.has(entry.id) && !reReviewIds.has(entry.id)) {
+          fail(`$.entries: historical ${entry.id} needs its re-review disposition before reuse`);
         }
       }
     }

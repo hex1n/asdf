@@ -222,6 +222,72 @@ function main() {
     check("closed disposition history can be retained in later rounds", () => {
       const p = next(previous, "resolved", "repaired"); const r = clone(p); r.round = 3; validate(r, 0, p);
     });
+    check("closed historical id cannot return without a disposition", () => {
+      const p = next(previous, "resolved", "repaired"), r = next(p);
+      validate(p, 0, previous);
+      r.entries = [{ ...finding(), title: "A different cause" }]; r.verdict = "needs-attention";
+      assert.match(validate(r, 1, p).failures.join("\n"), /historical F1/u);
+    });
+    check("unchanged title does not authorize historical id reuse", () => {
+      const p = next(previous, "refuted", "refuted", "refuted"), r = next(p);
+      validate(p, 0, previous);
+      r.entries = [finding()]; r.verdict = "needs-attention";
+      assert.match(validate(r, 1, p).failures.join("\n"), /historical F1/u);
+    });
+    check("a historical concern may reopen with an explicit disposition", () => {
+      const p = next(previous, "resolved", "repaired"), r = next(p);
+      r.entries = [finding()]; r.verdict = "needs-attention";
+      r.re_review = [{ id: "F1", fact_status: "confirmed", builder_action: "open",
+        reviewer_status: "still present", evidence: "Synthetic new observation reopens the same concern" }];
+      validate(r, 0, p);
+    });
+    check("a new concern may take a new id after the prior one closed", () => {
+      const p = next(previous, "resolved", "repaired"), r = next(p);
+      r.entries = [{ ...finding(), id: "F2", title: "A new cause" }]; r.verdict = "needs-attention";
+      validate(r, 0, p);
+    });
+    check("returned-record validation also rejects historical id reuse", () => {
+      const p = next(previous, "resolved", "repaired"), r = next(p);
+      r.entries = [finding()]; r.verdict = "needs-attention";
+      assert.match(validate(r, 1, p, clone(r)).failures.join("\n"), /historical F1/u);
+    });
+    for (const field of ["candidate", "base"]) {
+      check(`contradictory ${field} commit identity is rejected`, () => {
+        for (const width of [40, 64]) {
+          const r = clean(); r.reviewed[field] = "a".repeat(width);
+          r.reviewed[`${field}_identity`] = `git:${"b".repeat(width)}`;
+          assert.ok(validate(r, 1).failures.some((failure) => failure.includes(`$.reviewed.${field}_identity`)));
+        }
+      });
+      check(`matching ${field} commit identities remain valid`, () => {
+        for (const width of [40, 64]) {
+          const r = clean(); r.reviewed[field] = "a".repeat(width);
+          r.reviewed[`${field}_identity`] = `git:${r.reviewed[field]}`; validate(r);
+        }
+      });
+      check(`${field} commit comparison ignores display hex casing`, () => {
+        const r = clean(); r.reviewed[field] = "A".repeat(40);
+        r.reviewed[`${field}_identity`] = `git:${"a".repeat(40)}`; validate(r);
+      });
+      check(`${field} snapshot digest is not compared as a commit`, () => {
+        const r = clean(); r.reviewed[field] = "a".repeat(64);
+        r.reviewed[`${field}_identity`] = `sha256:${"b".repeat(64)}`; validate(r);
+      });
+      check(`${field} display prose is not parsed for a commit`, () => {
+        const r = clean(); r.reviewed[field] = `snapshot with navigation from ${"a".repeat(40)}`;
+        r.reviewed[`${field}_identity`] = `git:${"b".repeat(40)}`; validate(r);
+      });
+      check(`conflicting ${field} labels cannot merge behind one identity`, () => {
+        const a = clean(), b = clean(); a.reviewed[field] = "a".repeat(40); b.reviewed[field] = "c".repeat(40);
+        a.reviewed[`${field}_identity`] = b.reviewed[`${field}_identity`] = `git:${"b".repeat(40)}`;
+        merge([a, b], 1);
+      });
+      check(`returned-record validation rejects a contradictory ${field} identity`, () => {
+        const r = clean(); r.reviewed[field] = "a".repeat(40);
+        r.reviewed[`${field}_identity`] = `git:${"b".repeat(40)}`;
+        assert.ok(validate(r, 1, null, clone(r)).failures.some((failure) => failure.includes(`$.reviewed.${field}_identity`)));
+      });
+    }
     check("malformed preceding records fail schema validation", () => {
       const p = clone(previous); delete p.reviewed; validate(next(previous, "resolved", "repaired"), 1, p);
     });

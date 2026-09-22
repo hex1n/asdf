@@ -307,6 +307,7 @@ function evaluateRecord(record, options = {}) {
   const fail = (message) => failures.push(message);
 
   if (schema) failures.push(...validateAgainstSchema(record, schema, "$"));
+  if (previous && schema) failures.push(...validateAgainstSchema(previous, schema, "$previous"));
 
   // Every semantic check below reads fields the schema has already typed. When
   // the record is not even shaped like a record, those reads would report
@@ -341,6 +342,12 @@ function evaluateRecord(record, options = {}) {
     const findings = entries.filter((entry) => entry.kind === "finding");
     const risks = entries.filter((entry) => entry.kind === "risk");
     const credibleRisks = risks.filter((entry) => entry.severity === "critical" || entry.severity === "high");
+
+    // Context validity is independent of the findings: preserve both, but
+    // an unavailable independent review never becomes an acceptance verdict.
+    if (record.mode?.context === "blocked" && record.verdict !== "blocked") {
+      fail('$.verdict: mode.context "blocked" requires verdict "blocked"');
+    }
 
     if (record.verdict === "accept-scoped") {
       if (findings.length > 0) {
@@ -418,15 +425,60 @@ function evaluateRecord(record, options = {}) {
     }
 
     const reReview = record.re_review ?? [];
-    if (record.round > 1 && reReview.length === 0) {
-      fail(`$.re_review: round ${record.round} needs a row for every prior id`);
+    if (record.round > 1) {
+      if (!previous) fail(`$.re_review: round ${record.round} requires the previous record`);
+    } else if (previous || reReview.length > 0) {
+      fail('$.re_review: the first round has no previous record or dispositions');
     }
+    for (const field of ["candidate", "base"]) {
+      const label = record.reviewed?.[field];
+      const identity = record.reviewed?.snapshot?.[field];
+      if (typeof label === "string" && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu.test(label)
+        && typeof identity === "string" && identity.startsWith("git-commit ")
+        && identity.slice("git-commit ".length).toLowerCase() !== label.toLowerCase()) {
+        fail(`$.reviewed.snapshot.${field}: contradicts the exact commit in reviewed.${field}`);
+      }
+    }
+    const currentEntries = new Map(entries.map((entry) => [entry.id, entry]));
     const reReviewIds = new Map();
     reReview.forEach((row, index) => {
       if (reReviewIds.has(row.id)) {
         fail(`$.re_review[${index}]: id ${row.id} already has row ${reReviewIds.get(row.id)}`);
       } else {
         reReviewIds.set(row.id, index);
+      }
+      // Open concerns must remain in the current entries, where they affect
+      // the verdict. A response row alone cannot make an obligation disappear.
+      // current_id explicitly links a reclassification; prose is not an alias.
+      const currentId = row.current_id ?? row.id;
+      const current = currentEntries.get(currentId);
+      const closed = row.reviewer_status === "resolved" || row.reviewer_status === "refuted";
+      if (closed) {
+        if (current && current.kind !== "optional") {
+          fail(`$.re_review[${index}]: closed ${row.id} still points to active ${currentId}`);
+        }
+        if (row.current_id !== undefined) {
+          fail(`$.re_review[${index}]: a closed concern has no current_id`);
+        }
+        if (row.reviewer_status === "resolved" && (row.fact_status !== "confirmed" || row.builder_action !== "repaired")) {
+          fail(`$.re_review[${index}]: "resolved" requires a confirmed finding and a repaired action`);
+        }
+        if (row.reviewer_status === "refuted" && row.fact_status !== "refuted") {
+          fail(`$.re_review[${index}]: "refuted" requires fact_status "refuted"`);
+        }
+      } else {
+        if (!current || current.kind === "optional") {
+          fail(`$.re_review[${index}]: open ${row.id} needs a current finding, risk, or decision at ${currentId}`);
+        }
+        if (row.reviewer_status === "still present" && row.fact_status !== "confirmed") {
+          fail(`$.re_review[${index}]: "still present" requires fact_status "confirmed"`);
+        }
+        if (row.reviewer_status === "still present" && current?.kind === "risk") {
+          fail(`$.re_review[${index}]: a confirmed, still-present concern cannot be a risk`);
+        }
+        if (row.fact_status === "refuted") {
+          fail(`$.re_review[${index}]: fact_status "refuted" cannot remain open`);
+        }
       }
       // REPORT.md: `deferred` keeps `confirmed` and its owner and grants no
       // acceptance. A deferred row reading `resolved` is the exact laundering
@@ -442,6 +494,24 @@ function evaluateRecord(record, options = {}) {
     });
 
     if (previous) {
+      if (record.review_series !== previous.review_series) {
+        fail('$.review_series: must match the previous record');
+      }
+      if (record.round !== previous.round + 1) {
+        fail('$.round: must immediately follow the previous record');
+      }
+      const knownIds = new Set([
+        ...(previous.entries ?? []).map((entry) => entry.id),
+        ...(previous.re_review ?? []).map((row) => row.id),
+      ]);
+      for (const row of reReview) {
+        if (!knownIds.has(row.id)) fail(`$.re_review: ${row.id} has no history in the previous record`);
+      }
+      for (const entry of entries) {
+        if (knownIds.has(entry.id) && !reReviewIds.has(entry.id)) {
+          fail(`$.entries: historical ${entry.id} needs its re-review disposition before reuse`);
+        }
+      }
       const previousEntries = (previous.entries ?? []).filter((entry) => entry.kind !== "optional");
       for (const entry of previousEntries) {
         if (!reReviewIds.has(entry.id)) {

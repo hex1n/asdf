@@ -55,7 +55,10 @@ first.
   "review_series": "<the brief's review_series>",
   "round": 1,
   "brief": { "source": "inline | file", "path": "<the brief's path, when source is file>", "content_identity": "sha256 <hex of the brief as received>" },
-  "reviewed": { "candidate": "<revision reviewed>", "base": "<revision it is compared against>", "scope": "<what the review covered>" },
+  "reviewed": {
+    "candidate": "<revision reviewed>", "base": "<revision it is compared against>", "scope": "<what the review covered>",
+    "snapshot": { "candidate": "<immutable candidate content identity>", "base": "<immutable base content identity>" }
+  },
   "entries": [
     {
       "kind": "finding", "id": "F1", "title": "<...>",
@@ -97,12 +100,12 @@ first.
     "limits": ["<what the review could not establish>"]
   },
   "parity_ledger": [{ "obligation": "<...>", "expected": "<...>", "actual": "<...>", "evidence_or_gap": "<...>" }],
-  "re_review": [{ "id": "F1", "fact_status": "confirmed | refuted | unverified", "builder_action": "repaired | refuted | deferred | open", "reviewer_status": "resolved | still present | refuted | unverified", "evidence": "<what the new revision shows>" }]
+  "re_review": [{ "id": "F1", "current_id": "<current entry id only when reclassified>", "fact_status": "confirmed | refuted | unverified", "builder_action": "repaired | refuted | deferred | open", "reviewer_status": "resolved | still present | refuted | unverified", "evidence": "<what the new revision shows>" }]
 }
 ```
 
 [review-record-schema.json](review-record-schema.json) fixes the shape; these
-are the four fields whose meaning it cannot carry:
+are the fields whose meaning it cannot carry:
 
 - `mode.host_evidence` — the caller-verified launch facts bound to the returned
   session: mechanism, inheritance and read-only settings, session reference,
@@ -111,6 +114,17 @@ are the four fields whose meaning it cannot carry:
   resolves any pending verification under
   [HANDOFF.md](HANDOFF.md#host-mechanisms) before delivery; a role label or
   intended launch command is insufficient.
+- `reviewed.snapshot` — the immutable candidate and base actually inspected,
+  independent of the brief and the display labels. Use `git-commit <full object
+  id>` for a pinned commit, `git-tree <full object id>` for a pinned tree, or
+  `sha256 <64 hex>` of a retained snapshot archive or manifest. A worktree
+  manifest covers the resolved HEAD and the exact in-scope paths, file modes,
+  contents, additions, untracked files, and deletions; pin supporting inputs
+  the review relies on too. Freeze it once for all independent reads and
+  verify each read against that content. A shared HEAD alone does not identify
+  a worktree. Never derive this digest from the brief or the reviewer's prose.
+  The record validator checks the identity's form, not whether it matches
+  source bytes; establishing that remains a source/evidence check.
 - `location` and `line_text` — the file and line at the reviewed revision, plus
   the triggering line quoted verbatim, so the reference survives the builder's
   edits and a re-review matches on content rather than line numbers. A concern
@@ -138,7 +152,7 @@ prefixed `caller:`; and, when isolation cannot be established, setting
 a limit dropped, a severity moved, an entry reworded, is a new round with the
 changed material as its input. The prose is rendered from the delivered
 record, so it changes only where the record did. Check the pair with
-`node <skill-dir>/scripts/validate-review-record.cjs <delivered.json> --returned <returned.json>`.
+`node <skill-dir>/scripts/validate-review-record.cjs <delivered.json> [<previous.json>] --returned <returned.json>`.
 
 ## Independent reads
 
@@ -148,10 +162,19 @@ beside it. The series record is then built from the delivered reads:
 
 `node <skill-dir>/scripts/merge-review-records.cjs --series <series> --out review-record.json --map merge-map.json read-1=<file> read-2=<file>`
 
+Merging requires identical candidate and base identities, not identical briefs
+or entry-point choices. Legacy records without `snapshot` remain readable;
+they can merge only when both `reviewed.candidate` and `reviewed.base` are
+exact full commit IDs. A short or embedded hash, even in identical prose,
+does not qualify. Supply missing identities from retained inspected evidence
+in a new review record; do not rewrite a delivered record in place.
+
 It keeps every entry and renumbers it, places entries on one quoted line next
 to each other and marks them `co_located` in the map together with the read and
 id each came from, keeps each coverage surface at its deepest depth with every
-read's account, and derives the verdict from the merged entries. It merges
+read's account, and derives the verdict from the reads and merged entries.
+Any blocked read keeps the merged verdict blocked, with all findings and limits
+retained; otherwise findings and high-impact risks determine the verdict. It merges
 first-round reads of one candidate, refuses a read whose host evidence is still
 pending, and writes nothing unless the result validates. Co-located entries may
 be one defect or several, since two distinct defects on one line do occur, so
@@ -171,6 +194,7 @@ verdict: <verdict> | mode: <context> — <host_evidence>
 review_series: <review_series>; round <round>
 brief: <source> <path> — <content_identity>
 reviewed: <candidate> against <base>; <scope>
+snapshot: <candidate and base content identities, when present>
 
 ## Findings
 ### F1 — <title>
@@ -203,7 +227,7 @@ reviewed: <candidate> against <base>; <scope>
 | checks run: <command @ revision — observation> | limits: <limits> |
 
 ## Re-review               (round > 1 only)
-| id | fact status | builder action | reviewer status | evidence |
+| id | current id, if reclassified | fact status | builder action | reviewer status | evidence |
 ```
 
 ## Rules
@@ -212,14 +236,13 @@ reviewed: <candidate> against <base>; <scope>
   user owns rather than the change's defect: a pre-existing defect keeps its
   confirmed label, severity, attribution, and evidence class there, and adds
   `location` when it has one to quote.
-- `verdict` is `needs-attention` when any confirmed finding exists or a credible
-  high-impact risk stays unverified; `accept-scoped` when neither exists in the
-  inspected scope; `blocked` when the review could not be established or
-  completed, including when the caller cannot verify host isolation, with the
-  blocking limit in `coverage.limits`. A coverage limit
-  never turns `needs-attention` into `accept-scoped`. Only findings and risks
-  move the verdict: a decision item is reported for the user's decision and
-  leaves it where those two put it, confirmed label and all.
+- `verdict` is `blocked` when the review could not be established or completed,
+  including when host isolation cannot be verified; retain the blocking limit
+  and any findings. `mode.context: blocked` always requires that verdict.
+  Otherwise use `needs-attention` for confirmed findings or credible high-impact
+  risks, and `accept-scoped` when neither remains in the inspected scope.
+  A decision item remains for the user and does not change this verdict;
+  a coverage gap never removes a finding or upgrades the review to acceptance.
 - Severity measures consequence; the evidence class says how a finding is
   established. A concern resting on an unchecked premise is a risk at any
   severity, so a critical risk stays visible without being reported as
@@ -257,6 +280,15 @@ reviewed: <candidate> against <base>; <scope>
   grants no acceptance. Ids stay stable across rounds within a review series;
   sub-items carry their own ids, a merged or reclassified entry keeps its id or
   names the alias, and a new entry never reuses an old id.
+  Every re-review supplies the immediately preceding record from the same
+  series. A still-present or unverified concern stays in `entries` as a finding,
+  risk, or decision; its row cannot replace that active entry. For a
+  reclassification, add `current_id` to that row to name the current entry.
+  A confirmed, still-present defect cannot be hidden as an unverified risk.
+  A resolved concern requires `confirmed` and `repaired`; a refuted concern
+  requires fact status `refuted`. Those closed concerns leave the active list
+  and have no `current_id`. Evidence, not the action label alone, justifies
+  closure. These cross-field checks do not judge the evidence's truth.
 - When the builder's evidence and the reviewer's conclusion point opposite
   ways, both are carried side by side with the observation each rests on. The
   user decides; relabeling the finding settles nothing.

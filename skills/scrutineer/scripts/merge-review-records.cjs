@@ -34,14 +34,28 @@ function locationKey(entry) {
   return `${normalizePath(entry.location.file)}\n${String(entry.line_text ?? "").replace(/\s+/gu, " ").trim()}`;
 }
 
-// Reviewers write `reviewed.candidate` as prose around a revision ("b08a4a6 (worktree
-// ..., clean)", "working tree at <sha>"). Two reads name the same revision when the
-// first object name in each agrees, short or full; without one, the text itself.
+// Display labels and brief hashes are not candidate identities. New records
+// carry immutable snapshot identities; legacy records qualify only when both
+// labels are exactly full commit IDs (never a short prefix or embedded hash).
+const OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/iu;
+const SNAPSHOT_ID = /^(?:(?:git-commit|git-tree) (?:[0-9a-f]{40}|[0-9a-f]{64})|sha256 [0-9a-f]{64})$/iu;
+
 function sameRevision(left, right) {
-  const name = (text) => (String(text).match(/\b[0-9a-f]{7,40}\b/iu) ?? [null])[0]?.toLowerCase() ?? null;
-  const [a, b] = [name(left), name(right)];
-  if (a && b) return a.startsWith(b) || b.startsWith(a);
-  return String(left).trim() === String(right).trim();
+  return typeof left === "string" && typeof right === "string"
+    && OBJECT_ID.test(left) && OBJECT_ID.test(right)
+    && left.toLowerCase() === right.toLowerCase();
+}
+
+function snapshotOf(record) {
+  const reviewed = record?.reviewed;
+  if (reviewed?.snapshot !== undefined) {
+    const snapshot = reviewed.snapshot;
+    if (!snapshot || typeof snapshot.candidate !== "string" || typeof snapshot.base !== "string"
+      || !SNAPSHOT_ID.test(snapshot.candidate) || !SNAPSHOT_ID.test(snapshot.base)) return null;
+    return { candidate: snapshot.candidate.toLowerCase(), base: snapshot.base.toLowerCase() };
+  }
+  if (!OBJECT_ID.test(String(reviewed?.candidate ?? "")) || !OBJECT_ID.test(String(reviewed?.base ?? ""))) return null;
+  return { candidate: `git-commit ${reviewed.candidate.toLowerCase()}`, base: `git-commit ${reviewed.base.toLowerCase()}` };
 }
 
 function refusals(reads) {
@@ -58,10 +72,14 @@ function refusals(reads) {
       problems.push(`${label}: round ${record.round} carries a re-review; merge first-round reads, then re-review against the merged ids`);
     }
   }
-  const [first] = reads;
-  for (const { label, record } of reads.slice(1)) {
-    if (!sameRevision(record.reviewed.candidate, first.record.reviewed.candidate) || !sameRevision(record.reviewed.base, first.record.reviewed.base)) {
-      problems.push(`${label}: reviewed ${record.reviewed.candidate} against ${record.reviewed.base}, not the candidate and base of ${first.label}`);
+  const first = reads[0];
+  const expected = first ? snapshotOf(first.record) : null;
+  for (const { label, record } of reads) {
+    const snapshot = snapshotOf(record);
+    if (!snapshot) {
+      problems.push(`${label}: missing an immutable candidate/base identity; supply reviewed.snapshot from the inspected snapshot, not the brief or an embedded HEAD`);
+    } else if (expected && (snapshot.candidate !== expected.candidate || snapshot.base !== expected.base)) {
+      problems.push(`${label}: candidate or base content differs from ${first.label}`);
     }
   }
   return problems;
@@ -122,7 +140,7 @@ function mergeRecords(reads, { series, mapPath, lensHeadings = null }) {
   const findings = entries.filter((entry) => entry.kind === "finding");
   const credibleRisks = entries.filter((entry) => entry.kind === "risk" && (entry.severity === "critical" || entry.severity === "high"));
   const anyBlocked = reads.some(({ record }) => record.verdict === "blocked");
-  const verdict = findings.length > 0 || credibleRisks.length > 0 ? "needs-attention" : anyBlocked ? "blocked" : "accept-scoped";
+  const verdict = anyBlocked ? "blocked" : findings.length > 0 || credibleRisks.length > 0 ? "needs-attention" : "accept-scoped";
   const context = reads.map(({ record }) => record.mode.context).sort((a, b) => CONTEXT_RANK[b] - CONTEXT_RANK[a])[0];
   const scopes = [...new Set(reads.map(({ record }) => record.reviewed.scope))];
   const parity = reads.flatMap(({ record }) => record.parity_ledger ?? []);
@@ -139,6 +157,7 @@ function mergeRecords(reads, { series, mapPath, lensHeadings = null }) {
     },
     reviewed: {
       candidate: reads[0].record.reviewed.candidate,
+      snapshot: snapshotOf(reads[0].record),
       base: reads[0].record.reviewed.base,
       scope: scopes.length === 1 ? scopes[0] : reads.map(({ label, record: r }) => `[${label}] ${r.reviewed.scope}`).join(" | "),
     },
@@ -230,4 +249,4 @@ function main(argv) {
 // when the skill is reached through the symlink or junction install-skills.cjs creates.
 if (require.main === module) main(process.argv.slice(2));
 
-module.exports = { mergeRecords, locationKey, refusals, sameRevision };
+module.exports = { mergeRecords, locationKey, refusals, sameRevision, snapshotOf };

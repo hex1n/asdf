@@ -34,6 +34,15 @@
       "required": ["candidate", "base", "scope"],
       "properties": {
         "candidate": { "type": "string", "visibleContent": true },
+        "snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["candidate", "base"],
+          "properties": {
+            "candidate": { "type": "string", "pattern": "^(?:(?:git-commit|git-tree) (?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})|sha256 [0-9a-fA-F]{64})$" },
+            "base": { "type": "string", "pattern": "^(?:(?:git-commit|git-tree) (?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})|sha256 [0-9a-fA-F]{64})$" }
+          }
+        },
         "base": { "type": "string", "visibleContent": true },
         "scope": { "type": "string", "visibleContent": true }
       }
@@ -200,6 +209,7 @@
         "required": ["id", "fact_status", "builder_action", "reviewer_status", "evidence"],
         "properties": {
           "id": { "type": "string", "pattern": "^[FRDO][1-9][0-9]*$" },
+          "current_id": { "type": "string", "pattern": "^[FRD][1-9][0-9]*$" },
           "fact_status": { "enum": ["confirmed", "refuted", "unverified"] },
           "builder_action": { "enum": ["repaired", "refuted", "deferred", "open"] },
           "reviewer_status": { "enum": ["resolved", "still present", "refuted", "unverified"] },

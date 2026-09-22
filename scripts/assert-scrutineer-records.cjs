@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Exercise the review-record state machine through its public CLIs. Node only;
+// Exercise the review-record state machine through its public API and CLIs. Node only;
 // no agent, external toolchain, live service, or installed runtime is required.
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
@@ -12,7 +12,8 @@ const { spawnSync } = require("node:child_process");
 function main() {
   const root = path.join(__dirname, "..");
   const skill = path.join(root, "skills", "scrutineer");
-  const { readLensHeadings } = require(path.join(skill, "scripts", "validate-review-record.cjs"));
+  const { readLensHeadings, evaluateRecord } = require(path.join(skill, "scripts", "validate-review-record.cjs"));
+  const schema = JSON.parse(fs.readFileSync(path.join(skill, "review-record-schema.json"), "utf8"));
   const lenses = readLensHeadings(path.join(skill, "references", "LENSES.md"));
   assert.ok(lenses?.length, "the real lens file must be readable");
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "scrutineer-records-"));
@@ -124,6 +125,56 @@ function main() {
     });
     check("caller cannot drop a finding", () => { const returned = withFinding(); validate(clean(), 1, null, returned); });
     check("pending host evidence cannot be delivered", () => { const r = clean(); r.mode.host_evidence = "pending caller verification"; validate(r, 1, null, r); });
+    check("clean preceding review permits an empty re-review", () => {
+      const p = clean(), r = next(p); validate(r, 0, p);
+    });
+    check("clean re-review does not require an invented id", () => {
+      const p = clean(), r = next(p); r.re_review = [{ id: "F99", fact_status: "confirmed", builder_action: "repaired", reviewer_status: "resolved", evidence: "Invented id, not an earlier concern" }];
+      validate(r, 1, p);
+    });
+    check("confirmed still-present finding cannot masquerade as a low risk", () => {
+      const p = withFinding(), r = next(p); r.entries = [risk("low")];
+      r.re_review[0].current_id = "R1"; validate(r, 1, p);
+    });
+    check("an unchecked fact cannot masquerade as a confirmed finding", () => {
+      const p = withFinding(), r = next(p, "unverified", "open", "unverified");
+      r.entries = [finding()]; r.verdict = "needs-attention"; validate(r, 1, p);
+    });
+    check("2160 bounded state combinations follow the independent contract table", () => {
+      // Literal allowed rows, derived from REPORT.md rather than the validator.
+      // A reviewer unable to resolve a previously confirmed concern may retain
+      // it as confirmed; a change in its fact_status must also change its kind.
+      const table = {
+        "resolved/confirmed": { kinds: ["none"], actions: ["repaired"] },
+        "refuted/refuted": { kinds: ["none"], actions: ["repaired", "refuted", "open"] },
+        "still present/confirmed": { kinds: ["finding", "decision"], actions: ["repaired", "refuted", "deferred", "open"] },
+        "unverified/confirmed": { kinds: ["finding", "decision"], actions: ["repaired", "refuted", "deferred", "open"] },
+        "unverified/unverified": { kinds: ["risk"], actions: ["repaired", "refuted", "open"] },
+      };
+      const variants = { none: null, finding: finding(), risk: risk("low"), decision: decision(), optional: { kind: "optional", id: "O1", title: "Clarity", benefit: "Optional reading aid" } };
+      const p = withFinding();
+      let count = 0, accepted = 0;
+      for (const fact of ["confirmed", "refuted", "unverified"])
+        for (const action of ["repaired", "refuted", "deferred", "open"])
+          for (const status of ["resolved", "still present", "refuted", "unverified"])
+            for (const [kind, item] of Object.entries(variants))
+              for (const verdict of ["accept-scoped", "needs-attention", "blocked"])
+                for (const context of ["fresh-context", "self-review", "blocked"]) {
+                  const r = next(p, status, action, fact);
+                  r.entries = item ? [clone(item)] : [];
+                  if (item && item.id !== "F1") r.re_review[0].current_id = item.id;
+                  r.verdict = verdict; r.mode.context = context;
+                  r.coverage.limits = verdict === "blocked" ? ["Synthetic unavailable observation"] : [];
+                  const rule = table[`${status}/${fact}`];
+                  const expected = Boolean(rule && rule.kinds.includes(kind) && rule.actions.includes(action))
+                    && (context !== "blocked" || verdict === "blocked")
+                    && (verdict === "blocked" || verdict === (kind === "finding" ? "needs-attention" : "accept-scoped"));
+                  const got = evaluateRecord(r, { schema, previous: p, lensHeadings: lenses });
+                  assert.equal(got.pass, expected, `${fact}/${action}/${status}/${kind}/${verdict}/${context}: ${got.failures.join("; ")}`);
+                  count += 1; accepted += Number(expected);
+                }
+      assert.equal(count, 2160); assert.equal(accepted, 115);
+    });
     const previous = withFinding();
     check("unresolved deferred finding cannot vanish", () => validate(next(previous), 1, previous));
     check("unresolved entry must remain even with blocked verdict", () => {
@@ -217,7 +268,7 @@ function main() {
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
   for (const result of results) process.stdout.write(`${result.pass ? "PASS" : "FAIL"}: ${result.name}${result.error ? `\n${result.error}` : ""}\n`);
   const failed = results.filter((r) => !r.pass).length;
-  process.stdout.write(`${results.length - failed}/${results.length} review-record contract cases passed (synthetic CLI fixtures, not agent behavior).\n`);
+  process.stdout.write(`${results.length - failed}/${results.length} review-record contract checks passed (API matrix + synthetic CLI fixtures, not agent behavior).\n`);
   process.exitCode = failed ? 1 : 0;
 }
 

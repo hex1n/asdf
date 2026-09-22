@@ -429,9 +429,8 @@ function evaluateRecord(record, options = {}) {
     if (record.round === 1 && (previous || reReview.length > 0)) {
       fail("$.round: a first-round record has no previous record or re-review rows");
     }
-    if (record.round > 1 && reReview.length === 0) {
-      fail(`$.re_review: round ${record.round} needs a row for every prior id`);
-    }
+    // The previous active ids below determine which rows are owed. A clean
+    // preceding review has none; requiring a made-up row would block it.
     const reReviewIds = new Map();
     reReview.forEach((row, index) => {
       if (reReviewIds.has(row.id)) {
@@ -459,6 +458,14 @@ function evaluateRecord(record, options = {}) {
       }
       if (!closed && current && current.kind === "optional" && !row.id.startsWith("O")) {
         fail(`$.re_review[${index}]: an unresolved material item cannot become optional`);
+      }
+      // Reclassification preserves the stated fact: a risk has an unchecked
+      // premise, while findings and decisions carry established evidence.
+      if (!closed && current?.kind === "risk" && row.fact_status !== "unverified") {
+        fail(`$.re_review[${index}]: an active risk requires fact_status "unverified"; a confirmed issue cannot be hidden as a risk`);
+      }
+      if (!closed && current && ["finding", "decision"].includes(current.kind) && row.fact_status !== "confirmed") {
+        fail(`$.re_review[${index}]: an active ${current.kind} requires fact_status "confirmed"; an unchecked premise remains a risk`);
       }
       // REPORT.md: `deferred` keeps `confirmed` and its owner and grants no
       // acceptance. A deferred row reading `resolved` is the exact laundering

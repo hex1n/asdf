@@ -34,14 +34,24 @@ function locationKey(entry) {
   return `${normalizePath(entry.location.file)}\n${String(entry.line_text ?? "").replace(/\s+/gu, " ").trim()}`;
 }
 
-// Reviewers write `reviewed.candidate` as prose around a revision ("b08a4a6 (worktree
-// ..., clean)", "working tree at <sha>"). Two reads name the same revision when the
-// first object name in each agrees, short or full; without one, the text itself.
+// Display text is not a snapshot: two dirty worktrees can share the same HEAD.
+// Legacy records can merge only when the entire value is a full immutable id.
+// Snapshot digests are produced from the retained content, never from the brief.
+function immutableIdentity(value, allowNone = false) {
+  if (typeof value !== "string") return null;
+  if (allowNone && value === "none") return value;
+  if (/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u.test(value)) return `git:${value}`;
+  return /^(?:git:(?:[0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$/u.test(value) ? value : null;
+}
+
 function sameRevision(left, right) {
-  const name = (text) => (String(text).match(/\b[0-9a-f]{7,40}\b/iu) ?? [null])[0]?.toLowerCase() ?? null;
-  const [a, b] = [name(left), name(right)];
-  if (a && b) return a.startsWith(b) || b.startsWith(a);
-  return String(left).trim() === String(right).trim();
+  const a = immutableIdentity(left);
+  return a !== null && a === immutableIdentity(right);
+}
+
+function reviewIdentity(record, field) {
+  const explicit = record.reviewed?.[`${field}_identity`];
+  return immutableIdentity(explicit ?? record.reviewed?.[field], field === "base" && explicit !== undefined);
 }
 
 function refusals(reads) {
@@ -51,6 +61,11 @@ function refusals(reads) {
   for (const { label, record } of reads) {
     if (labels.has(label)) problems.push(`read label ${label} is used twice`);
     labels.add(label);
+    for (const field of ["candidate", "base"]) {
+      if (!reviewIdentity(record, field)) {
+        problems.push(`${label}: reviewed.${field} has no immutable identity; provide ${field}_identity from the inspected snapshot, not a branch name, short hash, or prose around HEAD`);
+      }
+    }
     if (PENDING.test(String(record.mode?.host_evidence ?? ""))) {
       problems.push(`${label}: host_evidence is still pending caller verification; deliver the read before merging it`);
     }
@@ -60,7 +75,7 @@ function refusals(reads) {
   }
   const [first] = reads;
   for (const { label, record } of reads.slice(1)) {
-    if (!sameRevision(record.reviewed.candidate, first.record.reviewed.candidate) || !sameRevision(record.reviewed.base, first.record.reviewed.base)) {
+    if (reviewIdentity(record, "candidate") !== reviewIdentity(first.record, "candidate") || reviewIdentity(record, "base") !== reviewIdentity(first.record, "base")) {
       problems.push(`${label}: reviewed ${record.reviewed.candidate} against ${record.reviewed.base}, not the candidate and base of ${first.label}`);
     }
   }
@@ -122,7 +137,8 @@ function mergeRecords(reads, { series, mapPath, lensHeadings = null }) {
   const findings = entries.filter((entry) => entry.kind === "finding");
   const credibleRisks = entries.filter((entry) => entry.kind === "risk" && (entry.severity === "critical" || entry.severity === "high"));
   const anyBlocked = reads.some(({ record }) => record.verdict === "blocked");
-  const verdict = findings.length > 0 || credibleRisks.length > 0 ? "needs-attention" : anyBlocked ? "blocked" : "accept-scoped";
+  // Incomplete execution outranks the finding verdict; retain the findings.
+  const verdict = anyBlocked ? "blocked" : findings.length > 0 || credibleRisks.length > 0 ? "needs-attention" : "accept-scoped";
   const context = reads.map(({ record }) => record.mode.context).sort((a, b) => CONTEXT_RANK[b] - CONTEXT_RANK[a])[0];
   const scopes = [...new Set(reads.map(({ record }) => record.reviewed.scope))];
   const parity = reads.flatMap(({ record }) => record.parity_ledger ?? []);
@@ -140,6 +156,8 @@ function mergeRecords(reads, { series, mapPath, lensHeadings = null }) {
     reviewed: {
       candidate: reads[0].record.reviewed.candidate,
       base: reads[0].record.reviewed.base,
+      candidate_identity: reviewIdentity(reads[0].record, "candidate"),
+      base_identity: reviewIdentity(reads[0].record, "base"),
       scope: scopes.length === 1 ? scopes[0] : reads.map(({ label, record: r }) => `[${label}] ${r.reviewed.scope}`).join(" | "),
     },
     entries,
@@ -230,4 +248,4 @@ function main(argv) {
 // when the skill is reached through the symlink or junction install-skills.cjs creates.
 if (require.main === module) main(process.argv.slice(2));
 
-module.exports = { mergeRecords, locationKey, refusals, sameRevision };
+module.exports = { mergeRecords, locationKey, refusals, sameRevision, immutableIdentity, reviewIdentity };

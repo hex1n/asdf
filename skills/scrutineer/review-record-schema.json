@@ -35,6 +35,8 @@
       "properties": {
         "candidate": { "type": "string", "visibleContent": true },
         "base": { "type": "string", "visibleContent": true },
+        "candidate_identity": { "type": "string", "pattern": "^(git:([0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$" },
+        "base_identity": { "type": "string", "pattern": "^(none|git:([0-9a-f]{40}|[0-9a-f]{64})|sha256:[0-9a-f]{64})$" },
         "scope": { "type": "string", "visibleContent": true }
       }
     },
@@ -200,6 +202,7 @@
         "required": ["id", "fact_status", "builder_action", "reviewer_status", "evidence"],
         "properties": {
           "id": { "type": "string", "pattern": "^[FRDO][1-9][0-9]*$" },
+          "current_id": { "type": "string", "pattern": "^[FRDO][1-9][0-9]*$" },
           "fact_status": { "enum": ["confirmed", "refuted", "unverified"] },
           "builder_action": { "enum": ["repaired", "refuted", "deferred", "open"] },
           "reviewer_status": { "enum": ["resolved", "still present", "refuted", "unverified"] },

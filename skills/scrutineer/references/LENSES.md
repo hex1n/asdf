@@ -41,7 +41,9 @@ without a test; changed helpers or fixtures.
   no such test is a coverage gap; name the branch.
 - Does the test assert the contract's property or the patch's current output?
   A test that snapshots the patch passes on the defect it should catch.
-- Would the test still pass with the fix reverted? Then it protects nothing.
+- For a test claiming defect reproduction, does reverting the fix expose the
+  target failure? A preservation test may pass before and after the change;
+  check whether it rejects a plausible violation of the preserved contract.
 - Are rejecting cases present for validation logic: invalid, empty, boundary,
   oversized inputs? Validation without a rejecting test drifts open.
 - Does the test depend on order, shared mutable state, time, or network? It

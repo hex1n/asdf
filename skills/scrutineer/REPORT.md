@@ -55,7 +55,12 @@ first.
   "review_series": "<the brief's review_series>",
   "round": 1,
   "brief": { "source": "inline | file", "path": "<the brief's path, when source is file>", "content_identity": "sha256 <hex of the brief as received>" },
-  "reviewed": { "candidate": "<revision reviewed>", "base": "<revision it is compared against>", "scope": "<what the review covered>" },
+  "reviewed": {
+    "candidate": "<revision reviewed>", "base": "<revision it is compared against>",
+    "candidate_identity": "<git:full-commit-id or sha256:snapshot-digest>",
+    "base_identity": "<git:full-commit-id, sha256:snapshot-digest, or none for no base>",
+    "scope": "<what the review covered>"
+  },
   "entries": [
     {
       "kind": "finding", "id": "F1", "title": "<...>",
@@ -97,12 +102,12 @@ first.
     "limits": ["<what the review could not establish>"]
   },
   "parity_ledger": [{ "obligation": "<...>", "expected": "<...>", "actual": "<...>", "evidence_or_gap": "<...>" }],
-  "re_review": [{ "id": "F1", "fact_status": "confirmed | refuted | unverified", "builder_action": "repaired | refuted | deferred | open", "reviewer_status": "resolved | still present | refuted | unverified", "evidence": "<what the new revision shows>" }]
+  "re_review": [{ "id": "F1", "current_id": "<current entry id, only after merging or reclassification>", "fact_status": "confirmed | refuted | unverified", "builder_action": "repaired | refuted | deferred | open", "reviewer_status": "resolved | still present | refuted | unverified", "evidence": "<what the new revision shows>" }]
 }
 ```
 
 [review-record-schema.json](review-record-schema.json) fixes the shape; these
-are the four fields whose meaning it cannot carry:
+are the fields whose meaning it cannot carry:
 
 - `mode.host_evidence` — the caller-verified launch facts bound to the returned
   session: mechanism, inheritance and read-only settings, session reference,
@@ -139,6 +144,29 @@ a limit dropped, a severity moved, an entry reworded, is a new round with the
 changed material as its input. The prose is rendered from the delivered
 record, so it changes only where the record did. Check the pair with
 `node <skill-dir>/scripts/validate-review-record.cjs <delivered.json> --returned <returned.json>`.
+On a re-review, also pass the preceding delivered record as the second positional argument.
+
+## Candidate identity
+
+Keep `reviewed.candidate` and `base` as display labels. For independent reads,
+record `candidate_identity` and `base_identity` from the exact retained inputs:
+`git:<full lowercase commit id>` for an immutable committed snapshot, or
+`sha256:<64 lowercase hex>` for a retained snapshot artifact. Use `none` as the
+base identity only for a component review that has no comparison base.
+
+A working-tree snapshot must account for the pinned HEAD, every in-scope file's
+path, mode and content, additions, deletions, and supporting inputs. Hash its
+retained archive or canonical manifest, not the words "working tree at HEAD",
+a branch name, a subset of changed files, or the review brief. Verify that the
+review reads those bytes. Reads can have different briefs and navigation while
+sharing one snapshot. If no recoverable identity exists, keep the reads separate
+and report the missing identity rather than merging them.
+
+Legacy records still validate individually. Without explicit identity fields,
+the merger accepts only an entire bare full commit id, not abbreviations or a
+hash embedded in prose. It checks identity equality, not the truth or completeness
+of a declared snapshot; the caller and reviewer establish that from the inputs.
+Keep old records unchanged; do not invent identities retroactively to pass a merge.
 
 ## Independent reads
 
@@ -151,8 +179,10 @@ beside it. The series record is then built from the delivered reads:
 It keeps every entry and renumbers it, places entries on one quoted line next
 to each other and marks them `co_located` in the map together with the read and
 id each came from, keeps each coverage surface at its deepest depth with every
-read's account, and derives the verdict from the merged entries. It merges
-first-round reads of one candidate, refuses a read whose host evidence is still
+read's account, and keeps the overall verdict `blocked` if any read is blocked;
+otherwise it derives the verdict from the merged entries. Findings and limits
+remain present in either case. It merges first-round reads with identical
+candidate and base identities, refuses a read whose host evidence is still
 pending, and writes nothing unless the result validates. Co-located entries may
 be one defect or several, since two distinct defects on one line do occur, so
 the builder verifies each before treating two as one. The prose renders from
@@ -171,6 +201,7 @@ verdict: <verdict> | mode: <context> — <host_evidence>
 review_series: <review_series>; round <round>
 brief: <source> <path> — <content_identity>
 reviewed: <candidate> against <base>; <scope>
+identities: <candidate_identity> against <base_identity>, when present
 
 ## Findings
 ### F1 — <title>
@@ -203,7 +234,7 @@ reviewed: <candidate> against <base>; <scope>
 | checks run: <command @ revision — observation> | limits: <limits> |
 
 ## Re-review               (round > 1 only)
-| id | fact status | builder action | reviewer status | evidence |
+| id | current id, if aliased | fact status | builder action | reviewer status | evidence |
 ```
 
 ## Rules
@@ -212,14 +243,13 @@ reviewed: <candidate> against <base>; <scope>
   user owns rather than the change's defect: a pre-existing defect keeps its
   confirmed label, severity, attribution, and evidence class there, and adds
   `location` when it has one to quote.
-- `verdict` is `needs-attention` when any confirmed finding exists or a credible
-  high-impact risk stays unverified; `accept-scoped` when neither exists in the
-  inspected scope; `blocked` when the review could not be established or
-  completed, including when the caller cannot verify host isolation, with the
-  blocking limit in `coverage.limits`. A coverage limit
-  never turns `needs-attention` into `accept-scoped`. Only findings and risks
-  move the verdict: a decision item is reported for the user's decision and
-  leaves it where those two put it, confirmed label and all.
+- `verdict` is `blocked` when the review could not be established or completed,
+  including when `mode.context` is `blocked`, with the reason in
+  `coverage.limits`. Preserve findings while blocked. Otherwise use
+  `needs-attention` when a confirmed finding or credible high-impact risk stays
+  open, and `accept-scoped` when neither exists in the inspected scope.
+  A limit never upgrades a verdict. Decision items remain the user's decisions
+  and do not erase a finding, risk, or review blocker.
 - Severity measures consequence; the evidence class says how a finding is
   established. A concern resting on an unchecked premise is a risk at any
   severity, so a critical risk stays visible without being reported as
@@ -257,6 +287,15 @@ reviewed: <candidate> against <base>; <scope>
   grants no acceptance. Ids stay stable across rounds within a review series;
   sub-items carry their own ids, a merged or reclassified entry keeps its id or
   names the alias, and a new entry never reuses an old id.
+- A re-review includes the preceding record from the same series and advances
+  its round by one. Every unresolved prior entry remains in `entries` under
+  its stable id, or names the retained entry in `current_id` after a merge or
+  reclassification; its evidence explains that mapping. An unresolved material
+  item cannot become optional. `re_review` is a disposition, not a replacement
+  for the open item. `resolved` requires `confirmed` plus `repaired` and new evidence;
+  `refuted` requires a refuted fact. Closed items leave the current entries
+  and remain in the disposition history. Neither deleting an entry nor
+  marking a still-present issue `deferred` grants acceptance.
 - When the builder's evidence and the reviewer's conclusion point opposite
   ways, both are carried side by side with the observation each rests on. The
   user decides; relabeling the finding settles nothing.

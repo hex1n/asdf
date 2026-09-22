@@ -162,7 +162,7 @@
                 "required": ["path", "identity"],
                 "properties": {
                   "path": { "type": "string", "visibleContent": true },
-                  "identity": { "type": "string", "visibleContent": true }
+                  "identity": { "type": "string", "visibleContent": true, "pattern": "^sha256 [0-9a-fA-F]{64}$" }
                 }
               }
             }
@@ -260,7 +260,7 @@
     "report": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["rules", "record_schema"],
+      "required": ["rules"],
       "properties": {
         "rules": {
           "type": "object",
@@ -270,8 +270,7 @@
             "revision": { "type": "string", "visibleContent": true },
             "text": { "type": "string", "visibleContent": true }
           }
-        },
-        "record_schema": { "type": "object" }
+        }
       }
     },
     "record_output": { "type": "string", "visibleContent": true },

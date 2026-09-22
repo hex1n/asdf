@@ -2,9 +2,8 @@
 name: rationale-records
 description: >
   Maintain personal docs/rationale records that explain why code is implemented
-  this way. Use when a change touches code an existing W-record anchors
-  or the callers, producers, or configuration that record depends on, when a
-  change leaves a constraint a natural-looking rewrite would break, when
+  this way. Use before editing code in a repository that keeps docs/rationale/,
+  when a change leaves a constraint a natural-looking rewrite would break, when
   answering a question took reconstructing a rule from source that no record
   states, when the user asks to record or query such a reason, or during
   worktree handoff of rationale notes.
@@ -35,8 +34,10 @@ is precisely what a rewrite reaches for.
 ## Main-checkout workflow
 
 1. Confirm this is the main checkout, not a linked worktree.
-2. Search by W-ID, `Class#member`, source path with optional line, and domain
-   terms. Treat member results as proximity navigation, then read the code.
+2. Before editing, search by W-ID, `Class#member`, source path with optional
+   line, and domain terms for every file the change will touch, including files
+   added to the change later. Treat member results as proximity navigation, then
+   read the code and the records found before implementing.
 3. Add or update an active entry under `docs/rationale/<stable-domain>/`. Name
    files `<NN>-<topic>.md` so their reading order is visible. Start every file
    with a topic and one-line `TL;DR` saying what it records. Split large domains
@@ -57,6 +58,11 @@ is precisely what a rewrite reaches for.
    samples, and history.
 6. Run a full check after creating, migrating, or restructuring records. Normal
    Codex and Claude Stop hooks use the incremental check.
+7. Run `scripts/rationale.mjs links --apply` after maintaining records or moving
+   their source lines. It makes each snippet clickable in IDEA, VS Code, and Zed
+   Markdown previews. The same relative link follows the reading editor across
+   operating systems; editor detection is unnecessary. Read
+   [source navigation](REFERENCE.md#source-navigation) for refresh behavior.
 
 Before relying on an existing explanation, check whether the current task
 changes its callers, producers, configuration, or dependency semantics even if

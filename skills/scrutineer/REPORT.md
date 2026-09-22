@@ -43,8 +43,66 @@ files or break report links to achieve a smaller directory.
 
 ## Record
 
-Return the record in-band unless the handoff names an output path. Its fields
-are the schema's; these are the four whose meaning the schema cannot carry:
+Return the record in-band unless the handoff names an output path. Write it
+from this template: one `entries` item per concern, of the kind it is, and
+`parity_ledger` and `re_review` only for parity work and for a round after the
+first.
+
+```json
+{
+  "verdict": "accept-scoped | needs-attention | blocked",
+  "mode": { "context": "fresh-context | self-review | blocked", "host_evidence": "<launch facts>" },
+  "review_series": "<the brief's review_series>",
+  "round": 1,
+  "brief": { "source": "inline | file", "path": "<the brief's path, when source is file>", "content_identity": "sha256 <hex of the brief as received>" },
+  "reviewed": { "candidate": "<revision reviewed>", "base": "<revision it is compared against>", "scope": "<what the review covered>" },
+  "entries": [
+    {
+      "kind": "finding", "id": "F1", "title": "<...>",
+      "severity": "critical | high | medium | low",
+      "attribution": "introduced | pre-existing | unknown",
+      "evidence": "observed | source-established",
+      "location": { "file": "<path at the reviewed revision>", "line": 1 },
+      "line_text": "<the triggering line, verbatim>",
+      "trigger": "<conditions that reach it>",
+      "contract": "<the obligation it breaks>",
+      "consequence": "<what goes wrong>",
+      "evidence_detail": "<the observation or source reading that establishes it>",
+      "repair_constraints": "<what a repair must preserve, when there is any>"
+    },
+    {
+      "kind": "risk", "id": "R1", "title": "<...>",
+      "severity": "critical | high | medium | low",
+      "unknown": "<the unchecked premise>",
+      "smallest_resolving_check": "<the check that would settle it>",
+      "blocks": "<the conclusion it prevents>"
+    },
+    {
+      "kind": "decision", "id": "D1", "title": "<...>",
+      "decision_kind": "scope deviation | pre-existing defect | target-versus-preservation conflict",
+      "severity": "critical | high | medium | low",
+      "attribution": "introduced | pre-existing | unknown",
+      "evidence": "observed | source-established",
+      "location": { "file": "<path, when there is a line to quote>", "line": 1 },
+      "evidence_detail": "<...>",
+      "decision_needed": "<the choice the user owns>"
+    },
+    { "kind": "optional", "id": "O1", "title": "<...>", "benefit": "<the concrete benefit>" }
+  ],
+  "coverage": {
+    "surfaces": [{ "surface": "<a surface of the brief's coverage_plan>", "depth": "in-depth | sampled | skipped", "evidence": "<see below>" }],
+    "lenses_applied": ["<LENSES.md section heading>"],
+    "lenses_excluded": [{ "lens": "<section heading>", "reason": "<the fact that excludes it>" }],
+    "checks_run": [{ "command": "<command>", "revision": "<revision it ran at>", "observation": "<what it showed>" }],
+    "limits": ["<what the review could not establish>"]
+  },
+  "parity_ledger": [{ "obligation": "<...>", "expected": "<...>", "actual": "<...>", "evidence_or_gap": "<...>" }],
+  "re_review": [{ "id": "F1", "fact_status": "confirmed | refuted | unverified", "builder_action": "repaired | refuted | deferred | open", "reviewer_status": "resolved | still present | refuted | unverified", "evidence": "<what the new revision shows>" }]
+}
+```
+
+[review-record-schema.json](review-record-schema.json) fixes the shape; these
+are the four fields whose meaning it cannot carry:
 
 - `mode.host_evidence` — the caller-verified launch facts bound to the returned
   session: mechanism, inheritance and read-only settings, session reference,

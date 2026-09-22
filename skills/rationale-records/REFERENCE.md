@@ -24,6 +24,9 @@ Continue with entries in this schema:
 
 These three labels are the record's only field names; any other line in a record
 body is rejected. Keep each `文件路径` and `代码片段` field on one physical line.
+The snippet can be plain inline code as above, or the generated inline-code
+link described in [source navigation](#source-navigation). Both carry the same
+source text and use the same anchor matcher.
 Only `实现理由` accepts continuation lines indented by two spaces; reach for an
 indented `text` block when order, scale, or two parallel
 paths are what the reader must see — prose describing a rounding chain is harder
@@ -148,6 +151,50 @@ FAIL; there is no warning state, and failed checks do not advance state.
 
 `Class#member` lookup finds the unique class file and sorts by textual proximity.
 It is navigation only, not an AST claim that an anchor belongs to that member.
+
+## Source navigation
+
+After writing records, run the CLI from the target repository to generate links:
+
+```bash
+node "$HOME/.agents/skills/rationale-records/scripts/rationale.mjs" links
+node "$HOME/.agents/skills/rationale-records/scripts/rationale.mjs" links --apply
+node "$HOME/.agents/skills/rationale-records/scripts/rationale.mjs" links --check
+```
+
+`links` previews destinations without writing. `--apply` updates only the
+`代码片段` fields; `--check` exits 1 if regeneration would change a record.
+Every anchor must pass the normal full validation before any file is written.
+Writes replace each changed file atomically; after an interrupted multi-file
+update, rerun the idempotent command. Linked worktrees cannot run this command.
+
+The generated field looks like this (the destination is relative to the record
+file, whereas `文件路径` remains relative to the repository root):
+
+```markdown
+- **代码片段** [`apply(first, second);`](<../../../src/main/java/sample/Alpha.java#L42>)
+```
+
+Open the record in IDEA, VS Code, or Zed's built-in Markdown preview and click
+the code text. All three support local relative links with `#L<line>`; the
+preview opens its own editor, so a shared record needs no editor-process
+detection, local preference, absolute machine path, or OS URL registration.
+Paths use `/` and percent-encoded segments for spaces, Unicode, `#`, and `%`.
+Backticks within source snippets receive a longer Markdown code delimiter.
+This targets local source files; remote workspace routing and other Markdown
+viewers are outside the tested contract. Use current editor releases.
+
+The snippet remains the anchor; the line number is derived navigation data.
+After source edits, record moves, or snippet changes, rerun `links --apply`.
+Normal `check` and Stop hooks validate snippets but do not refresh links or
+prove the stored destination is current; use `links --check` for that check.
+The command reads saved files, so save editor buffers before refreshing.
+
+The navigation behavior is grounded in the editors' handlers:
+[IDEA](https://github.com/JetBrains/intellij-community/blob/master/plugins/markdown/core/frontend/src/com/intellij/markdown/frontend/preview/accessor/impl/MarkdownLinkOpenerImpl.kt),
+[VS Code](https://github.com/microsoft/vscode/blob/main/extensions/markdown-language-features/src/util/openDocumentLink.ts),
+and [Zed](https://github.com/zed-industries/zed/blob/main/crates/markdown_preview/src/markdown_preview_view.rs).
+Source compatibility is distinct from exercising GUI clicks on each OS.
 
 ## Worktree handoff
 

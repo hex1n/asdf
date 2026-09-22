@@ -49,6 +49,12 @@ Follow that workflow for evaluation and iteration while preserving this
 repository's source, distribution, and verification constraints. Use the
 current runtime's official guidance for invocation settings and metadata.
 
+**Portable text:** skills here are installed into many repositories, so rules
+and examples under `skills/` state the general class and use invented
+placeholders, never an identifier, code, table, or domain term from a real
+project. Before committing, search the diff for names and domain terms from the
+repositories the session read.
+
 **Wording and structure:** use `writing-for-agents` when writing or editing
 skills and shared agent instructions. Apply its wording, information hierarchy,
 context-pointer, and pruning guidance while preserving the intended behavior.
@@ -77,11 +83,13 @@ runs top-level stays `.mjs`.
 
 A skill's record schema is declarative and lives at the skill root, next to
 `SKILL.md`, because a reference file hands the same field list to the agent
-that must emit the record. Where more than one skill needs the schema
-interpreter, each carries its own copy — an import reaching outside the skill
-directory resolves in this checkout and nowhere else — delimited by the
-`shared-validator-helpers` markers that `scripts/assert-validator-helpers.mjs`
-pins byte-identical.
+that must emit the record. Where that file shows the fields as a ```json
+template, `scripts/assert-schema-templates.cjs` pins the template to the
+schema; a new template joins the list at the top of that script. Where more
+than one skill needs the schema interpreter, each carries its own copy — an
+import reaching outside the skill directory resolves in this checkout and
+nowhere else — delimited by the `shared-validator-helpers` markers that
+`scripts/assert-validator-helpers.mjs` pins byte-identical.
 
 ## Target-Specific Requirements
 

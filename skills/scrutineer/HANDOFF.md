@@ -34,7 +34,7 @@ and task-specific memory out of it.
   "scope": {
     "candidate": {
       "revision": "<commit, branch tip, or working tree at <HEAD sha>>",
-      "content_identity": [{ "path": "<uncommitted file or supporting input>", "identity": "<digest>" }]
+      "content_identity": [{ "path": "<uncommitted file or supporting input>", "identity": "sha256 <hex>" }]
     },
     "base": "<merge-base sha, parent sha, or HEAD for working-tree review>",
     "uncommitted": [{ "path": "<included path>", "state": "staged | unstaged | untracked" }],
@@ -53,8 +53,7 @@ and task-specific memory out of it.
   },
   "prior_evidence": [{ "path": "<test results or CI run>", "revision": "<...>" }],
   "report": {
-    "rules": { "path": "<scrutineer/REPORT.md>", "revision": "<...>" },
-    "record_schema": { "title": "<review-record-schema.json, inlined as the object itself>" }
+    "rules": { "path": "<scrutineer/REPORT.md>", "revision": "<...>" }
   },
   "record_output": "<path to write the review record, or \"inline\">",
   "re_review": {
@@ -78,9 +77,9 @@ The schema fixes the shape; these are the fields whose meaning it cannot carry.
   The reviewer reads that exact version, `git show <revision>:<path>` or the
   hash checked, because the caller keeps working while the review runs; the
   validator verifies the same two roads. `text` carries the content only where
-  the reviewer's filesystem cannot reach the file. `report.record_schema` is
-  always the schema object itself: the contract the record is validated
-  against is the contract the reviewer was given.
+  the reviewer's filesystem cannot reach the file. The brief carries no record
+  schema: the reviewer writes the record from the template in the `report.rules`
+  file.
 - `lenses` is the caller's selection, because selection reads the diff and the
   reviewer has not seen it yet: each section of
   [references/LENSES.md](references/LENSES.md) whose trigger the change meets
@@ -88,10 +87,11 @@ The schema fixes the shape; these are the fields whose meaning it cannot carry.
   fact that excludes each. The two lists partition that file, every section
   once, on one side or the other.
 - `scope.candidate.content_identity` pins the uncommitted files in scope and
-  the supporting inputs the review evidence depends on. `coverage_plan` uses
-  the record's `in-depth | sampled | skipped` vocabulary, one row per surface,
-  so the record's `coverage.surfaces` reports the plan and its outcome instead
-  of reconstructing them afterward.
+  the supporting inputs the review evidence depends on, each `identity` as
+  `sha256 <hex>` of the file as it is now, so the reviewer recomputes the
+  same digest. `coverage_plan` uses the record's `in-depth | sampled | skipped`
+  vocabulary, one row per surface, so the record's `coverage.surfaces` reports
+  the plan and its outcome instead of reconstructing them afterward.
 - `target`, `prior_evidence`, and `re_review.responses` are builder-held
   navigation: facts and unknowns, never conclusions. An entry point is
   navigation; "this path is safe" is a finding. The reviewer derives its
@@ -102,13 +102,13 @@ The schema fixes the shape; these are the fields whose meaning it cannot carry.
 
 `node <skill-dir>/scripts/validate-handoff.cjs <brief.json>` applies the
 schema and the rules it cannot express: every reference readable at its
-revision or carrying its text, the lens lists partitioning LENSES.md, the
-inlined record schema identical to the skill's file, a re-review carrying
-its prior round. The caller runs it before dispatch; the reviewer runs it on
-acceptance whenever Node and the skill directory are reachable, and reads for
-the same things otherwise. It cannot tell a quote from a paraphrase: a
-`request.original` item that reads as a task description rather than a
-message is the reviewer's to report.
+revision or carrying its text, every content identity the digest of its file
+as it is now, the lens lists partitioning LENSES.md, a re-review carrying its
+prior round. The caller runs it before dispatch; the
+reviewer runs it on acceptance whenever Node and the skill directory are
+reachable, and reads for the same things otherwise. It cannot tell a quote
+from a paraphrase: a `request.original` item that reads as a task description
+rather than a message is the reviewer's to report.
 
 The brief is a file the launch message names, or inline. The launch message
 carries the brief's location and the permissions the reviewer runs under;
@@ -146,8 +146,8 @@ visibility alone does not.
 
 | Host | Fresh context | Read-only enforcement |
 |---|---|---|
-| Claude Code | The Agent tool with a non-fork subagent type starts an isolated context without the parent transcript. A fork inherits the conversation and does not qualify. | Recommended: a project agent definition under `.claude/agents/` with `disallowedTools: Write, Edit` and `permissionMode: plan`. The built-in `Explore` and `Plan` types also deny Write and Edit but skip CLAUDE.md and the parent's git status, so the brief's `repository_rules` and `scope` must carry everything they need. |
-| Codex | `codex exec --sandbox read-only "<launch message>"` starts a new session that reads this brief. `codex review --uncommitted`, `--base <branch>`, or `--commit <sha>` runs Codex's own review prompt without this skill; use it only when the user asks for Codex's own opinion, and report it as that. | The `read-only` sandbox policy on the run. |
+| Claude Code | The Agent tool with a non-fork subagent type starts an isolated context without the parent transcript. A fork inherits the conversation and does not qualify. | Recommended: a project agent definition under `.claude/agents/` with `disallowedTools: Write, Edit` and `permissionMode: plan`. The built-in `Explore` and `Plan` types also deny Write and Edit but start without the parent's git status, and which project instructions the host loads for them is observed per session rather than fixed, so the brief's `repository_rules` and `scope` must carry everything they need. |
+| Codex | `codex exec --sandbox read-only -o <file> "<launch message>"` starts a new session that reads this brief and writes its last message to `<file>`. From inside a sandboxed Codex session the launch itself needs escalation; the reviewer still runs under `read-only`. `codex review --uncommitted`, `--base <branch>`, or `--commit <sha>` runs Codex's own review prompt without this skill; use it only when the user asks for Codex's own opinion, and report it as that. | The `read-only` sandbox policy on the run. |
 | Other | Any launch whose configuration shows no transcript inheritance. | The host's tool allowlist or sandbox policy, named in the report. |
 
 When no row applies and the host offers no equivalent, the review is blocked

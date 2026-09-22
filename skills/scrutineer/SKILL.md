@@ -259,11 +259,10 @@ with evidence. Preserve competing evidence when the conclusion remains disputed.
 
 ## Report and re-review
 
-Write the review record first, against
-[review-record-schema.json](review-record-schema.json), then render the prose report from it
-in the user's language, findings first: both are defined by
-[REPORT.md](REPORT.md), and the record is the one the caller reconciles rounds
-by. Each actionable finding carries a stable identifier, a source location at
+Write the review record first, from the template in
+[REPORT.md](REPORT.md#record), then render the prose report from it in the
+user's language, findings first: that file defines both, and the record is the
+one the caller reconciles rounds by. Each actionable finding carries a stable identifier, a source location at
 the reviewed revision with the triggering line quoted verbatim so the reference
 survives later edits, trigger or structural mechanism, violated contract,
 consequence, evidence class, and decisive evidence, with repair constraints

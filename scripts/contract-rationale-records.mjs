@@ -18,12 +18,12 @@ const SKILL = fs.existsSync(STAGED_SKILL)
   ? STAGED_SKILL
   : path.join(ROOT, "skills", "rationale-records", "SKILL.md");
 
-function run(args, cwd, stateRoot) {
+function run(args, cwd, stateRoot, extraEnv = {}) {
   return spawnSync(process.execPath, [CLI, ...args], {
     cwd,
     encoding: "utf8",
     windowsHide: true,
-    env: { ...process.env, ASDF_AGENT_STATE_ROOT: stateRoot },
+    env: { ...process.env, ASDF_AGENT_STATE_ROOT: stateRoot, ...extraEnv },
   });
 }
 
@@ -114,6 +114,49 @@ try {
     if (query.includes("#")) assert.match(found, /近邻导航/);
   }
   stage("full check and navigation");
+
+  const linkPreview = JSON.parse(expect(run(["links", "--json"], repo, stateRoot), 0, "links preview"));
+  assert.equal(linkPreview.links[0].href, "../../../src/main/java/sample/Alpha.java#L1");
+  assert.equal(fs.readFileSync(rationale, "utf8"), activeRecord(), "preview leaves records unchanged");
+  const interruption = path.join(temporary, "interrupt-write.cjs");
+  fs.writeFileSync(interruption, `
+    const fs = require("node:fs");
+    const original = fs.renameSync;
+    fs.renameSync = function (from, to) {
+      const result = original.apply(this, arguments);
+      if (from === process.env.RATIONALE_TEST_RECORD || to === process.env.RATIONALE_TEST_RECORD) process.exit(86);
+      return result;
+    };
+  `);
+  expect(run(["links", "--apply"], repo, stateRoot, {
+    NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --require="${interruption.replaceAll("\\", "/")}"`,
+    RATIONALE_TEST_RECORD: rationale,
+  }), 86, "interrupt immediately after a record rename");
+  assert.ok(fs.existsSync(rationale), "the original record name must remain visible after abrupt termination");
+  assert.match(fs.readFileSync(rationale, "utf8"), /#L1>/, "the visible record contains the complete replacement");
+  expect(run(["links", "--apply"], repo, stateRoot), 0, "generate links");
+  assert.match(fs.readFileSync(rationale, "utf8"), /\[`apply\(first, second\);`\]\(<\.\.\/\.\.\/\.\.\/src\/main\/java\/sample\/Alpha.java#L1>\)/);
+  expect(run(["check", "--full"], repo, stateRoot), 0, "linked records retain schema and anchors");
+  expect(run(["find", "W-001"], repo, stateRoot), 0, "find linked record");
+  expect(run(["links", "--check"], repo, stateRoot), 0, "links are current");
+  fs.writeFileSync(alpha, "\n\n" + fs.readFileSync(alpha, "utf8"));
+  expect(run(["links", "--check"], repo, stateRoot), 1, "line drift detected");
+  expect(run(["links", "--apply"], repo, stateRoot), 0, "refresh moved anchor");
+  assert.match(fs.readFileSync(rationale, "utf8"), /Alpha.java#L3/);
+  const secondApply = JSON.parse(expect(run(["links", "--apply", "--json"], repo, stateRoot), 0, "idempotent links"));
+  assert.deepEqual(secondApply.changedFiles, []);
+  const linkedBeforeFailure = fs.readFileSync(rationale, "utf8");
+  fs.writeFileSync(beta, "class Beta {}\n");
+  expect(run(["links", "--apply"], repo, stateRoot), 1, "invalid anchor prevents writes");
+  assert.equal(fs.readFileSync(rationale, "utf8"), linkedBeforeFailure);
+  fs.writeFileSync(alpha, "class Alpha { void preserveOrder() { apply(first, second); } }\n");
+  fs.writeFileSync(beta, "class Beta { void callRule() { alpha.preserveOrder(); } }\n");
+  const crlf = activeRecord().replaceAll("\n", "\r\n");
+  fs.writeFileSync(rationale, crlf);
+  expect(run(["links", "--apply"], repo, stateRoot), 0, "CRLF links");
+  assert.ok(!/(?<!\r)\n/.test(fs.readFileSync(rationale, "utf8")), "keep CRLF");
+  fs.writeFileSync(rationale, activeRecord());
+  stage("preview links, refresh, failure isolation, and CRLF preservation");
 
   const rebuilt = JSON.parse(expect(run(["check", "--incremental", "--json"], repo, stateRoot), 0, "initial incremental"));
   assert.equal(rebuilt.mode, "full-rebuild");

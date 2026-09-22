@@ -81,6 +81,23 @@ node "$HOME/.agents/skills/rationale-records/scripts/rationale.mjs" find path/to
 全量和增量校验返回 PASS、FAIL 或明确的 SKIP。增量状态存放在用户目录的
 `~/.agents/state/rationale-records` 下，通过原子替换更新；状态无效时重建全量索引。
 
+## 点击片段跳转源码
+
+在目标仓库中运行：
+
+```bash
+node "$HOME/.agents/skills/rationale-records/scripts/rationale.mjs" links --apply
+```
+
+生成后，在 **IDEA、VS Code、Zed 的 Markdown 预览**中点击“代码片段”即可打开对应源码行。
+三者使用相同的相对链接，记录跟随当前阅读它的编辑器，无需检测进程、注册 URL 协议或写入机器绝对路径。
+路径按跨平台形式生成，支持 Windows、macOS、Linux 的路径布局。
+
+片段仍是定位依据，行号只是生成结果。源码行移动后重新运行上述命令即可刷新。
+不加 `--apply` 只预览；`links --check` 检测待更新链接。
+普通锚点校验和 Stop hook 不修改链接。格式与编辑器处理入口见
+[源码跳转说明](REFERENCE.md#source-navigation)。
+
 ## 工作树交接
 
 关联工作树跳过正式校验，通过 `handoff-create` 封存交接说明或 `none` 结果。

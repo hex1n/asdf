@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import sourceLinks from "./source-links.cjs";
 
 const SCHEMA_VERSION = 6;
 const HANDOFF_VERSION = 1;
@@ -64,29 +65,21 @@ function repositoryInfo(start, explicitRoot = "") {
 function atomicWrite(file, text) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const staged = `${file}.staged-${process.pid}-${crypto.randomUUID()}`;
-  const backup = `${file}.backup-${process.pid}-${crypto.randomUUID()}`;
-  fs.writeFileSync(staged, text, "utf8");
-  const handle = fs.openSync(staged, "r");
   try {
+    fs.writeFileSync(staged, text, "utf8");
+    const handle = fs.openSync(staged, "r");
     try {
-      fs.fsyncSync(handle);
-    } catch (error) {
-      if (!["EPERM", "EINVAL", "ENOTSUP"].includes(error?.code)) throw error;
+      try {
+        fs.fsyncSync(handle);
+      } catch (error) {
+        if (!["EPERM", "EINVAL", "ENOTSUP"].includes(error?.code)) throw error;
+      }
+    } finally {
+      fs.closeSync(handle);
     }
-  } finally {
-    fs.closeSync(handle);
-  }
-  const existed = fs.existsSync(file);
-  try {
-    if (existed) fs.renameSync(file, backup);
+    // Rename replaces an existing destination on Windows and POSIX. Moving
+    // the old file aside first would leave its name absent after a crash.
     fs.renameSync(staged, file);
-    if (existed) fs.rmSync(backup, { force: true });
-  } catch (error) {
-    try {
-      if (fs.existsSync(file)) fs.rmSync(file, { force: true });
-      if (existed && fs.existsSync(backup)) fs.renameSync(backup, file);
-    } catch {}
-    throw error;
   } finally {
     if (fs.existsSync(staged)) fs.rmSync(staged, { force: true });
   }
@@ -132,6 +125,7 @@ function parseArgs(argv) {
       case "--full": options.full = true; break;
       case "--incremental": options.incremental = true; break;
       case "--apply": options.apply = true; break;
+      case "--check": options.checkLinks = true; break;
       case "--help": case "-h": options.help = true; break;
       default:
         if (arg.startsWith("-")) throw new Error(`Unknown option: ${arg}`);
@@ -140,6 +134,8 @@ function parseArgs(argv) {
   }
   if (options.extensions.length === 0) options.extensions = [...DEFAULT_EXTENSIONS];
   if (!Number.isSafeInteger(options.limit) || options.limit < 1) throw new Error("--limit must be a positive integer.");
+  if (options.checkLinks && command !== "links") throw new Error("--check requires links.");
+  if (options.checkLinks && options.apply) throw new Error("Choose --check or --apply.");
   return options;
 }
 
@@ -147,6 +143,7 @@ function printHelp() {
   process.stdout.write(`Rationale records CLI\n\n` +
     `  rationale.mjs check [--full|--incremental] [--root DIR] [--json] [-q]\n` +
     `  rationale.mjs find QUERY [--full] [--limit N]\n` +
+    `  rationale.mjs links [--apply|--check] [--root DIR] [--json]\n` +
     `  rationale.mjs handoff-create --task ID --base SHA --note FILE|none [--out FILE]\n` +
     `  rationale.mjs handoff-consume --manifest FILE [--resolution FILE]\n` +
     `  rationale.mjs worktree-finish --manifest FILE --main-root DIR [--branch NAME] [--apply]\n`);
@@ -210,10 +207,15 @@ function parseRecords(text, rationaleFile, rationaleRel, fileErrors) {
       continue;
     }
     match = RE_SHAPE.exec(line);
-    if (match) {
+    const linked = line.startsWith("- **代码片段** ")
+      ? sourceLinks.parseLinkedSnippet(line.slice("- **代码片段** ".length)) : null;
+    if (match || linked) {
       const anchor = current.anchors.at(-1);
       if (!anchor || anchor.shape) current.errors.push(`line ${lineNumber}: **代码片段** must follow one unmatched **文件路径**`);
-      else anchor.shape = match[1];
+      else {
+        anchor.shape = match ? match[1] : linked.shape;
+        anchor.shapeLine = lineNumber;
+      }
       continue;
     }
     match = RE_EXPLANATION.exec(line);
@@ -632,6 +634,67 @@ function runFind(options) {
   return 0;
 }
 
+function runLinks(options) {
+  const repo = repositoryInfo(process.cwd(), options.root);
+  if (repo.linkedWorktree) throw new Error("links must run in the main checkout.");
+  const recordsRoot = path.resolve(repo.root, options.records);
+  if (!under(repo.root, recordsRoot) ||
+      (fs.existsSync(recordsRoot) && !under(fs.realpathSync(repo.root), fs.realpathSync(recordsRoot)))) {
+    throw new Error("Rationale links must stay inside the checkout.");
+  }
+  const corpus = loadCorpus(repo, options);
+  const validation = validateEntries(repo, corpus.entries, null, corpus.fileErrors);
+  if (validation.failures.length) {
+    if (options.json) process.stdout.write(`${JSON.stringify({ failures: validation.failures, changedFiles: [] })}\n`);
+    else for (const failure of validation.failures) process.stderr.write(`${failure.id}: ${failure.detail}\n`);
+    return 1;
+  }
+  const files = new Map(corpus.rationaleFiles.map((file) => {
+    const original = fs.readFileSync(file, "utf8");
+    if (sha256(original) !== corpus.fileHashes[posixRelative(repo.root, file)]) {
+      throw new Error(`Record changed while generating links; retry: ${file}`);
+    }
+    return [file, { original, lines: original.split("\n") }];
+  }));
+  const links = [];
+  for (const entry of corpus.entries) {
+    for (const anchor of entry.anchors) {
+      const { line } = validation.resolved.get(`${entry.id}\0${anchor.source}\0${anchor.shape}`);
+      const href = sourceLinks.sourceLink(entry.rationaleFile, path.resolve(repo.root, anchor.source), line);
+      const field = sourceLinks.linkedSnippet(anchor.shape, href);
+      const record = files.get(entry.rationaleFile);
+      const index = anchor.shapeLine - 1;
+      const ending = record.lines[index].endsWith("\r") ? "\r" : "";
+      record.lines[index] = `- **代码片段** ${field}${ending}`;
+      links.push({ id: entry.id, record: entry.rationaleRel, source: anchor.source, line, href });
+    }
+  }
+  const changed = [...files].map(([file, record]) => ({ file, ...record, text: record.lines.join("\n") }))
+    .filter((record) => record.text !== record.original);
+  // Finish all validation and rendering before touching the first record.
+  if (options.apply) {
+    for (const record of changed) {
+      if (fs.readFileSync(record.file, "utf8") !== record.original) {
+        throw new Error(`Record changed while generating links; retry: ${record.file}`);
+      }
+    }
+    for (const record of changed) atomicWrite(record.file, record.text);
+  }
+  const result = {
+    mode: options.apply ? "applied" : options.checkLinks ? "check" : "preview",
+    format: "relative-line",
+    changedFiles: changed.map((record) => posixRelative(repo.root, record.file)), links, failures: [],
+  };
+  if (options.json) process.stdout.write(`${JSON.stringify(result)}\n`);
+  else {
+    for (const file of result.changedFiles) process.stdout.write(`${options.apply ? "UPDATED" : "CHANGE"} ${file}\n`);
+    for (const link of links) process.stdout.write(`  ${link.id}: ${link.href}\n`);
+    process.stdout.write(`${result.mode}: ${changed.length} file(s), ${links.length} anchor(s).\n`);
+    if (!options.apply && !options.checkLinks && changed.length) process.stdout.write("Re-run with --apply to write records.\n");
+  }
+  return options.checkLinks && changed.length ? 1 : 0;
+}
+
 function requireOption(options, name) {
   if (!options[name]) throw new Error(`--${name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)} is required.`);
   return options[name];
@@ -788,6 +851,7 @@ function main() {
         break;
       }
       case "find": status = runFind(options); break;
+      case "links": status = runLinks(options); break;
       case "handoff-create": status = runHandoffCreate(options); break;
       case "handoff-consume": status = runHandoffConsume(options); break;
       case "worktree-finish": status = runWorktreeFinish(options); break;

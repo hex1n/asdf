@@ -9,9 +9,9 @@
 // restated in the builder's words — each one allowed by nothing and caught
 // by nobody. As JSON the brief has exactly the schema's fields and no room
 // beside them; this script applies the schema and the cross-field rules a
-// schema cannot express: every reference readable or inlined, the lens lists
-// partitioning LENSES.md, the inlined record schema identical to the one the
-// record validator will apply, a re-review carrying its prior round.
+// schema cannot express: every reference readable or inlined, every content
+// identity the digest of its file as it is now, the lens lists partitioning
+// LENSES.md, a re-review carrying its prior round.
 //
 // What it cannot judge is substance. A quoted request that is really a
 // paraphrase passes here and is the reviewer's to notice; a passing brief is
@@ -259,6 +259,19 @@ function collectReferences(brief) {
 
 const CONTENT_HASH = /^sha256\s+([0-9a-f]{64})$/iu;
 
+// The sha256 road, which a hashed reference and a content identity both take:
+// hash the file as it is now and compare. Null is a match.
+function contentHashProblem(resolved, hex) {
+  let content;
+  try {
+    if (!fs.statSync(resolved).isFile()) throw new Error("not a file");
+    content = fs.readFileSync(resolved);
+  } catch {
+    return "unreadable";
+  }
+  return crypto.createHash("sha256").update(content).digest("hex") === hex.toLowerCase() ? null : "mismatch";
+}
+
 // A revision is either a content hash of the file as it is now, or a Git
 // object name the reviewer reads the file at with `git show`. The check
 // follows the same two roads: hash the file, or ask Git whether the path
@@ -268,17 +281,9 @@ function revisionProblem(label, reference, root) {
   const resolved = path.isAbsolute(reference.path) ? reference.path : path.join(root, reference.path);
   const hash = CONTENT_HASH.exec(String(reference.revision).trim());
   if (hash) {
-    let content;
-    try {
-      if (!fs.statSync(resolved).isFile()) throw new Error("not a file");
-      content = fs.readFileSync(resolved);
-    } catch {
-      return `${label}: ${quote(reference.path)} is not a readable file; inline its text or fix the path`;
-    }
-    const actual = crypto.createHash("sha256").update(content).digest("hex");
-    if (actual !== hash[1].toLowerCase()) {
-      return `${label}: ${quote(reference.path)} does not match its stated content identity; restate the revision or inline the text`;
-    }
+    const problem = contentHashProblem(resolved, hash[1]);
+    if (problem === "unreadable") return `${label}: ${quote(reference.path)} is not a readable file; inline its text or fix the path`;
+    if (problem === "mismatch") return `${label}: ${quote(reference.path)} does not match its stated content identity; restate the revision or inline the text`;
     return null;
   }
   const relative = path.relative(root, resolved).replace(/\\/gu, "/");
@@ -320,8 +325,23 @@ function referenceProblems(label, reference, root) {
   return problems;
 }
 
+// A content identity pins a file the review evidence depends on to the bytes
+// it has now, so that the reviewer recomputes the same digest. The schema
+// fixes its form; this check is that the digest is the file's. A caller and
+// a reviewer who hash by different algorithms produced a blocked review once,
+// so the algorithm is not the caller's choice.
+function contentIdentityProblem(label, entry, root) {
+  const hash = CONTENT_HASH.exec(String(entry.identity).trim());
+  if (!hash) return `${label}.identity: must be sha256 <hex> of the file as it is now`;
+  const resolved = path.isAbsolute(entry.path) ? entry.path : path.join(root, entry.path);
+  const problem = contentHashProblem(resolved, hash[1]);
+  if (problem === "unreadable") return `${label}: ${quote(entry.path)} is not a readable file; fix the path`;
+  if (problem === "mismatch") return `${label}: ${quote(entry.path)} does not match its stated content identity; restate the identity from the file as it is now`;
+  return null;
+}
+
 function evaluateHandoff(brief, options = {}) {
-  const { schema, lensHeadings = null, recordSchema = null, root = null } = options;
+  const { schema, lensHeadings = null, root = null } = options;
   const failures = [];
   const fail = (message) => failures.push(message);
 
@@ -333,12 +353,11 @@ function evaluateHandoff(brief, options = {}) {
     for (const { label, value } of collectReferences(brief)) {
       failures.push(...referenceProblems(label, value, root));
     }
-
-    // The record schema travels inside the brief so the contract the reviewer
-    // writes to is the contract the record validator applies; a copy that
-    // drifted from the skill's file means one of the two is being lied to.
-    if (recordSchema && canonical(brief.report.record_schema) !== canonical(recordSchema)) {
-      fail("$.report.record_schema: differs from review-record-schema.json; inline the schema the record will be validated against");
+    if (root !== null) {
+      (brief.scope?.candidate?.content_identity ?? []).forEach((entry, index) => {
+        const problem = contentIdentityProblem(`$.scope.candidate.content_identity[${index}]`, entry, root);
+        if (problem) fail(problem);
+      });
     }
 
     const selected = brief.lenses.selected.map((item) => item.heading);
@@ -459,16 +478,6 @@ function main(argv) {
   try {
     const skillDir = path.join(__dirname, "..");
     const schema = JSON.parse(readFileBounded(path.join(skillDir, "handoff-schema.json")));
-    // The record schema is the contract the inlined copy is compared with. A
-    // copy that cannot be read is a check that cannot run, and a check that
-    // cannot run exits 2 rather than passing the brief on the checks left.
-    const recordSchemaPath = process.env.SCRUTINEER_RECORD_SCHEMA ?? path.join(skillDir, "review-record-schema.json");
-    let recordSchema;
-    try {
-      recordSchema = JSON.parse(readFileBounded(recordSchemaPath));
-    } catch (error) {
-      throw new Error(`cannot read the record schema at ${recordSchemaPath}: ${error.message}`);
-    }
     const lensPath = process.env.SCRUTINEER_LENSES ?? path.join(skillDir, "references", "LENSES.md");
     const lensHeadings = readLensHeadings(lensPath);
     if (lensHeadings === null) {
@@ -476,7 +485,6 @@ function main(argv) {
     }
     const result = evaluateHandoff(readJson(target), {
       schema,
-      recordSchema,
       lensHeadings,
       root: path.resolve(root),
     });

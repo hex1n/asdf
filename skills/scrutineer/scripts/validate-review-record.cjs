@@ -307,6 +307,7 @@ function evaluateRecord(record, options = {}) {
   const fail = (message) => failures.push(message);
 
   if (schema) failures.push(...validateAgainstSchema(record, schema, "$"));
+  if (schema && previous) failures.push(...validateAgainstSchema(previous, schema, "$previous"));
 
   // Every semantic check below reads fields the schema has already typed. When
   // the record is not even shaped like a record, those reads would report
@@ -341,6 +342,10 @@ function evaluateRecord(record, options = {}) {
     const findings = entries.filter((entry) => entry.kind === "finding");
     const risks = entries.filter((entry) => entry.kind === "risk");
     const credibleRisks = risks.filter((entry) => entry.severity === "critical" || entry.severity === "high");
+
+    if (record.mode?.context === "blocked" && record.verdict !== "blocked") {
+      fail('$.verdict: mode.context "blocked" requires verdict "blocked"; findings remain in entries');
+    }
 
     if (record.verdict === "accept-scoped") {
       if (findings.length > 0) {
@@ -418,15 +423,49 @@ function evaluateRecord(record, options = {}) {
     }
 
     const reReview = record.re_review ?? [];
-    if (record.round > 1 && reReview.length === 0) {
-      fail(`$.re_review: round ${record.round} needs a row for every prior id`);
+    if (record.round > 1 && !previous) {
+      fail("$: a re-review needs the previous record to check prior ids and open obligations");
     }
+    if (record.round === 1 && (previous || reReview.length > 0)) {
+      fail("$.round: a first-round record has no previous record or re-review rows");
+    }
+    // The previous active ids below determine which rows are owed. A clean
+    // preceding review has none; requiring a made-up row would block it.
     const reReviewIds = new Map();
     reReview.forEach((row, index) => {
       if (reReviewIds.has(row.id)) {
         fail(`$.re_review[${index}]: id ${row.id} already has row ${reReviewIds.get(row.id)}`);
       } else {
         reReviewIds.set(row.id, index);
+      }
+      const currentId = row.current_id ?? row.id;
+      const current = entries.find((entry) => entry.id === currentId);
+      const closed = row.reviewer_status === "resolved" || row.reviewer_status === "refuted";
+      if (row.reviewer_status === "resolved" && (row.fact_status !== "confirmed" || row.builder_action !== "repaired")) {
+        fail(`$.re_review[${index}]: "resolved" requires a confirmed issue, a repaired action, and the new revision's evidence`);
+      }
+      if ((row.reviewer_status === "refuted") !== (row.fact_status === "refuted")) {
+        fail(`$.re_review[${index}]: a refuted fact and a refuted reviewer status must agree`);
+      }
+      if (row.reviewer_status === "still present" && row.fact_status !== "confirmed") {
+        fail(`$.re_review[${index}]: "still present" requires fact_status "confirmed"`);
+      }
+      if (!closed && !current) {
+        fail(`$.entries: unresolved prior ${row.id} must remain an entry; omission cannot close it`);
+      }
+      if (closed && (current || row.current_id !== undefined)) {
+        fail(`$.entries: closed prior ${row.id} belongs in re_review, not the current open entries or an alias`);
+      }
+      if (!closed && current && current.kind === "optional" && !row.id.startsWith("O")) {
+        fail(`$.re_review[${index}]: an unresolved material item cannot become optional`);
+      }
+      // Reclassification preserves the stated fact: a risk has an unchecked
+      // premise, while findings and decisions carry established evidence.
+      if (!closed && current?.kind === "risk" && row.fact_status !== "unverified") {
+        fail(`$.re_review[${index}]: an active risk requires fact_status "unverified"; a confirmed issue cannot be hidden as a risk`);
+      }
+      if (!closed && current && ["finding", "decision"].includes(current.kind) && row.fact_status !== "confirmed") {
+        fail(`$.re_review[${index}]: an active ${current.kind} requires fact_status "confirmed"; an unchecked premise remains a risk`);
       }
       // REPORT.md: `deferred` keeps `confirmed` and its owner and grants no
       // acceptance. A deferred row reading `resolved` is the exact laundering
@@ -442,7 +481,17 @@ function evaluateRecord(record, options = {}) {
     });
 
     if (previous) {
+      if (record.review_series !== previous.review_series) {
+        fail("$.review_series: re-review must continue the previous record's series");
+      }
+      if (record.round !== previous.round + 1) {
+        fail("$.round: re-review must follow the previous record's round");
+      }
       const previousEntries = (previous.entries ?? []).filter((entry) => entry.kind !== "optional");
+      const priorIds = new Set([...(previous.entries ?? []), ...(previous.re_review ?? [])].map((entry) => entry.id));
+      for (const row of reReview) {
+        if (!priorIds.has(row.id)) fail(`$.re_review: ${row.id} is not an entry in the previous record`);
+      }
       for (const entry of previousEntries) {
         if (!reReviewIds.has(entry.id)) {
           fail(`$.re_review: prior ${entry.id} has no row; the builder answers every identifier`);

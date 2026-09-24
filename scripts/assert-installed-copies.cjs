@@ -11,6 +11,7 @@ const os = require("node:os");
 const path = require("node:path");
 
 const { TARGET_RUNTIMES, classify } = require("./install-skills.cjs");
+const { RULES_SOURCE_NAME, classifyRulesCopy } = require("./install-agent-tools.cjs");
 
 // Runtimes are discovered, never hard-coded: this machine carries our skills in
 // .agents, .claude, .codex and .factory, and a hard-coded pair silently reported
@@ -97,6 +98,38 @@ function scanSkills(skillsRoot, runtimeRoots) {
   return results;
 }
 
+// The user-level rules file has one installed copy the installer may have had
+// to make instead of a link: ~/.codex/AGENTS.md on a Windows account without
+// symlink privilege. A link reads as its source and needs no comparison; a
+// copy is compared byte for byte like a skill file, and content the installer
+// did not write is a local override, reported and never fixed.
+function scanRules(sourceFile, home = os.homedir()) {
+  if (!fs.existsSync(sourceFile)) return null;
+  const target = path.join(home, ".codex", "AGENTS.md");
+  const base = {
+    kind: "rules",
+    skill: RULES_SOURCE_NAME,
+    runtime: ".codex",
+    source: sourceFile,
+    target,
+    installed: true,
+    override: false,
+    drift: [],
+    missing: [],
+    extra: [],
+  };
+  switch (classifyRulesCopy(target, sourceFile)) {
+    case "absent":
+      return { ...base, installed: false };
+    case "stale":
+      return { ...base, drift: ["AGENTS.md"] };
+    case "foreign":
+      return { ...base, override: true };
+    default:
+      return base;
+  }
+}
+
 function summarize(results) {
   const overrides = results.filter((r) => r.override);
   const managed = results.filter((r) => !r.override);
@@ -155,6 +188,10 @@ function discoverRuntimes(explicit, skillsRoot, home = os.homedir()) {
 }
 
 function applyFix(result, skillsRoot) {
+  if (result.kind === "rules") {
+    fs.copyFileSync(result.source, result.target);
+    return ["AGENTS.md"];
+  }
   const sourceDir = path.join(skillsRoot, result.skill);
   const targetDir = result.runtimeSkillsDir ? path.join(result.runtimeSkillsDir, result.skill) : null;
   if (!targetDir) return [];
@@ -182,7 +219,9 @@ function main(argv) {
     return;
   }
   const explicit = argv.filter((a) => a.startsWith("--runtime=")).map((a) => path.resolve(a.split("=")[1]));
-  const runtimes = discoverRuntimes(explicit, skillsRoot);
+  const home = argv.find((a) => a.startsWith("--home="))?.split("=")[1] ?? os.homedir();
+  const rulesSource = path.join(path.dirname(skillsRoot), RULES_SOURCE_NAME);
+  const runtimes = discoverRuntimes(explicit, skillsRoot, home);
 
   if (!runtimes.length) {
     process.stderr.write("no runtime carries any skill from this repository\n");
@@ -190,7 +229,8 @@ function main(argv) {
     return;
   }
 
-  let results = scanSkills(skillsRoot, runtimes);
+  const scanAll = () => [...scanSkills(skillsRoot, runtimes), scanRules(rulesSource, home)].filter(Boolean);
+  let results = scanAll();
   const fixedLog = [];
   const skippedBackups = [];
   if (fix) {
@@ -203,7 +243,7 @@ function main(argv) {
       const fixed = applyFix(result, skillsRoot);
       if (fixed.length) fixedLog.push({ skill: result.skill, runtime: result.runtime, files: fixed });
     }
-    results = scanSkills(skillsRoot, runtimes);
+    results = scanAll();
   }
 
   const { clean, dirty, absent, overrides, pass } = summarize(results);
@@ -232,9 +272,10 @@ function main(argv) {
       process.stdout.write(`DRIFT ${result.skill} @ ${result.runtime} — ${parts.join("; ")}\n`);
     }
     for (const result of overrides) {
-      process.stdout.write(
-        `local override: ${result.skill} @ ${result.runtime} — not a link to this repository; not checked\n`,
-      );
+      const reason = result.kind === "rules"
+        ? "content the installer did not write"
+        : "not a link to this repository";
+      process.stdout.write(`local override: ${result.skill} @ ${result.runtime} — ${reason}; not checked\n`);
     }
     for (const result of absent) {
       process.stdout.write(`not installed: ${result.skill} @ ${result.runtime}\n`);
@@ -256,4 +297,4 @@ function main(argv) {
 // worst failure available.
 if (require.main === module) main(process.argv.slice(2));
 
-module.exports = { compareSkillTree, scanSkills, summarize, discoverRuntimes };
+module.exports = { compareSkillTree, scanSkills, scanRules, summarize, discoverRuntimes };

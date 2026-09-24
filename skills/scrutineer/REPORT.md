@@ -14,7 +14,7 @@ not.
 
 Return the record and prose in-band for a review that needs no saved output or
 later continuation. When saving is requested or needed for repair/re-review,
-use the user's output path; otherwise use `.scratch/review-YYYYMMDD-topic/`
+use the user's output path; otherwise use `.scratch/YYYYMMDD-review-topic/`
 under the target repository, with the review start date and a short subject.
 Choose an unused name for a new series; reuse the directory for re-review.
 Keep existing audit directories and their references intact.

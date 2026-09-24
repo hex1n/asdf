@@ -7,6 +7,13 @@ const path = require("node:path");
 const { classify, linkSkill } = require("./install-skills.cjs");
 
 const ROOT = path.join(__dirname, "..");
+// The user-level rules file is one source with two runtime entry points:
+// Codex reads ~/.codex/AGENTS.md itself, so that path becomes a file symlink,
+// or a byte-identical copy where a file symlink needs elevation (Windows
+// without Developer Mode) — the installed-copies gate then re-checks the copy.
+// Claude Code reads ~/.claude/CLAUDE.md and expands `@path` imports, so one
+// import line there needs no link and no copy on any platform.
+const RULES_SOURCE_NAME = "global-agent-rules.md";
 const ASSET_SPECS = [
   { name: "java-formatter", source: ["tools", "java-formatter"], install: [".agents", "tools", "java-formatter"] },
   { name: "rationale-records", source: ["skills", "rationale-records"], install: [".agents", "skills", "rationale-records"] },
@@ -83,6 +90,151 @@ function writeJsonAtomic(file, value, io = fs) {
   }
 }
 
+function firstLine(text) {
+  return String(text).split(/\r?\n/u, 1)[0];
+}
+
+function importLine(source) {
+  return "@" + source.split(path.sep).join("/");
+}
+
+// What occupies the Codex rules path. "stale" is a copy this installer made
+// that fell behind the source; "foreign" is content the user wrote themselves
+// or a link elsewhere, which is reported and never replaced. The provenance
+// test is the source's first line, the same kind of marker isManaged() uses
+// for the Stop hook. An empty file counts as absent: a runtime creates one
+// as a placeholder.
+function classifyRulesCopy(target, source, io = fs) {
+  let stat;
+  try {
+    stat = io.lstatSync(target);
+  } catch {
+    return "absent";
+  }
+  if (stat.isSymbolicLink()) {
+    try {
+      return io.realpathSync(target) === io.realpathSync(source) ? "linked" : "foreign";
+    } catch {
+      return "foreign";
+    }
+  }
+  const content = io.readFileSync(target);
+  if (content.length === 0) return "absent";
+  const expected = io.readFileSync(source);
+  if (content.equals(expected)) return "copy";
+  return firstLine(content.toString("utf8")) === firstLine(expected.toString("utf8")) ? "stale" : "foreign";
+}
+
+// Link first; a copy only where the platform refuses a file symlink to this
+// user. With linkOnly, a refused link leaves an existing copy untouched, so a
+// re-run after gaining the privilege upgrades the copy and a re-run without it
+// changes nothing.
+function installRulesCopy(target, source, io = fs, { linkOnly = false } = {}) {
+  io.mkdirSync(path.dirname(target), { recursive: true });
+  const staged = target + ".asdf-tools-staged";
+  if (io.existsSync(staged)) {
+    throw new Error("Installer recovery file already exists beside " + target + "; inspect it before retrying.");
+  }
+  let mode;
+  try {
+    io.symlinkSync(source, staged, "file");
+    mode = "linked";
+  } catch (error) {
+    if (error.code !== "EPERM" && error.code !== "EACCES") throw error;
+    if (linkOnly) return "copy";
+    io.copyFileSync(source, staged);
+    mode = "copied";
+  }
+  try {
+    io.rmSync(target, { force: true });
+    io.renameSync(staged, target);
+  } catch (error) {
+    io.rmSync(staged, { force: true });
+    throw error;
+  }
+  return mode;
+}
+
+function classifyRulesImport(target, source, line, io = fs) {
+  let stat;
+  try {
+    stat = io.lstatSync(target);
+  } catch {
+    return "absent";
+  }
+  if (stat.isSymbolicLink()) {
+    try {
+      if (io.realpathSync(target) === io.realpathSync(source)) return "linked";
+    } catch {}
+  }
+  const content = io.readFileSync(target, "utf8");
+  if (content.trim() === "") return "absent";
+  return content.split(/\r?\n/u).some((candidate) => candidate.trim() === line) ? "present" : "append";
+}
+
+// The user's own CLAUDE.md keeps everything it has; the import line is added
+// below it, the way mergeStopHook adds one hook beside the user's hooks.
+function installRulesImport(target, line, io = fs) {
+  io.mkdirSync(path.dirname(target), { recursive: true });
+  let existing = "";
+  try {
+    existing = io.readFileSync(target, "utf8");
+  } catch {}
+  const separator = existing === "" || existing.endsWith("\n") ? "" : "\n";
+  io.appendFileSync(target, separator + line + "\n", "utf8");
+}
+
+function planRules(home, sourceRoot, io = fs) {
+  const source = path.join(sourceRoot, RULES_SOURCE_NAME);
+  const rules = [];
+  if (io.existsSync(path.join(home, ".codex"))) {
+    const target = path.join(home, ".codex", "AGENTS.md");
+    rules.push({ runtime: "codex", mode: "file", source, target, state: classifyRulesCopy(target, source, io) });
+  }
+  if (io.existsSync(path.join(home, ".claude"))) {
+    const target = path.join(home, ".claude", "CLAUDE.md");
+    const line = importLine(source);
+    rules.push({ runtime: "claude", mode: "import", source, target, line, state: classifyRulesImport(target, source, line, io) });
+  }
+  return rules;
+}
+
+function applyRules(rules, io = fs) {
+  const outcomes = [];
+  for (const rule of rules) {
+    let outcome = rule.state;
+    if (rule.mode === "file") {
+      if (rule.state === "absent" || rule.state === "stale") outcome = installRulesCopy(rule.target, rule.source, io);
+      else if (rule.state === "copy") outcome = installRulesCopy(rule.target, rule.source, io, { linkOnly: true });
+    } else if (rule.state === "absent" || rule.state === "append") {
+      installRulesImport(rule.target, rule.line, io);
+      outcome = "present";
+    }
+    outcomes.push({ ...rule, outcome });
+  }
+  return outcomes;
+}
+
+function describeRule(rule, apply) {
+  const prefix = apply ? "DO " : "would ";
+  if (rule.mode === "file") {
+    switch (rule.state) {
+      case "absent": return prefix + "install rules (link, or copy where a file symlink needs elevation): " + rule.target;
+      case "stale": return prefix + "refresh stale rules copy: " + rule.target;
+      case "copy": return prefix + "keep rules copy, upgrading to a link if the platform now allows one: " + rule.target;
+      case "linked": return prefix + "keep rules link: " + rule.target;
+      default: return "SKIP rules: " + rule.target + " holds content this installer did not write; merge "
+        + RULES_SOURCE_NAME + " into it by hand";
+    }
+  }
+  switch (rule.state) {
+    case "absent": return prefix + "create rules import " + rule.line + ": " + rule.target;
+    case "append": return prefix + "append rules import " + rule.line + " to: " + rule.target;
+    case "linked": return prefix + "keep rules link: " + rule.target;
+    default: return prefix + "keep rules import: " + rule.target;
+  }
+}
+
 function planInstall(home = os.homedir(), sourceRoot = ROOT, platform = process.platform) {
   const assets = ASSET_SPECS.map((spec) => {
     const source = path.join(sourceRoot, ...spec.source);
@@ -105,6 +257,7 @@ function planInstall(home = os.homedir(), sourceRoot = ROOT, platform = process.
   return {
     assets,
     configs,
+    rules: planRules(home, sourceRoot),
   };
 }
 
@@ -117,6 +270,7 @@ function applyInstall(plan) {
       writeJsonAtomic(config.file, config.after);
     }
   }
+  return { rules: applyRules(plan.rules || []) };
 }
 
 function main(args) {
@@ -131,10 +285,16 @@ function main(args) {
     process.stdout.write((apply ? "DO " : "would ") + (changed ? "merge" : "keep")
       + " " + config.runtime + " Stop hook: " + config.file + "\n");
   }
+  for (const rule of plan.rules) {
+    process.stdout.write(describeRule(rule, apply) + "\n");
+  }
   if (apply) {
-    applyInstall(plan);
+    const { rules } = applyInstall(plan);
     process.stdout.write("applied: portable agent tools installed for "
       + plan.configs.map((config) => config.runtime).join(", ") + "\n");
+    for (const rule of rules) {
+      process.stdout.write("rules " + rule.runtime + ": " + rule.outcome + " — " + rule.target + "\n");
+    }
   } else {
     process.stdout.write("re-run with --apply to install\n");
   }
@@ -148,4 +308,18 @@ function main(args) {
 // worst failure available.
 if (require.main === module) main(process.argv.slice(2));
 
-module.exports = { hookHandler, mergeStopHook, writeJsonAtomic, planInstall, applyInstall };
+module.exports = {
+  RULES_SOURCE_NAME,
+  hookHandler,
+  mergeStopHook,
+  writeJsonAtomic,
+  importLine,
+  classifyRulesCopy,
+  installRulesCopy,
+  classifyRulesImport,
+  installRulesImport,
+  planRules,
+  applyRules,
+  planInstall,
+  applyInstall,
+};

@@ -147,7 +147,8 @@ evals/       # eval run artifacts (local-only, Git-ignored)
 tests/       # test suites run by the gate (local-only, Git-ignored)
 AGENTS.md    # shared repository contract
 CONTEXT.md   # canonical domain terms for skill distribution
-CLAUDE.md    # runtime guidance for Claude Code
+CLAUDE.md    # Claude Code entry: one @AGENTS.md import
+global-agent-rules.md  # portable user-level rules for any repository
 ```
 
 Each skill directory contains a task-facing `SKILL.md` (with `name` / `description`
@@ -169,6 +170,14 @@ Claude Code. Business repositories may carry Git-ignored personal records under
 The installer links the formatter into `~/.agents/tools`, the complete rationale
 skill into `~/.agents/skills`, and merges global runtime settings without
 replacing unrelated hooks or settings.
+
+It also installs [`global-agent-rules.md`](global-agent-rules.md), the user-level
+rules for every repository: `~/.codex/AGENTS.md` becomes a file symlink to it, or
+a byte-identical copy where a file symlink needs elevation (Windows without
+Developer Mode), and `~/.claude/CLAUDE.md` gets one `@import` line pointing at it.
+Existing content in either file is kept; a Codex file the installer did not write
+is reported, never replaced. `node scripts/assert-installed-copies.cjs` re-checks
+the copy, so re-run the installer after editing the rules file.
 
 ## Testing
 

@@ -21,6 +21,11 @@ coherent slice, and inspect the result. Keep local work lightweight. Add records
 design comparison, and review when they resolve a concrete decision or risk.
 Use the user's language for explanations; preserve code identifiers and commands.
 
+When task artifacts need a scratch directory, use `.scratch/YYYYMMDD-task-name/`,
+with the task start date in the user's timezone and a short lowercase hyphenated
+task name. Reuse that directory when resuming the task; honor a user-specified
+output path.
+
 ## Establish the contract
 
 Before editing, identify:
@@ -169,6 +174,12 @@ finding that falsifies one evidence claim (a fixture's stated source, a
 claimed reproduction, a reported detection), whoever raises it, reopens every
 claim of the same kind in the slice: re-derive each from its source before
 reporting, and list the claims rechecked.
+
+When two or more confirmed findings point at one seam, or the candidate repair
+amounts to picking which of several authoritative sources or mechanisms wins,
+write one root-cause hypothesis that explains them all and run the cheapest
+check that could refute it before repairing. If it holds, repair the shared cause and recheck each
+finding against the repair; otherwise repair them as independent defects.
 
 ## Close the requested outcomes
 

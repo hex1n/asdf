@@ -138,7 +138,8 @@ evals/       # 评测运行产物（仅本机，Git 忽略）
 tests/       # 门禁运行的测试套件（仅本机，Git 忽略）
 AGENTS.md    # 跨运行时共用仓库约定
 CONTEXT.md   # 技能分发的领域术语
-CLAUDE.md    # 面向 Claude Code 的运行时指引
+CLAUDE.md    # Claude Code 入口：一行 @AGENTS.md 导入
+global-agent-rules.md  # 适用于任意仓库的用户级通用规则
 ```
 
 每个技能目录包含面向任务的 `SKILL.md`（含 `name` / `description` 路由 frontmatter）、
@@ -157,6 +158,11 @@ CLAUDE.md    # 面向 Claude Code 的运行时指引
 
 安装器把 formatter 链接到 `~/.agents/tools`、完整 rationale skill 链接到
 `~/.agents/skills`，合并全局运行时配置时保留已有 Hook 和其他设置。
+
+它还会安装 [`global-agent-rules.md`](global-agent-rules.md)，即适用于任意仓库的用户级规则：
+`~/.codex/AGENTS.md` 建成指向它的文件符号链接，建不了链接的环境（没有开发者模式的 Windows）退回逐字节相同的副本；
+`~/.claude/CLAUDE.md` 加一行指向它的 `@import`。两个文件里已有的内容都保留；不是安装器写的 Codex 文件只报告、不替换。
+`node scripts/assert-installed-copies.cjs` 会复查副本，所以改完规则文件后重跑一次安装器。
 
 ## 测试
 

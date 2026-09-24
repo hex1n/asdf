@@ -101,6 +101,9 @@ When changing these targets:
 - `skills/rationale-records/`: read
   [skills/rationale-records/README.md](skills/rationale-records/README.md) and run
   `node scripts/contract-rationale-records.mjs`.
+- `global-agent-rules.md`: run `node scripts/install-agent-tools.cjs --apply` so a
+  Codex copy made where a file symlink was unavailable follows the source, then
+  `node scripts/gate.mjs`, whose installed-copies check reports a stale copy.
 
 ## Verification And Completion
 

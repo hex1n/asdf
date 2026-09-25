@@ -46,12 +46,18 @@ without a test; changed helpers or fixtures.
   check whether it rejects a plausible violation of the preserved contract.
 - Are rejecting cases present for validation logic: invalid, empty, boundary,
   oversized inputs? Validation without a rejecting test drifts open.
+- Do rejecting cases reach the intended rule with unrelated preconditions
+  satisfied? Rejection by another guard can leave this test green when the
+  intended rule fails open; check the contract-visible result and effects.
 - Does the test depend on order, shared mutable state, time, or network? It
   passes alone and fails in CI, or the reverse.
 - Does a mock replace the component under test? Then the test exercises the
   mock.
-- Was a test deleted, skipped, or its assertion weakened? Each is a removed
-  guard; the change must say what now covers that obligation.
+- Was a test deleted, skipped, or weakened? Identify retained evidence for its
+  relevant inputs and observable obligation, or why that obligation no longer
+  applies. Similar names, overlapping code coverage, or a green suite before
+  and after removal do not establish equivalent detection; resolve material
+  doubt with a focused check of the affected failure mode.
 - Do fixtures match the current schema or contract? A stale fixture tests
   yesterday's shape.
 - Does each expected value or fixture carry a provenance the reviewer can

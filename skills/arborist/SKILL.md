@@ -140,8 +140,11 @@ feasible and its absence after the fix. A check passing both versions can
 protect behavior but does not establish reproduction. Keep the limits of
 intermittent or unavailable reproduction explicit.
 
-Add or strengthen tests where a missing case matters; routine reversible edits
-do not need new tests that merely repeat the implementation.
+Add or strengthen tests for a meaningful gain in detection, feedback speed,
+reliability, or failure diagnosis for an important contract. Overlap alone is
+not redundancy; reuse existing coverage when another test adds no such value.
+Let assertions accept implementation changes the contract permits. Keep decisive
+inputs and expectations visible when sharing setup.
 
 Use targeted mutation or fault injection when confidence depends on whether
 checks detect a plausible critical mistake, especially after guards are

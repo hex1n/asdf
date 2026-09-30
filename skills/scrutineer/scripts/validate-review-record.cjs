@@ -343,6 +343,19 @@ function evaluateRecord(record, options = {}) {
     const risks = entries.filter((entry) => entry.kind === "risk");
     const credibleRisks = risks.filter((entry) => entry.severity === "critical" || entry.severity === "high");
 
+    // SKILL.md owes one falsification check to a critical or high finding
+    // whose evidence is source-established: nothing else behind it was run or
+    // read twice. Its result lives on the entry rather than in checks_run or
+    // limits prose, because a merge renumbers entries without rewriting the
+    // ids that prose quotes, and a generic limit naming the id was already
+    // present on the 2026-09-28 record whose unchecked finding had no producer.
+    for (const entry of findings) {
+      if ((entry.severity === "critical" || entry.severity === "high")
+        && entry.evidence === "source-established" && entry.falsification === undefined) {
+        fail(`$.entries: ${entry.id} is a ${entry.severity} source-established finding without falsification; record the separate check's observation as "ran", or "not-run" with what prevented it`);
+      }
+    }
+
     if (record.mode?.context === "blocked" && record.verdict !== "blocked") {
       fail('$.verdict: mode.context "blocked" requires verdict "blocked"; findings remain in entries');
     }

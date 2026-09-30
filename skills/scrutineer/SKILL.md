@@ -50,10 +50,22 @@ performing the review first. Only an explicit user decision changes a
 user-owned review requirement.
 
 When acting on a report, the builder verifies each finding before changing
-code. Repair confirmed in-scope defects and rerun affected checks; carry
-confirmed findings outside that scope as open decisions for the user, with
-their evidence and attribution intact. Report every finding and sub-item,
+code, its trigger's producer as well as its mechanism. A finding whose
+falsification is `not-run` first gets that check from the caller, dispatched
+the same way into a separate context; an observation that refutes it is
+answered as `refuted` with that evidence, and one that leaves a condition open
+is settled on that condition before any repair. A
+`target-versus-preservation conflict`, or any other decision item that
+questions the candidate's own premise, is settled before repairs to the code
+it may remove. Repair confirmed in-scope defects and rerun affected checks;
+carry confirmed findings outside that scope as open decisions for the user,
+with their evidence and attribution intact. Report every finding and sub-item,
 including those not repaired, using [REPORT.md](REPORT.md)'s disposition rules.
+Findings are attributed against the reviewed candidate. When that candidate is
+reverted or replaced, its `introduced` findings and the repairs made for them
+leave with it; a repair kept as a standalone fix, or a finding carried to the
+base, is re-established there from the base's own producer and evidence
+before it counts as a pre-existing defect.
 
 If the host already placed this request in a fresh reviewer session, accept
 the brief before reviewing: run the check
@@ -173,10 +185,24 @@ checklist is derived once, not per run.
 ## Test the failure hypothesis
 
 For each material concern, establish the triggering input or state, violated
-contract or structural goal, causal path, and consequence. Search for evidence
-that could defeat it: an upstream guard, database constraint, supported-input
-restriction, alternate owner, or required compatibility behavior. Check where a
-protection takes effect; a guard downstream of the effect does not undo it.
+contract or structural goal, causal path, and consequence. Establish the
+triggering state by its producer: the supported input, writer, or transition
+that creates it in normal operation, followed until it reaches the state
+itself. Code that fails to rule a state out does not produce it. When the
+state is a relation between values, such as two orders that disagree, its
+producer is a path that sets those values apart; a path that rewrites or
+reuses them all together produces nothing, even when it is what drew attention
+to one of them. Upstream often keeps such values together by how it generates
+them, all at one moment in one order or carried unchanged on update, rather
+than by a guard. A producer holds only when each condition it needs is itself
+established, by source, a documented contract, data, or an execution; a
+condition taken as possible because nothing forbids it is the same gap one
+step upstream. Where the review can read a real data source, a survey for
+the state is evidence either way, and a state found only in hand-made data
+names no producer. Search for evidence that could defeat the concern: an
+upstream guard, database constraint, supported-input restriction, alternate
+owner, or required compatibility behavior. Check where a protection takes
+effect; a guard downstream of the effect does not undo it.
 
 Distinguish source-level reachability from an observed execution path. Source,
 types, and documented API semantics can establish a defect without a runnable
@@ -185,19 +211,30 @@ could change the conclusion. Investigate tractable concerns rather than parking
 them all as unknown; keep a material unsupported premise explicit when blocked.
 
 Label each finding's evidence class: observed when an execution showed it, or
-source-established when source, types, or documented semantics establish it.
-A concern whose case still rests on a premise not yet checked is an unverified
-risk, not a finding, whatever its severity. For a critical or high risk, the
-reviewer may dispatch one falsification check in a separate context that
-receives only that record and repository access, never the reviewer's reasoning;
-it returns the observation, and the reviewer promotes the risk to a finding
-only when that observation establishes it. The same single check serves a
-critical or high finding whose evidence class is source-established — the one
-finding kind that reaches the builder with neither an execution nor a second
-reader behind it — and an observation that refutes it returns that finding to
-a risk or retires it. One check per risk or finding, none at lower severities
-and none for an observed finding, keeps verification bounded, so the review
-ends on evidence rather than on rounds.
+source-established when source, types, or documented semantics establish the
+whole case, the trigger's producer included. A value worked out from source
+illustrates the mechanism; it is not an observation. A concern whose case
+still rests on a premise not yet checked, such as a triggering state with no
+named producer, is an unverified risk, not a finding, whatever its severity.
+A falsification check runs in a separate context, started as
+[HANDOFF.md](HANDOFF.md#host-mechanisms) names for the host, that receives
+only the entry's record and the read access the reviewer holds, never the
+reviewer's reasoning. It searches for the trigger's producer and for anything
+that defeats the causal path, and returns one of three observations: a
+producer with each of its conditions established, a defeat of the causal
+path, or the condition still open. For a critical or high risk the reviewer may dispatch one, and
+promotes the risk to a finding only when the observation establishes it. A
+critical or high finding whose evidence class is
+source-established — the one finding kind that reaches the builder with
+neither an execution nor a second reader behind it — receives one before the
+report returns, and the entry's `falsification` records `ran` with the
+observation, or `not-run` with what prevented the dispatch. An observation
+that refutes the finding retires it or returns it to a risk, and one that
+leaves a condition open returns it to a risk with that condition as its
+unknown, unless the reviewer establishes the condition itself. One check per
+risk or finding, none at lower severities and none for an observed finding,
+keeps verification bounded, so the review ends on evidence rather than on
+rounds.
 
 Check that tests observe the relevant property and derive expected behavior from
 the contract, not the proposed patch. Green tests or coverage alone do not prove

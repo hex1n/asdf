@@ -73,6 +73,7 @@ first.
       "contract": "<the obligation it breaks>",
       "consequence": "<what goes wrong>",
       "evidence_detail": "<the observation or source reading that establishes it>",
+      "falsification": { "status": "ran | not-run", "detail": "<the separate context's reference and what it observed, or what prevented the dispatch>" },
       "repair_constraints": "<what a repair must preserve, when there is any>"
     },
     {
@@ -121,6 +122,17 @@ are the fields whose meaning it cannot carry:
   edits and a re-review matches on content rather than line numbers. A concern
   with no quotable line is a risk, not a finding, and the schema enforces that
   by requiring `line_text` on findings alone.
+- `trigger` — the conditions that reach the defect and the producer that
+  creates them in normal operation, as
+  [SKILL.md](SKILL.md#test-the-failure-hypothesis) requires; a trigger that
+  names no producer belongs to a risk.
+- `falsification` — the result of the check
+  [SKILL.md](SKILL.md#test-the-failure-hypothesis) owes a critical or high
+  source-established finding, and required on exactly those: `ran` names the
+  dispatched context's session or agent reference and what it observed;
+  `not-run` names what prevented the dispatch. It sits on the entry so it
+  travels with the finding through a merge, which renumbers ids that prose
+  elsewhere in the record still quotes.
 - `coverage.surfaces[].depth` — `in-depth` names the checks that reached the
   surface in `evidence`; `sampled` and `skipped` name there why they did not.
 - `re_review[].reviewer_status` — what the new revision shows, read from its
@@ -209,6 +221,7 @@ identities: <candidate_identity> against <base_identity>, when present
 - location: <file>:<line>  ·  line: <line_text>
 - trigger / contract / consequence: <one line each>
 - evidence detail: <evidence_detail>
+- falsification: <status> — <detail>, when present
 - repair constraints: <repair_constraints, when present>
 
 ## Unverified risks

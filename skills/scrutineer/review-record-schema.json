@@ -69,6 +69,15 @@
               "contract": { "type": "string", "visibleContent": true },
               "consequence": { "type": "string", "visibleContent": true },
               "evidence_detail": { "type": "string", "visibleContent": true },
+              "falsification": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["status", "detail"],
+                "properties": {
+                  "status": { "enum": ["ran", "not-run"] },
+                  "detail": { "type": "string", "visibleContent": true }
+                }
+              },
               "repair_constraints": { "type": "string", "visibleContent": true }
             }
           },

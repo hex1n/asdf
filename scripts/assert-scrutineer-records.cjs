@@ -112,6 +112,11 @@ function main() {
     check("high risk prevents acceptance", () => { const r = clean(); r.entries = [risk()]; validate(r, 1); });
     check("low risk permits scoped acceptance", () => { const r = clean(); r.entries = [risk("low")]; validate(r); });
     check("decision does not become a change defect", () => { const r = clean(); r.entries = [decision()]; validate(r); });
+    check("a high source-established finding records its falsification", () => {
+      const r = withFinding(); r.entries[0].evidence = "source-established";
+      assert.match(validate(r, 1).failures.join("\n"), /F1 is a high source-established finding without falsification/u);
+      r.entries[0].falsification = { status: "not-run", detail: "Synthetic: the host offered the reviewer no sub-agent" }; validate(r);
+    });
     check("blocked record is valid", () => validate(blocked()));
     check("blocked context cannot accept", () => { const r = blocked(); r.verdict = "accept-scoped"; validate(r, 1); });
     check("blocked context cannot become needs-attention", () => { const r = blocked(); r.verdict = "needs-attention"; r.entries = [finding()]; validate(r, 1); });
@@ -319,6 +324,12 @@ function main() {
     check("blocked plus clean remains blocked", () => assert.equal(merge([blocked(), clean()]).record.verdict, "blocked"));
     check("findings without blockers remain needs-attention", () => assert.equal(merge([clean(), withFinding()]).record.verdict, "needs-attention"));
     check("co-located findings are retained rather than voted away", () => { const { record, map } = merge([withFinding(), withFinding()]); assert.equal(record.entries.length, 2); assert.equal(map.entries[0].co_located.length, 1); });
+    check("falsification travels with its finding through the merge's renumbering", () => {
+      const sourced = (detail) => { const r = withFinding(); r.entries[0].evidence = "source-established"; r.entries[0].falsification = { status: "not-run", detail }; return r; };
+      const { record, map } = merge([sourced("read-1 synthetic: host offered no sub-agent"), sourced("read-2 synthetic: host offered no sub-agent")]);
+      assert.deepEqual(map.entries.map((entry) => [entry.id, entry.from.read, entry.from.id]), [["F1", "read-1", "F1"], ["F2", "read-2", "F1"]]);
+      assert.deepEqual(record.entries.map((entry) => entry.falsification.detail), ["read-1 synthetic: host offered no sub-agent", "read-2 synthetic: host offered no sub-agent"]);
+    });
     check("snapshot identity survives merge into a valid re-review", () => {
       const a = dirty(identity); a.entries = [finding()]; a.verdict = "needs-attention";
       const p = merge([a, dirty(identity)]).record; validate(next(p, "resolved", "repaired"), 0, p);

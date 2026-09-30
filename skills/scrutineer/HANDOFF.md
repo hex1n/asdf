@@ -49,6 +49,7 @@ and task-specific memory out of it.
   "access": {
     "read_only_mechanism": "<host mechanism from the table below, as configured>",
     "check_entry_points": [{ "command": "<test, lint, or build command>", "covers": "<what it covers>" }],
+    "evidence_sources": [{ "source": "<data, logs, or another record of how the system behaves>", "read_by": "<the read-only way to query it>" }],
     "isolated_copy": "<path for authorized experiments, or \"not authorized\">"
   },
   "prior_evidence": [{ "path": "<test results or CI run>", "revision": "<...>" }],
@@ -92,6 +93,13 @@ The schema fixes the shape; these are the fields whose meaning it cannot carry.
   same digest. `coverage_plan` uses the record's `in-depth | sampled | skipped`
   vocabulary, one row per surface, so the record's `coverage.surfaces` reports
   the plan and its outcome instead of reconstructing them afterward.
+- `access.evidence_sources` lists what the reviewer may read beyond the
+  repository to learn how the system actually behaves, such as captured data,
+  a test data source, or logs, each with its read-only way in; the list is
+  empty only when the project has no such source. The review establishes a
+  trigger's conditions from these and the falsification check reads the same
+  ones, so a source the brief leaves out turns the findings that need it into
+  risks.
 - `target`, `prior_evidence`, and `re_review.responses` are builder-held
   navigation: facts and unknowns, never conclusions. An entry point is
   navigation; "this path is safe" is a finding. The reviewer derives its
@@ -113,7 +121,11 @@ rather than a message is the reviewer's to report.
 The brief is a file the launch message names, or inline. The launch message
 carries the brief's location and the permissions the reviewer runs under;
 anything else the reviewer needs to know is a brief field, so it is checked
-like one. A brief that fails
+like one. Those permissions keep the one falsification dispatch
+[SKILL.md](SKILL.md#test-the-failure-hypothesis) allows, and the launch
+leaves enabled the host capability the table below names for it; a reviewer
+launched without it records `not-run` on every finding that owed the check.
+A brief that fails
 the check comes back `blocked` naming the gap, and the corrected brief starts
 a new reviewer, because a context that has read builder material is not
 restored by ignoring it. Without a review-method skill the reviewer still
@@ -146,8 +158,8 @@ visibility alone does not.
 
 | Host | Fresh context | Read-only enforcement |
 |---|---|---|
-| Claude Code | The Agent tool with a non-fork subagent type starts an isolated context without the parent transcript. A fork inherits the conversation and does not qualify. | Recommended: a project agent definition under `.claude/agents/` with `disallowedTools: Write, Edit` and `permissionMode: plan`. The built-in `Explore` and `Plan` types also deny Write and Edit but start without the parent's git status, and which project instructions the host loads for them is observed per session rather than fixed, so the brief's `repository_rules` and `scope` must carry everything they need. |
-| Codex | `codex exec --sandbox read-only -o <file> "<launch message>"` starts a new session that reads this brief and writes its last message to `<file>`. From inside a sandboxed Codex session the launch itself needs escalation; the reviewer still runs under `read-only`. `codex review --uncommitted`, `--base <branch>`, or `--commit <sha>` runs Codex's own review prompt without this skill; use it only when the user asks for Codex's own opinion, and report it as that. | The `read-only` sandbox policy on the run. |
+| Claude Code | The Agent tool with a non-fork subagent type starts an isolated context without the parent transcript. A fork inherits the conversation and does not qualify. | Recommended: a project agent definition under `.claude/agents/` with `disallowedTools: Write, Edit` and `permissionMode: plan`. The built-in `Explore` and `Plan` types also deny Write and Edit but start without the parent's git status, and which project instructions the host loads for them is observed per session rather than fixed, so the brief's `repository_rules` and `scope` must carry everything they need. Neither type has the Agent tool, so a reviewer of either type cannot dispatch its falsification check. |
+| Codex | `codex exec --sandbox read-only -o <file> "<launch message>"` starts a new session that reads this brief and writes its last message to `<file>`. From inside a sandboxed Codex session the launch itself needs escalation; the reviewer still runs under `read-only`. `codex review --uncommitted`, `--base <branch>`, or `--commit <sha>` runs Codex's own review prompt without this skill; use it only when the user asks for Codex's own opinion, and report it as that. Keep the `multi_agent` feature enabled: the falsification check is a `spawn_agent` child with `fork_turns: "none"`, which starts without the reviewer's turns and inherits its sandbox. | The `read-only` sandbox policy on the run. |
 | Other | Any launch whose configuration shows no transcript inheritance. | The host's tool allowlist or sandbox policy, named in the report. |
 
 When no row applies and the host offers no equivalent, the review is blocked

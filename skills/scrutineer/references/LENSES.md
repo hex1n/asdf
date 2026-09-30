@@ -41,19 +41,34 @@ without a test; changed helpers or fixtures.
   no such test is a coverage gap; name the branch.
 - Does the test assert the contract's property or the patch's current output?
   A test that snapshots the patch passes on the defect it should catch.
+- Does the test's name promise more than its input exercises? Judge it by its
+  assertions and the production branch each named variant reaches; a variation
+  that stays in fixture code reports coverage that does not exist.
 - For a test claiming defect reproduction, does reverting the fix expose the
   target failure? A preservation test may pass before and after the change;
   check whether it rejects a plausible violation of the preserved contract.
 - Are rejecting cases present for validation logic: invalid, empty, boundary,
   oversized inputs? Validation without a rejecting test drifts open.
+- Would removing the guard a rejecting case targets turn a test red, on input
+  production can deliver? A rejection another guard also produces, or one from
+  a branch production never reaches, stays green with the target guard gone;
+  when no deliverable input isolates the guard, the finding is the redundant
+  guard.
 - Does the test depend on order, shared mutable state, time, or network? It
   passes alone and fails in CI, or the reverse.
 - Does a mock replace the component under test? Then the test exercises the
   mock.
+- Does one identical mock stand in for several different APIs? A call sent to
+  the wrong one still passes.
 - Was a test deleted, skipped, or its assertion weakened? Each is a removed
   guard; the change must say what now covers that obligation.
 - Do fixtures match the current schema or contract? A stale fixture tests
   yesterday's shape.
+- Does a fixture supply an output the code under test owns (an
+  acknowledgement, a callback order, a record in a store the path never
+  writes, a capability flag read back instead of exercised), or does the check
+  never reach production code? The test then passes whether or not the code
+  does the work.
 - Does each expected value or fixture carry a provenance the reviewer can
   check: a captured source that reproduces it, a derivation from the
   contract, or a declared construction? A provenance that does not

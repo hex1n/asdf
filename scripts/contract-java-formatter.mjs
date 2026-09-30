@@ -447,13 +447,7 @@ function runHookScopeContract(temporaryDir) {
   const ownedBytes = "class Owned { void mine( ) { } }\n";
   write(owned, ownedBytes);
   assert.deepEqual(hookRun(worktree, stateRoot, "worktree stop"), {});
-  const check = run(process.execPath, [HOOK, "--files", "Owned.java"], { cwd: worktree, input: "{}" });
-  requireStatus(check, 0, "explicit Stop check");
-  assert.equal(JSON.parse(check.stdout).decision, "block");
-  assert.equal(fs.readFileSync(owned, "utf8"), ownedBytes, "explicit Stop check is read-only");
-  const missing = run(process.execPath, [HOOK, "--files", "Missing.java"], { cwd: worktree, input: "{}" });
-  requireStatus(missing, 0, "Stop check of a missing path");
-  assert.equal(JSON.parse(missing.stdout).decision, "block", "a Stop check of a path it cannot take blocks instead of passing");
+  assert.equal(fs.readFileSync(owned, "utf8"), ownedBytes, "Stop never formats an unformatted task file");
   assert.deepEqual(fs.readFileSync(taskIndexPath), taskIndexBefore, "worktree Stop must not stage files");
   assert.equal(fs.readFileSync(peer, "utf8"), newerBytes, "worktree check must not write the main checkout");
   requireStatus(run(process.execPath, [FORMATTER, "--check", "--files", owned], { cwd: worktree }), 3, "read-only formatter");

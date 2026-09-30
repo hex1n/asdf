@@ -8,7 +8,7 @@ Maven dependencies are pinned so JDK 8 remains sufficient.
 The installer links this directory and the sibling rationale-records tool under
 ~/.agents/tools, then merges one Stop hook into each installed runtime. Stop
 checks rationale anchors and invokes docs/tools/run-agent-gates.mjs when present.
-It never runs the formatter in write mode. Repository dispatchers own their own
+It never runs the formatter. Repository dispatchers own their own
 side effects; the shared formatter does not infer file ownership from timestamps.
 
 The formatter keeps Javadoc blocks byte-for-byte and preserves LF/CRLF layout.
@@ -43,11 +43,11 @@ without --include-tests; the error names each such path and nothing is written.
 Relative paths resolve against the working directory. Production Java is the default scope;
 --include-tests admits explicitly requested test files.
 
-Stop optionally accepts --files <paths> for read-only format checks and reports
-required formatting as a blocking hook result. Without an explicit list it only
-runs the existing rationale/repository checks, so another task's Java changes or
-a formatter upgrade cannot create unsolicited source changes. Old observation
-cache files are unused and may remain on disk.
+Stop neither formats nor checks formatting: it only runs the rationale and
+repository checks, so another task's Java changes or a formatter upgrade cannot
+create unsolicited source changes. A read-only format check is
+format-changed-java.mjs --check --files <paths>. Old observation cache files are
+unused and may remain on disk.
 
 Requirements: Node.js 18+, JDK 8+, Maven 3.6+, and Git. Maven builds
 target/java-formatter.jar on first use and again whenever pom.xml or the Java

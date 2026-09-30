@@ -6,7 +6,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { findGitRoot, formatChangedJava } from "./format-changed-java.mjs";
+import { findGitRoot } from "./format-changed-java.mjs";
 
 const TOOL_ROOT = path.dirname(fileURLToPath(import.meta.url));
 // The rationale checker is a separate asset, so this tool locates it instead of
@@ -175,22 +175,6 @@ function main() {
   }
 
   try {
-    const marker = process.argv.indexOf("--files");
-    if (marker !== -1) {
-      const files = process.argv.slice(marker + 1);
-      if (files.length === 0 || files.some((file) => file.startsWith("--"))) {
-        throw new Error("Stop formatting checks require an explicit non-empty --files list.");
-      }
-      const pending = formatChangedJava({ repoRoot, explicitFiles: files, checkOnly: true });
-      if (pending.length > 0) {
-        const names = pending.map((file) => path.relative(repoRoot, file)).join(", ");
-        process.stdout.write(JSON.stringify(blockingPayload(input.value,
-          "Java formatting required for explicit files: " + names
-          + ". Run format-changed-java.mjs --files <task-owned files>, inspect, then verify and stage.")) + "\n");
-        return;
-      }
-    }
-
     if (fs.existsSync(path.join(repoRoot, "docs", "rationale"))) runRationaleGate(repoRoot);
 
     const dispatcher = repositoryDispatcher(repoRoot);
@@ -198,7 +182,7 @@ function main() {
     process.stdout.write(JSON.stringify(result || {}) + "\n");
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    const reason = "Java formatting, rationale records, or repository delivery gates failed.\n\n" + detail.slice(-6000);
+    const reason = "Rationale records or repository delivery gates failed.\n\n" + detail.slice(-6000);
     process.stdout.write(JSON.stringify(blockingPayload(input.value, reason)) + "\n");
   }
 }

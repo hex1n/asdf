@@ -289,6 +289,8 @@ function runSourceScopeContract(temporaryDir) {
   git(repo, ["commit", "-qm", "baseline"]);
 
   write(production, "class Production { void changed( ) { } }\n");
+  write(unitTest, "class ProductionTest { void renamed( ) { } }\n");
+  write(appTest, "class Test { void renamed( ) { } }\n");
   const unitTestBefore = fs.readFileSync(unitTest, "utf8");
   const appTestBefore = fs.readFileSync(appTest, "utf8");
   const productionRun = run(process.execPath, [FORMATTER], { cwd: repo });
@@ -301,8 +303,97 @@ function runSourceScopeContract(temporaryDir) {
 
   const testRun = run(process.execPath, [FORMATTER, "--include-tests", "--files", unitTest, appTest], { cwd: repo });
   requireStatus(testRun, 3, "explicit test format");
-  assert.match(fs.readFileSync(unitTest, "utf8"), /void oldName\(\) \{/);
-  assert.match(fs.readFileSync(appTest, "utf8"), /void oldName\(\) \{/);
+  assert.match(fs.readFileSync(unitTest, "utf8"), /void renamed\(\) \{/);
+  assert.match(fs.readFileSync(appTest, "utf8"), /void renamed\(\) \{/);
+}
+
+// Only the members a change touches are formatted, measured against HEAD or --base;
+// every other line keeps its bytes however far it is from the profile.
+function runChangedRegionContract(temporaryDir) {
+  const repo = path.join(temporaryDir, "region-repo");
+  fs.mkdirSync(repo, { recursive: true });
+  git(repo, ["init", "-q"]);
+  git(repo, ["config", "user.email", "formatter@example.invalid"]);
+  git(repo, ["config", "user.name", "Formatter Probe"]);
+  const file = path.join(repo, "Region.java");
+  const untouched = [
+    "import java.util.List;",
+    "    int  untouchedField=1;",
+    "    void untouched( ) { int  a=1; }",
+    "    void after( ) { int  c=3; }",
+  ];
+  const baseline = [
+    untouched[0],
+    "class Region {",
+    untouched[1],
+    untouched[2],
+    "    void edited( ) {",
+    "        int  b=2;",
+    "    }",
+    untouched[3],
+    "}",
+    "",
+  ].join("\n");
+  write(file, baseline);
+  git(repo, ["add", "."]);
+  git(repo, ["commit", "-qm", "baseline"]);
+  const format = (...args) => run(process.execPath, [FORMATTER, ...args, "--files", file], { cwd: repo });
+
+  write(file, baseline.replace("int  b=2;", "int  b=22;"));
+  requireStatus(format(), 3, "member format");
+  let lines = fs.readFileSync(file, "utf8").split("\n");
+  assert.ok(lines.includes("    void edited() {") && lines.includes("        int b = 22;"),
+    "the whole member holding the change is formatted, its untouched signature included");
+  for (const line of untouched) assert.ok(lines.includes(line), "a line outside the changed member keeps its bytes: " + line);
+
+  write(file, baseline.replace("class Region {", "class Region  {"));
+  requireStatus(format(), 3, "header format");
+  lines = fs.readFileSync(file, "utf8").split("\n");
+  assert.ok(lines.includes("class Region {"), "the changed header line is formatted");
+  for (const line of [...untouched, "    void edited( ) {"]) {
+    assert.ok(lines.includes(line), "a header change does not reach the members: " + line);
+  }
+
+  write(file, baseline);
+  requireStatus(format(), 0, "unchanged file");
+  assert.equal(fs.readFileSync(file, "utf8"), baseline, "a file without changes against the base keeps its bytes");
+
+  write(file, baseline.replace("int  b=2;", "int  b=22;"));
+  git(repo, ["commit", "-qam", "unformatted change"]);
+  const committed = fs.readFileSync(file, "utf8");
+  requireStatus(format(), 0, "committed change against HEAD");
+  assert.equal(fs.readFileSync(file, "utf8"), committed, "HEAD is the default base, so committed lines are not reformatted");
+  requireStatus(format("--base", "HEAD~1"), 3, "committed change against --base");
+  assert.ok(fs.readFileSync(file, "utf8").includes("        int b = 22;"), "--base widens the change to earlier commits");
+  requireStatus(format("--base", "no-such-revision"), 1, "unknown base");
+}
+
+// Every path --files names is taken or refused by name; none is dropped, since a
+// dropped path would be reported formatted or checked when nothing looked at it.
+function runExplicitScopeContract(temporaryDir) {
+  const repo = path.join(temporaryDir, "explicit-repo");
+  fs.mkdirSync(repo, { recursive: true });
+  git(repo, ["init", "-q"]);
+  const nested = path.join(repo, "module", "Nested.java");
+  write(nested, "class Nested { void nested( ) { } }\n");
+  write(path.join(repo, "notes.txt"), "not Java\n");
+  write(path.join(repo, "src", "test", "java", "NestedTest.java"), "class NestedTest { }\n");
+  write(path.join(temporaryDir, "Outside.java"), "class Outside { }\n");
+  const refused = (label, files, named) => {
+    const result = run(process.execPath, [FORMATTER, "--files", ...files], { cwd: repo });
+    requireStatus(result, 1, label);
+    assert.match(result.stderr, new RegExp(named.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), label + " names " + named);
+  };
+  refused("missing path", ["module/Missing.java"], "module/Missing.java");
+  refused("non-Java path", ["notes.txt"], "notes.txt");
+  refused("path outside the repository", ["../Outside.java"], "../Outside.java");
+  refused("test source without --include-tests", ["src/test/java/NestedTest.java"], "src/test/java/NestedTest.java");
+  refused("one bad path refuses the batch", ["module/Nested.java", "module/Missing.java"], "module/Missing.java");
+  assert.match(fs.readFileSync(nested, "utf8"), /nested\( \)/, "a refused batch writes nothing");
+
+  const relative = run(process.execPath, [FORMATTER, "--files", "Nested.java"], { cwd: path.dirname(nested) });
+  requireStatus(relative, 3, "path relative to the working directory");
+  assert.match(fs.readFileSync(nested, "utf8"), /void nested\(\) \{/);
 }
 
 function hookRun(repo, stateRoot, label, extraEnv = {}) {
@@ -360,6 +451,9 @@ function runHookScopeContract(temporaryDir) {
   requireStatus(check, 0, "explicit Stop check");
   assert.equal(JSON.parse(check.stdout).decision, "block");
   assert.equal(fs.readFileSync(owned, "utf8"), ownedBytes, "explicit Stop check is read-only");
+  const missing = run(process.execPath, [HOOK, "--files", "Missing.java"], { cwd: worktree, input: "{}" });
+  requireStatus(missing, 0, "Stop check of a missing path");
+  assert.equal(JSON.parse(missing.stdout).decision, "block", "a Stop check of a path it cannot take blocks instead of passing");
   assert.deepEqual(fs.readFileSync(taskIndexPath), taskIndexBefore, "worktree Stop must not stage files");
   assert.equal(fs.readFileSync(peer, "utf8"), newerBytes, "worktree check must not write the main checkout");
   requireStatus(run(process.execPath, [FORMATTER, "--check", "--files", owned], { cwd: worktree }), 3, "read-only formatter");
@@ -412,6 +506,8 @@ try {
   runShapeContracts(temporaryDir);
   runChangedFileContract(temporaryDir);
   runSourceScopeContract(temporaryDir);
+  runChangedRegionContract(temporaryDir);
+  runExplicitScopeContract(temporaryDir);
   runHookScopeContract(temporaryDir);
   runRationaleToolingContract(temporaryDir);
   process.stdout.write("Portable Java formatter contract OK\n");

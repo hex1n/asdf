@@ -27,9 +27,20 @@ Direct invocation without --files retains the legacy whole-changed-set behavior;
 use it only when that complete set belongs to the task. The automatic Stop hook
 never selects this behavior.
 
+Within each file only the changed code is formatted: the lines that differ from
+HEAD, or from --base <rev>, widened to the outermost method, field, or
+initializer they touch, together with the blank lines and comments between it
+and its neighbours. A change outside every member formats only its own lines, a
+file the base does not contain is formatted whole, and a file without changes
+is left alone. The formatter refuses to write a file when a byte outside those
+regions would change.
+
 The formatter exits 3 when it changed files, or when --check detects required
 formatting; 0 means no changes, 1 means execution failed. --check never writes
-source. An empty --files list is an error. Production Java is the default scope;
+source. An empty --files list is an error, and so is any named path that does
+not exist, is not Java, lies outside the repository, or is a test source
+without --include-tests; the error names each such path and nothing is written.
+Relative paths resolve against the working directory. Production Java is the default scope;
 --include-tests admits explicitly requested test files.
 
 Stop optionally accepts --files <paths> for read-only format checks and reports
@@ -38,7 +49,9 @@ runs the existing rationale/repository checks, so another task's Java changes or
 a formatter upgrade cannot create unsolicited source changes. Old observation
 cache files are unused and may remain on disk.
 
-Requirements: Node.js 18+, JDK 8+, Maven 3.6+, and Git.
+Requirements: Node.js 18+, JDK 8+, Maven 3.6+, and Git. Maven builds
+target/java-formatter.jar on first use and again whenever pom.xml or the Java
+sources change by content; every other run starts the jar directly.
 
 Commands:
 

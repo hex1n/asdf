@@ -19,7 +19,7 @@ const ASSET_SPECS = [
   { name: "rationale-records", source: ["skills", "rationale-records"], install: [".agents", "skills", "rationale-records"] },
 ];
 const MANAGED_FRAGMENT = ".agents/tools/java-formatter/run-agent-hook.mjs";
-const STATUS = "Formatting changed production Java and checking local rationale/repository gates";
+const STATUS = "Checking local rationale and repository gates";
 
 function hookHandler(runtime, platform = process.platform) {
   const command = 'node "$HOME/.agents/tools/java-formatter/run-agent-hook.mjs"';

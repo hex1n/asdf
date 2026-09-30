@@ -88,6 +88,22 @@ Every test is an oracle: it goes red for the real reason.
 - **Design assertions from how the code goes wrong:** after writing one,
   substitute the most plausible wrong implementation and confirm the test goes
   red.
+- **Assert behavior, not implementation:** a test that a behavior-preserving
+  refactor would break is rewritten at the owning boundary before it lands.
+  A detail is asserted when it is itself the contract: call order a caller
+  observes, or a user-facing key, byte, or path a source check guards most
+  cheaply. An existing test that resembles implementation stays until the
+  contract it fails to guard is named.
+- **One contract, one owning test** at the strongest boundary; another layer
+  earns a test only for a risk the owner cannot reach, such as transport or
+  lifecycle. Extend the owner's table case or shared fixture instead of adding
+  a near-duplicate, and merge the setup the change duplicates.
+- **Test through the production boundary:** a test the change adds or edits
+  that needs an export, flag, wrapper, or hook no production caller uses moves
+  to the boundary production calls; an existing test on such a seam stays
+  until a change touches it. A self-test entry or export that a tool documents
+  as its contract surface is itself a production boundary. Production code the
+  change leaves with only test callers is deleted with those tests.
 - **Fixtures start from a real sample** when the project has a real data
   source: before deriving expected values, survey that source for the target
   shape (existence, count, distribution), pick one real sample, and take its

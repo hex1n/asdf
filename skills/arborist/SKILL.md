@@ -32,7 +32,7 @@ Before editing, identify:
 
 - the observable outcome the user wants;
 - affected behavior that must remain true;
-- any requested structural improvement;
+- the relevant business objects, relationships and rule owners, including requested structural improvements;
 - evidence that distinguishes success from a plausible wrong result.
 
 Separate requirements from characterization of existing behavior. Agreement
@@ -41,8 +41,10 @@ can be an oracle for preservation; a bug fix needs an expectation independent of
 the defect. When an exact answer is unavailable, use a justified invariant,
 comparison, replay, or relationship between inputs and outputs.
 
-Account for guards, errors, and effects that will be removed, narrowed, merged,
-or relocated. Establish which obligation each serves before changing it.
+Account for guards, errors, and effects that will be added, removed, narrowed,
+merged, or relocated. Establish each obligation and its owner before the edit.
+Use source-established invariants; an added defense needs a reachable failure
+that the owning boundary does not already exclude.
 Investigate technical unknowns directly. Ask only for missing user-owned intent
 or authority decisions, and continue work that does not depend on the answer.
 
@@ -78,19 +80,43 @@ deliverable. Identify the actual source of complexity: duplicated decisions,
 coordinated edits, implicit state, mixed responsibilities, unnecessary indirection,
 or misleading domain concepts.
 
+Shape the implementation around the business concepts, rules and relationships
+that explain the requested behavior. Choose a representation suited to the
+problem: a flow can expose meaningful order, a state model can express lifecycle
+constraints, and a relation can express scope or membership. Use the existing
+representation when it already makes the relevant meaning clear.
+
+Develop this understanding and the code together. Where a design choice is
+unclear, refine a business-level sketch or a thin implementation until the
+responsibilities and dependencies can be explained. Adapt reused mechanisms to
+confirmed intent; revise assumptions when implementation supplies contrary
+evidence. Keep logical dependencies distinct from physical execution, choosing
+call boundaries, materialization and scheduling for ownership, validity and cost.
+One expression or query may preserve the relevant business relationships.
+
+For repeated data access, derive acquisition and reuse from what keys determine
+a result, which consumers share it, and what can invalidate it. Batch or reuse
+within that validity scope; repeat a read or check when a relevant change can
+alter the next decision. Preserve required observation points and distinguish
+what an observation proves from what the effect boundary must enforce.
+
 Use these criteria to shape the implementation:
 
 - **One rule owner.** Each business decision has one authoritative home. Callers
-  use that decision without reproducing its conditions.
+  use its result without reproducing its conditions or reconstructing the
+  decision from raw data.
 - **Deep modules.** A module hides substantial coherent complexity behind a
-  small interface. The interface includes everything callers must know: errors,
-  ordering, state, configuration, and performance obligations as well as signatures.
+  small interface. Group decisions that must change together; hide representation
+  and policy choices from callers. Processing order alone does not determine
+  module boundaries. Expose required errors, ordering, state, configuration,
+  and performance obligations.
 - **Clear dependencies.** Dependencies lead toward the owner of a decision.
   Adapters translate external representations and effects at that boundary.
 - **Justified seams.** A seam is a replaceable boundary. Add one for demonstrated
   variation, isolation, or a migration need; collapse it when that need expires.
-- **Direct expression.** Use domain names, readable control flow, and explicit
-  effects. Remove duplication and indirection that add no useful distinction.
+- **State ownership.** Distinguish authoritative facts from derived results and
+  execution bookkeeping. Retained state has an owner, a required lifetime, and
+  a reason to store rather than recompute it.
 
 Judge a design by how much callers must understand, how many places a rule change
 touches, and whether behavior can be tested through the relevant interface.
@@ -108,6 +134,14 @@ read its [transition section](references/REFACTORING.md#choose-the-transition).
 Choose a slice with an observable result that can be verified. Distinguish
 behavior-preserving movement from intentional changes to semantics. Keep
 intermediate states valid for the callers and data that can encounter them.
+
+Read the changed code as an explanation of the requested behavior. Check that
+its governing rules and relationships are visible where they are owned. For a
+required scope or prerequisite, locate how it is established and what consumes
+or relies on it. Reshape meaning carried only by names or comments. Where work
+repeats, follow helpers and loops on effectful and no-effect paths; relate keys,
+sharing scope, validity and execution counts to input growth. Preparation or
+preview alone cannot establish the effectful path's structure or cost.
 
 Run focused verification and inspect the diff after each meaningful slice.
 If a new affected path or contract appears, update the scope and design before
@@ -128,9 +162,9 @@ the affected behavior; the following are options, not a universal checklist:
 | Compatibility | Old and new callers, payloads, and stored data, including reachable mixed states |
 | Retry and idempotency | Repeated execution and failures around effects; observe duplicates or omissions |
 | Concurrency | Controlled interleavings that can expose the suspected race |
-| Performance | Representative work, resource or operation counts, and required thresholds |
+| Performance | The slice's operation counts and retained state at representative scale, plus measured workloads and required thresholds |
 | Operations | Actionable diagnostics and demonstrated recovery at the affected boundary |
-| Structure | Rule ownership, caller knowledge, dependency direction, and obsolete path removal |
+| Structure | Business rules and relationships recognizable in executable structure; rule ownership, state lifetime, caller knowledge and obsolete path removal |
 
 Discover the repository's actual commands and test entry points. Confirm the
 relevant tests execute and observe the claimed result. For new or changed tests,
@@ -184,7 +218,11 @@ finding against the repair; otherwise repair them as independent defects.
 ## Close the requested outcomes
 
 Before reporting completion, check that the requested behavior has evidence,
-affected preserved contracts hold, and requested structural gains are observable.
+affected preserved contracts hold, and the representative case reaches the
+intended decisions and effects. Judge behavior, structure, and cost separately
+using the relevant evidence above; equivalent results alone establish neither structural
+fit nor acceptable cost. Correct unexplained mismatches within scope, or report
+the remaining mismatch and its consequence.
 When review is required, acceptance also needs a completed review whose evidence
 applies to the final material revision, with every finding dispositioned. If that
 review is pending or blocked, report implementation and local verification

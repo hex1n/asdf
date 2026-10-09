@@ -8,7 +8,7 @@ short process in `SKILL.md` is not enough.
 - Localized Request and Output Rules: localized routing signals, examples, and labels
 - Problem Archaeology: root trace, problem statement, assumption audit
 - Value Gate and Decision Envelope: mechanism families, economic evidence, envelope schema
-- Solution Reconstruction: option categories, independent context, independent option tournament, inversion test, recommendation chain
+- Solution Reconstruction: business operation model, option categories, independent context, independent option tournament, inversion test, recommendation chain
 - Bestness Check: fit criteria, closest alternative, stop point
 - Plan Synthesis: scope table, decision pricing, decision-first structure
 - Evidence Conventions: verified evidence, derived conclusions, and unverified premises
@@ -117,6 +117,21 @@ Phase gate: if an assumption can change the root problem or eliminate the
 recommended approach, verify it before solution design, or ask one focused
 question with a recommended default.
 
+### Constraint Provenance
+
+Separate the required outcome, the domain facts it relies on, and the proposed
+system behavior. Explain how the latter two establish the outcome. Facts about
+the environment are assumptions to verify, not guarantees created by the design.
+
+Establish what the current request holds fixed and what it opens for selection.
+A source document may mix requirements, confirmed choices, and proposals. For a
+mechanism that decides the recommendation, trace the user's choice or governing
+contract rather than inheriting the document's label. Preserve what the user
+actually confirmed, including agent proposals, at its original scope and
+conditions. Compare complete alternatives for choices still open. Where
+authority remains unclear, give conditional recommendations with the deciding
+assumption visible instead of silently eliminating an alternative.
+
 ## Value Gate And Decision Envelope
 
 Runs after the constraint split, before options are reconstructed or any
@@ -194,10 +209,38 @@ containment usually resolves to `BUILD`.
 
 ## Solution Reconstruction
 
+### Business Operation Model
+
+Translate the required outcome into operations over the relevant business
+objects and relationships. For each consequential operation, identify its input
+scope, the rule it owns, the result it establishes, and the outcome or downstream
+operation that uses that result. Derive dependencies from these inputs and
+results; identify which conditions permit an effect and which require it.
+
+Keep this model small enough to guide implementation directly; an inline sketch
+usually suffices. Use domain facts, task lifetime and scale to explain the
+required responsibilities. Choose representations and mechanisms afterward.
+If implementation exposes a missing relationship or infeasible assumption,
+revise the model and its affected operations together while preserving confirmed
+requirements. The model is ready when its operations explain the outcome and
+each has a business reason; technical components remain choices to compare.
+
 ### Option Categories
 
-Enumerate at least two fundamentally different approaches when possible.
-Differences must be in mechanism or responsibility allocation, not just params.
+Construct the simplest complete allocation of the business operations to
+available capabilities, even when building is already decided. Walk normal work,
+relevant failure, and completion through it. Keep the same required outcomes, domain
+assumptions, and operating conditions when comparing alternatives; stronger
+guarantees are additional scope, not grounds for rejecting a sufficient path.
+
+Distinct concepts or lifetimes justify separate storage or services only through
+their consumers and operations. For added state or coordination, identify the
+required outcome, operating limit, or cost target that would fail without it,
+then compare ways to close that gap. Distinguish facts that must survive from
+information that can be derived again; justify retaining the latter by its cost
+or use. Lifecycle and accepted human involvement determine how long
+responsibilities persist. Include work transferred to callers or operators when
+comparing costs; preserve required guarantees whichever allocation wins.
 
 For each approach:
 
@@ -228,8 +271,9 @@ judge favors its own prior unless the rubric is fixed before any draft exists.
 
 1. **Prepare in the main context**: finish the root trace and constraint
    split; write the problem statement and the full constraint split (true
-   constraints, conventions, unverified assumptions). Drafters start with no
-   other context — step 4 lists everything they receive.
+   constraints, conventions, unverified assumptions, and the business shape
+   when the plan builds a mechanism). Drafters start with no other context —
+   step 4 lists everything they receive.
 2. **Pre-register the rubric**: write the Bestness Check fit criteria before
    any draft exists. They are the judging rubric and stay fixed.
 3. **Assign mechanism families**: enumerate fundamentally different mechanism
@@ -326,6 +370,7 @@ For Plan mode, make the plan specific enough to price and falsify the
 decision:
 
 - What changes, including likely files/modules when known
+- How the business operations map to responsibilities, flow and state lifetime, preserving input/result dependencies through physical execution choices
 - Effort ranges tied to identifiable work and explicit assumptions; mark unknowns instead of inventing numerical precision
 - Code examples only when the mechanism is non-obvious
 
